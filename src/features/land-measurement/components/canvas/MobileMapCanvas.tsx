@@ -9,6 +9,7 @@ import { getDirectionalContainingPlot } from '../../utils/directionalPlot';
 import { splitPolygonByPolyline } from '../../utils/polygonDivision';
 import { formatFeetInches } from '../../utils/canvas';
 import { getPolygonAreaLabelLayout } from '../../utils/polygon-label';
+import { getReadableRotation } from '../../utils/component-helpers';
 import type { Point } from '../../types/map';
 import { toBengaliDigits } from '../../../../lib/utils';
 import { Fonts } from '../../../../constants/typography';
@@ -19,6 +20,72 @@ const pointString = (points: Point[]) => points.map((point) => `${point.x},${poi
 const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 
+type BadgeProps = {
+  x: number;
+  y: number;
+  text: string;
+  stageScale: number;
+  color: string;
+  rotation?: number;
+  compact?: boolean;
+};
+
+function SvgBadge({ x, y, text, stageScale, color, rotation = 0, compact = false }: BadgeProps) {
+  const safeScale = Math.max(stageScale, 0.01);
+  const fontSize = (compact ? 10 : 11.5) / safeScale;
+  const height = (compact ? 19 : 23) / safeScale;
+  const screenWidth = Math.max(compact ? 42 : 58, text.length * (compact ? 5.7 : 6.6) + 14);
+  const width = screenWidth / safeScale;
+
+  return (
+    <G transform={`translate(${x} ${y}) rotate(${getReadableRotation(rotation)})`}>
+      <Rect
+        x={-width / 2}
+        y={-height / 2}
+        width={width}
+        height={height}
+        rx={5 / safeScale}
+        fill={color}
+        fillOpacity={0.94}
+        stroke='#ffffff'
+        strokeOpacity={0.22}
+        strokeWidth={0.8 / safeScale}
+      />
+      <SvgText
+        x={0}
+        y={fontSize * 0.34}
+        fill='#ffffff'
+        fontFamily={Fonts.headingBold}
+        fontSize={fontSize}
+        fontWeight='700'
+        textAnchor='middle'
+      >
+        {text}
+      </SvgText>
+    </G>
+  );
+}
+
+function SvgOutlinedText({ x, y, text, stageScale, color, rotation = 0 }: BadgeProps) {
+  const safeScale = Math.max(stageScale, 0.01);
+  const fontSize = 11.5 / safeScale;
+  const common = {
+    x: 0,
+    y: fontSize * 0.34,
+    fontFamily: Fonts.headingBold,
+    fontSize,
+    fontWeight: '700' as const,
+    textAnchor: 'middle' as const,
+  };
+
+  return (
+    <G transform={`translate(${x} ${y}) rotate(${getReadableRotation(rotation)})`}>
+      <SvgText {...common} fill={color} stroke={color} strokeWidth={3.6 / safeScale} strokeLinejoin='round'>{text}</SvgText>
+      <SvgText {...common} fill='#ffffff'>{text}</SvgText>
+    </G>
+  );
+}
+
 export function MobileMapCanvas() {
   const state = useMapStore();
   const {
@@ -26,6 +93,7 @@ export function MobileMapCanvas() {
     isShowDiagonals, isMagnifierEnabled, manualDividePlotId, manualCutLine,
   } = state;
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
+  const contentGroupRef = useRef<React.ElementRef<typeof G> | null>(null);
   const fitScaleRef = useRef(1);
   const transformRef = useRef({ scale: stageScale, pos: stagePos });
   const panStartRef = useRef<Point>({ x: 0, y: 0 });
@@ -40,10 +108,17 @@ export function MobileMapCanvas() {
     height: Math.max(1, mapImage?.height ?? 900),
   }), [mapImage?.height, mapImage?.width]);
 
-  const commitTransform = useCallback((next: { scale: number; pos: Point }) => {
+  const applyNativeTransform = useCallback((next: { scale: number; pos: Point }) => {
     transformRef.current = next;
-    useMapStore.getState().setStageTransform(next);
+    contentGroupRef.current?.setNativeProps({
+      transform: `translate(${next.pos.x} ${next.pos.y}) scale(${next.scale})`,
+    });
   }, []);
+
+  const commitTransform = useCallback((next: { scale: number; pos: Point }) => {
+    applyNativeTransform(next);
+    useMapStore.getState().setStageTransform(next);
+  }, [applyNativeTransform]);
 
   const resetView = useCallback(() => {
     if (!viewport.width || !viewport.height) return;
@@ -122,7 +197,7 @@ export function MobileMapCanvas() {
         const min = Math.max(fitScaleRef.current * 0.5, 0.02);
         const nextScale = Math.max(min, Math.min(fitScaleRef.current * 12, initial.scale * nextDistance / initial.distance));
         const ratio = nextScale / initial.scale;
-        commitTransform({ scale: nextScale, pos: { x: center.x - (initial.center.x - initial.pos.x) * ratio, y: center.y - (initial.center.y - initial.pos.y) * ratio } });
+        applyNativeTransform({ scale: nextScale, pos: { x: center.x - (initial.center.x - initial.pos.x) * ratio, y: center.y - (initial.center.y - initial.pos.y) * ratio } });
         return;
       }
       if (didPinchRef.current) return;
@@ -130,20 +205,28 @@ export function MobileMapCanvas() {
         useMapStore.getState().moveManualCutAnchor(draggingAnchorRef.current, screenToCanvas({ x: event.nativeEvent.locationX, y: event.nativeEvent.locationY }));
         return;
       }
-      commitTransform({ scale: transformRef.current.scale, pos: { x: panStartRef.current.x + gesture.dx, y: panStartRef.current.y + gesture.dy } });
+      applyNativeTransform({ scale: transformRef.current.scale, pos: { x: panStartRef.current.x + gesture.dx, y: panStartRef.current.y + gesture.dy } });
     },
     onPanResponderRelease: (event, gesture) => {
       const wasDragging = draggingAnchorRef.current !== null;
       draggingAnchorRef.current = null;
       pinchRef.current = null;
-      if (didPinchRef.current || wasDragging || Math.hypot(gesture.dx, gesture.dy) > 8) return;
+      if (didPinchRef.current || Math.hypot(gesture.dx, gesture.dy) > 8) {
+        commitTransform(transformRef.current);
+        return;
+      }
+      if (wasDragging) return;
       const current = useMapStore.getState();
       if (current.mode === 'manual_divide_plot' && !current.manualDividePlotId) {
         current.selectPlotForDivide(screenToCanvas({ x: event.nativeEvent.locationX, y: event.nativeEvent.locationY }));
       }
     },
-    onPanResponderTerminate: () => { draggingAnchorRef.current = null; pinchRef.current = null; },
-  }), [commitTransform, findAnchor, screenToCanvas]);
+    onPanResponderTerminate: () => {
+      draggingAnchorRef.current = null;
+      pinchRef.current = null;
+      commitTransform(transformRef.current);
+    },
+  }), [applyNativeTransform, commitTransform, findAnchor, screenToCanvas]);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -165,11 +248,6 @@ export function MobileMapCanvas() {
     }
     return target;
   }, [centerRaw, mode, plotPoints, plots, stageScale]);
-
-  const liveResults = useMemo(() => {
-    if (!scale || plotPoints.length < 2 || mode !== 'drawing_plot') return null;
-    return calculatePolygonData([...plotPoints, liveTarget], scale);
-  }, [liveTarget, mode, plotPoints, scale]);
 
   const selectedPlot = plots.find((plot) => plot.id === manualDividePlotId) ?? null;
   const splitPreview = useMemo(() => {
@@ -198,7 +276,7 @@ export function MobileMapCanvas() {
       {viewport.width > 0 && viewport.height > 0 && (
         <Svg width={viewport.width} height={viewport.height}>
           <Rect width={viewport.width} height={viewport.height} fill='#090d16' />
-          <G transform={`translate(${stagePos.x} ${stagePos.y}) scale(${stageScale})`}>
+          <G ref={contentGroupRef} transform={`translate(${stagePos.x} ${stagePos.y}) scale(${stageScale})`}>
             {mapImage && <SvgImage href={{ uri: mapImage.uri }} x={0} y={0} width={contentSize.width} height={contentSize.height} preserveAspectRatio='none' />}
 
             {plots.map((plot) => {
@@ -212,16 +290,17 @@ export function MobileMapCanvas() {
                     const last = group[group.length - 1].nextPoint;
                     const mid = midpoint(first, last);
                     const lengthFt = group.reduce((sum, segment) => sum + segment.distPx / (scale ?? 1), 0);
-                    return <SvgText key={`${plot.id}-side-${index}`} x={mid.x} y={mid.y - 8 / stageScale} fill='#fff' stroke='#0f172a' strokeWidth={1.4 / stageScale} fontSize={11 / stageScale} textAnchor='middle'>{formatFeetInches(lengthFt)}</SvgText>;
+                    return <SvgOutlinedText key={`${plot.id}-side-${index}`} x={mid.x} y={mid.y} text={formatFeetInches(lengthFt)} stageScale={stageScale} color={plot.color ?? '#0f766e'} rotation={group[0].angle} />;
                   })}
                   {isShowDiagonals && plot.results.diagonals?.map((diagonal, index) => {
                     const start = plot.points[diagonal.p1Index];
                     const end = plot.points[diagonal.p2Index];
                     if (!start || !end) return null;
                     const mid = midpoint(start, end);
-                    return <G key={`${plot.id}-diag-${index}`}><Line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke='#a78bfa' strokeWidth={1.3 / stageScale} strokeDasharray={`${5 / stageScale},${4 / stageScale}`} /><SvgText x={mid.x} y={mid.y - 5 / stageScale} fill='#ddd6fe' fontSize={10 / stageScale} textAnchor='middle'>{formatFeetInches(diagonal.lengthFt)}</SvgText></G>;
+                    const angle = Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
+                    return <G key={`${plot.id}-diag-${index}`}><Line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke='#8b5cf6' strokeWidth={1.3 / stageScale} strokeDasharray={`${5 / stageScale},${4 / stageScale}`} /><SvgOutlinedText x={mid.x} y={mid.y} text={formatFeetInches(diagonal.lengthFt)} stageScale={stageScale} color='#6d28d9' rotation={angle} /></G>;
                   })}
-                  <SvgText x={label.center.x} y={label.center.y} fill='#fff' stroke='#0f172a' strokeWidth={1.8 / stageScale} fontSize={13 / stageScale} fontWeight='700' textAnchor='middle' transform={`rotate(${label.rotation} ${label.center.x} ${label.center.y})`}>{toBengaliDigits(plot.results.shotok.toFixed(3))} শতক</SvgText>
+                  <SvgBadge x={label.center.x} y={label.center.y} text={`${toBengaliDigits(plot.results.shotok.toFixed(3))} শতক`} stageScale={stageScale} color={plot.color ?? '#0f766e'} rotation={label.rotation} />
                 </G>
               );
             })}
@@ -232,7 +311,7 @@ export function MobileMapCanvas() {
                 <Polygon points={pointString(splitPreview.poly2)} fill='#2563eb' fillOpacity={0.26} stroke='#60a5fa' strokeWidth={2 / stageScale} />
                 {[{ points: splitPreview.poly1, value: splitPreview.resultA?.shotok }, { points: splitPreview.poly2, value: splitPreview.resultB?.shotok }].map((part, index) => {
                   const label = getPolygonAreaLabelLayout(part.points);
-                  return <SvgText key={`split-label-${index}`} x={label.center.x} y={label.center.y} fill='#fff' stroke='#0f172a' strokeWidth={1.8 / stageScale} fontSize={12 / stageScale} fontWeight='700' textAnchor='middle'>{part.value ? `${toBengaliDigits(part.value.toFixed(3))} শতক` : ''}</SvgText>;
+                  return part.value ? <SvgBadge key={`split-label-${index}`} x={label.center.x} y={label.center.y} text={`${toBengaliDigits(part.value.toFixed(3))} শতক`} stageScale={stageScale} color={index === 0 ? '#15803d' : '#1d4ed8'} rotation={label.rotation} /> : null;
                 })}
               </G>
             )}
@@ -244,9 +323,11 @@ export function MobileMapCanvas() {
                 {plotPoints.map((point, index) => <Circle key={`point-${index}`} cx={point.x} cy={point.y} r={(index === 0 ? 7 : 5) / stageScale} fill={index === 0 ? '#f97316' : '#fff'} stroke='#2563eb' strokeWidth={2 / stageScale} />)}
                 {[...plotPoints, liveTarget].slice(0, -1).map((point, index) => {
                   const next = [...plotPoints, liveTarget][index + 1];
-                  return <SvgText key={`live-side-${index}`} x={(point.x + next.x) / 2} y={(point.y + next.y) / 2 - 10 / stageScale} fill='#fff' stroke='#0f172a' strokeWidth={1.5 / stageScale} fontSize={11 / stageScale} textAnchor='middle'>{scale ? formatFeetInches(distance(point, next) / scale) : ''}</SvgText>;
+                  const lengthFt = scale ? distance(point, next) / scale : 0;
+                  if (lengthFt < 1) return null;
+                  const angle = Math.atan2(next.y - point.y, next.x - point.x) * 180 / Math.PI;
+                  return <SvgOutlinedText key={`live-side-${index}`} x={(point.x + next.x) / 2} y={(point.y + next.y) / 2} text={formatFeetInches(lengthFt)} stageScale={stageScale} color='#2563eb' rotation={angle} />;
                 })}
-                {liveResults && <SvgText x={liveTarget.x} y={liveTarget.y + 24 / stageScale} fill='#86efac' stroke='#0f172a' strokeWidth={1.4 / stageScale} fontSize={11 / stageScale} textAnchor='middle'>{toBengaliDigits(liveResults.shotok.toFixed(3))} শতক</SvgText>}
               </G>
             )}
 
@@ -261,7 +342,20 @@ export function MobileMapCanvas() {
             {manualCutLine && <G><Polyline points={pointString(manualCutLine)} fill='none' stroke='#ef4444' strokeWidth={3 / stageScale} strokeDasharray={`${8 / stageScale},${5 / stageScale}`} />{manualCutLine.map((point, index) => <Circle key={`cut-${index}`} cx={point.x} cy={point.y} r={7 / stageScale} fill={index === 0 || index === manualCutLine.length - 1 ? '#ef4444' : '#fff'} stroke='#7f1d1d' strokeWidth={2 / stageScale} />)}</G>}
           </G>
 
-          {(mode === 'drawing_plot' || mode === 'calibrating') && <G><Circle cx={viewport.width / 2} cy={viewport.height / 2} r={isMagnifierEnabled ? 25 : 14} fill='rgba(15,23,42,0.16)' stroke={mode === 'calibrating' ? '#f59e0b' : '#22c55e'} strokeWidth={1.5} /><Line x1={viewport.width / 2 - 22} y1={viewport.height / 2} x2={viewport.width / 2 + 22} y2={viewport.height / 2} stroke='#fff' strokeWidth={1.4} /><Line x1={viewport.width / 2} y1={viewport.height / 2 - 22} x2={viewport.width / 2} y2={viewport.height / 2 + 22} stroke='#fff' strokeWidth={1.4} /><Circle cx={viewport.width / 2} cy={viewport.height / 2} r={3} fill={mode === 'calibrating' ? '#f59e0b' : '#22c55e'} /></G>}
+          {(mode === 'drawing_plot' || mode === 'calibrating') && (
+            <G>
+              {isMagnifierEnabled && <Circle cx={viewport.width / 2} cy={viewport.height / 2} r={18} fill='rgba(255,255,255,0.08)' stroke='#ef4444' strokeOpacity={0.5} strokeWidth={1} />}
+              <Line x1={viewport.width / 2 - 13} y1={viewport.height / 2} x2={viewport.width / 2 - 3} y2={viewport.height / 2} stroke='#ffffff' strokeWidth={3.5} strokeOpacity={0.8} />
+              <Line x1={viewport.width / 2 + 3} y1={viewport.height / 2} x2={viewport.width / 2 + 13} y2={viewport.height / 2} stroke='#ffffff' strokeWidth={3.5} strokeOpacity={0.8} />
+              <Line x1={viewport.width / 2} y1={viewport.height / 2 - 13} x2={viewport.width / 2} y2={viewport.height / 2 - 3} stroke='#ffffff' strokeWidth={3.5} strokeOpacity={0.8} />
+              <Line x1={viewport.width / 2} y1={viewport.height / 2 + 3} x2={viewport.width / 2} y2={viewport.height / 2 + 13} stroke='#ffffff' strokeWidth={3.5} strokeOpacity={0.8} />
+              <Line x1={viewport.width / 2 - 13} y1={viewport.height / 2} x2={viewport.width / 2 - 3} y2={viewport.height / 2} stroke='#ef4444' strokeWidth={1.5} />
+              <Line x1={viewport.width / 2 + 3} y1={viewport.height / 2} x2={viewport.width / 2 + 13} y2={viewport.height / 2} stroke='#ef4444' strokeWidth={1.5} />
+              <Line x1={viewport.width / 2} y1={viewport.height / 2 - 13} x2={viewport.width / 2} y2={viewport.height / 2 - 3} stroke='#ef4444' strokeWidth={1.5} />
+              <Line x1={viewport.width / 2} y1={viewport.height / 2 + 3} x2={viewport.width / 2} y2={viewport.height / 2 + 13} stroke='#ef4444' strokeWidth={1.5} />
+              <Circle cx={viewport.width / 2} cy={viewport.height / 2} r={2} fill='#ef4444' />
+            </G>
+          )}
         </Svg>
       )}
 
