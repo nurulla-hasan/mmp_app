@@ -103,14 +103,10 @@ export const Input: React.FC<InputProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
     marginBottom: 10,
     width: '100%',
   },
   label: {
-    fontSize: 13,
-    fontFamily: Fonts.headingSemiBold,
-    marginBottom: 6,
     fontSize: 11.5,
     fontFamily: Fonts.sansMedium,
     marginBottom: 3,
@@ -118,47 +114,33 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.2,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 48,
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 9,
     height: 38,
   },
   leftIconContainer: {
-    marginRight: 8,
     marginRight: 6,
   },
   textInput: {
     flex: 1,
     height: '100%',
-    fontSize: 14,
-    fontFamily: Fonts.sansMedium,
     fontSize: 12.5,
     fontFamily: Fonts.sansRegular,
   },
   rightIconBtn: {
-    padding: 4,
-    marginLeft: 6,
     padding: 2,
     marginLeft: 4,
   },
   errorText: {
     color: '#ef4444',
-    fontSize: 12,
-    fontFamily: Fonts.sansMedium,
-    marginTop: 4,
     fontSize: 10.5,
     fontFamily: Fonts.sansRegular,
     marginTop: 2,
   },
   helperText: {
-    fontSize: 12,
     fontSize: 10.5,
     fontFamily: Fonts.sansRegular,
-    marginTop: 4,
     marginTop: 2,
   },
 });

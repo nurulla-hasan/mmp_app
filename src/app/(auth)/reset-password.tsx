@@ -106,7 +106,6 @@ export default function ResetPasswordScreen() {
 
           <View style={styles.header}>
             <View style={styles.iconCircle}>
-              <KeyRound size={36} color='#16a34a' />
               <KeyRound size={24} color='#16a34a' />
             </View>
             <Text style={[styles.title, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
@@ -204,69 +203,43 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   iconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: 'rgba(22, 163, 74, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
     marginBottom: 8,
   },
   title: {
-    fontSize: 24,
     fontSize: 18,
     fontFamily: Fonts.headingBold,
-    marginBottom: 6,
     marginBottom: 4,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 13,
     fontSize: 11,
     fontFamily: Fonts.sansRegular,
     textAlign: 'center',
-    lineHeight: 19,
-    paddingHorizontal: 16,
     lineHeight: 16,
     paddingHorizontal: 12,
   },
   card: {
     borderWidth: 1,
-    borderRadius: 18,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 3,
     borderRadius: 12,
     padding: 16,
     elevation: 1,
   },
   primaryActionBtn: {
     backgroundColor: '#16a34a',
-    height: 48,
-    borderRadius: 12,
     height: 36,
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#16a34a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-    marginTop: 8,
     marginTop: 6,
   },
   primaryActionBtnText: {
     color: '#ffffff',
-    fontSize: 15,
-    fontFamily: Fonts.headingBold,
     fontSize: 12.5,
     fontFamily: Fonts.sansMedium,
   },
