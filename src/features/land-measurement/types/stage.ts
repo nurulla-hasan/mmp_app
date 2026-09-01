@@ -1,7 +1,8 @@
 import type { MapMode, Point, PlotRecord } from './map';
+import type Konva from 'konva';
 
 export type StageBackgroundProps = {
-  image?: any;
+  image: HTMLImageElement | null;
 };
 
 export type StageCalibrationProps = {
@@ -26,7 +27,7 @@ export type StageActivePlotProps = {
   stageScale: number;
   stagePos: Point;
   scale: number | null;
-  handlePointDragEnd: (e: any, i: number) => void;
+  handlePointDragEnd: (e: Konva.KonvaEventObject<DragEvent>, i: number) => void;
   getStageCenterPoint: () => Point;
 };
 

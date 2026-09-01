@@ -13,7 +13,6 @@ const ALLOWED_MAP_TYPES = new Set(['application/pdf', 'image/png', 'image/jpeg']
  * Falls back to 4096 if WebGL is unavailable.
  */
 function detectMaxTextureSize(): number {
-  if (typeof document === 'undefined') return 4096;
   try {
     const canvas = document.createElement('canvas');
     const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
@@ -82,13 +81,13 @@ function downscaleImage(img: HTMLImageElement, maxPx: number): Promise<HTMLImage
 }
 
 export interface ImageState {
-  image: any;
+  image: HTMLImageElement | null;
   /** Full-resolution original image (kept for accurate tile generation). */
-  _originalImage: any;
+  _originalImage: HTMLImageElement | null;
   /** The natural dimensions of the full-resolution image. Used for coordinate system consistency. */
   originalWidth: number;
   originalHeight: number;
-  selectedFile: any;
+  selectedFile: File | null;
   imageName: string;
   isProcessingFile: boolean;
   /** Detected DPI info from PDF (only for PDF imports) */
@@ -104,12 +103,11 @@ export interface ImageState {
 }
 
 export interface ImageActions {
-  setImage: (image: any) => void;
-  setImageUri: (uri: string, width?: number, height?: number) => void;
-  setSelectedFile: (file: any) => void;
+  setImage: (image: HTMLImageElement | null) => void;
+  setSelectedFile: (file: File | null) => void;
   setImageName: (name: string) => void;
-  handleImageUpload: (e: any) => Promise<void>;
-  processFile: (file: any) => Promise<boolean>;
+  handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
+  processFile: (file: File) => Promise<boolean>;
   handleClearFile: () => Promise<void>;
   // Tiling
   buildTilePyramid: () => Promise<void>;
@@ -122,8 +120,8 @@ export const createImageSlice: StateCreator<ImageSlice, [], [], ImageSlice> = (s
   // State
   image: null,
   _originalImage: null,
-  originalWidth: 1200,
-  originalHeight: 900,
+  originalWidth: 0,
+  originalHeight: 0,
   selectedFile: null,
   imageName: 'map.jpg',
   isProcessingFile: false,
@@ -136,14 +134,6 @@ export const createImageSlice: StateCreator<ImageSlice, [], [], ImageSlice> = (s
 
   // Actions
   setImage: (image) => set({ image }),
-  setImageUri: (uri, width = 1200, height = 900) =>
-    set({
-      image: uri,
-      _originalImage: uri,
-      originalWidth: width,
-      originalHeight: height,
-      imageName: 'mouza_map.jpg',
-    }),
   setSelectedFile: (selectedFile) => set({ selectedFile }),
   setImageName: (name) => set({ imageName: name }),
 
@@ -198,14 +188,13 @@ export const createImageSlice: StateCreator<ImageSlice, [], [], ImageSlice> = (s
         // Read once, then process sequentially to avoid two full PDF parses in memory.
         const pdfBuffer = await file.arrayBuffer();
         const dpiInfo = await detectPdfDpi(pdfBuffer);
-        const img: any = await extractImageFromPDF(pdfBuffer);
-        if (!img) return false;
+        const img = await extractImageFromPDF(pdfBuffer);
         // ── Downscale for GPU safety on low-end devices ──
         const safeMax = getSafeMaxDimension();
         let displayImg = img;
-        if (img.naturalWidth && (img.naturalWidth > safeMax || img.naturalHeight > safeMax)) {
+        if (img.naturalWidth > safeMax || img.naturalHeight > safeMax) {
           displayImg = await downscaleImage(img, safeMax);
-          console.info(`📐 PDF image downscaled for GPU safety`);
+          console.info(`📐 PDF image downscaled for GPU safety: ${img.naturalWidth}×${img.naturalHeight} → ${displayImg.naturalWidth}×${displayImg.naturalHeight} (max: ${safeMax})`);
         }
         if (get()._generationId !== generationId) return false;
 
@@ -213,8 +202,8 @@ export const createImageSlice: StateCreator<ImageSlice, [], [], ImageSlice> = (s
           selectedFile: file, 
           image: displayImg, 
           _originalImage: img, 
-          originalWidth: img.naturalWidth || img.width || 1200,
-          originalHeight: img.naturalHeight || img.height || 900,
+          originalWidth: img.naturalWidth,
+          originalHeight: img.naturalHeight,
           pdfDpiInfo: dpiInfo, 
           isProcessingFile: false 
         });

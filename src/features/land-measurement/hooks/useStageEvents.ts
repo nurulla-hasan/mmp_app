@@ -1,15 +1,11 @@
-
+﻿
 import { useRef, useCallback, useLayoutEffect } from "react";
 import type { Point, PinchStart } from "@/features/land-measurement/types/map";
+import type Konva from "konva";
 
 import { useShallow } from 'zustand/shallow';
 import { useMapStore } from "@/features/land-measurement/store/useMapStore";
 import { STAGE_MIN_ZOOM, STAGE_MAX_ZOOM } from "@/features/land-measurement/utils/canvas";
-
-declare namespace Konva {
-  type KonvaEventObject<T = any> = any;
-  type Node = any;
-}
 
 type ClientXY = { clientX: number; clientY: number };
 
