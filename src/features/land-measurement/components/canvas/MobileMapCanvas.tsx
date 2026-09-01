@@ -111,7 +111,7 @@ export function MobileMapCanvas() {
   const applyNativeTransform = useCallback((next: { scale: number; pos: Point }) => {
     transformRef.current = next;
     contentGroupRef.current?.setNativeProps({
-      transform: `translate(${next.pos.x} ${next.pos.y}) scale(${next.scale})`,
+      matrix: [next.scale, 0, 0, next.scale, next.pos.x, next.pos.y],
     });
   }, []);
 
