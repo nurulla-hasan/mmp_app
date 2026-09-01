@@ -35,7 +35,7 @@ export const ActivityCard: React.FC = () => {
               borderColor: isDark ? '#1f2937' : '#e2e8f0',
             },
           ]}
-          onPress={() => router.push('/land-measurement')}
+          onPress={() => router.push('/calculations')}
         >
           <View style={styles.leftCol}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>

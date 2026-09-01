@@ -1,5 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Sparkles,
@@ -14,42 +22,22 @@ import {
   Star,
   FolderKanban,
   ChevronRight,
+  Calculator,
+  Plus,
 } from 'lucide-react-native';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
-
-const SAVED_PLOT_PROJECTS = [
-  {
-    id: '1',
-    name: 'দিনাজপুর সদর জমি (দাগ ৪২৮)',
-    scale: '১৬″ = ১ মাইল',
-    plots: 3,
-    area: '৪২.৭৫ শতাংশ',
-    status: 'সম্পন্ন',
-    statusVariant: 'pro' as const,
-  },
-  {
-    id: '2',
-    name: 'বিরল গ্রামের খতিয়ান প্লট',
-    scale: '৩২″ = ১ মাইল',
-    plots: 2,
-    area: '১৮.৪০ শতাংশ',
-    status: 'খসড়া',
-    statusVariant: 'warning' as const,
-  },
-  {
-    id: '3',
-    name: 'পারিবারিক জমি ভাগ-বাটোয়ারা',
-    scale: '১৬″ = ১ মাইল',
-    plots: 5,
-    area: '৬৫.২০ শতাংশ',
-    status: 'সম্পন্ন',
-    statusVariant: 'pro' as const,
-  },
-];
+import { useAuthStore } from '../../stores/auth-store';
+import { useCalculationStore } from '../../stores/calculation-store';
+import { useMapStore } from '../../features/land-measurement/store/useMapStore';
+import { calculatePolygonData } from '../../features/land-measurement/utils/calculations';
+import { PLOT_COLOR_PALETTE } from '../../features/land-measurement/utils/canvas';
+import { toBengaliDigits, SuccessToast } from '../../lib/utils';
+import type { TCalculation, Point } from '../../types/calculation';
+import type { PlotRecord } from '../../features/land-measurement/types/map';
 
 const TOP_SURVEYORS = [
   {
@@ -74,12 +62,73 @@ export default function HomeScreen() {
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
+  const { isAuthenticated } = useAuthStore();
+
+  const {
+    calculations,
+    isLoading: loadingCalculations,
+    fetchCalculations,
+  } = useCalculationStore();
+
+  const realCalculations = calculations.slice(0, 3);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchCalculations();
+    }
+  }, [isAuthenticated, fetchCalculations]);
+
+  const handleOpenCalculation = (calculation: TCalculation) => {
+    const scaleValue = calculation.scalePxPerUnit || null;
+    if (scaleValue) {
+      useMapStore.getState().setScale(scaleValue);
+    }
+
+    const loadedPlots: PlotRecord[] = (calculation.plots || []).map((p, idx) => {
+      let rawPoints: Point[] = [];
+      if (Array.isArray(p.points)) {
+        rawPoints = p.points as Point[];
+      } else if (typeof p.points === 'string') {
+        try {
+          rawPoints = JSON.parse(p.points);
+        } catch {
+          rawPoints = [];
+        }
+      }
+
+      const results = calculatePolygonData(rawPoints, scaleValue);
+      return {
+        id: p.id || `${Date.now()}-${idx}`,
+        name: p.plotNumber || `প্লট ${toBengaliDigits(idx + 1)}`,
+        points: rawPoints,
+        results: results || {
+          sqft: 0,
+          shotok: Number(p.areaShotok) || 0,
+          katha: Number(p.areaKatha) || 0,
+          lengths: [],
+          perimeter: 0,
+        },
+        color: PLOT_COLOR_PALETTE[idx % PLOT_COLOR_PALETTE.length],
+      };
+    });
+
+    useMapStore.getState().setPlots(loadedPlots);
+    SuccessToast(`"${calculation.name}" পরিমাপ লোড হয়েছে!`);
+    router.push('/land-measurement');
+  };
 
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={loadingCalculations}
+          onRefresh={() => fetchCalculations(true)}
+          tintColor='#16a34a'
+        />
+      }
     >
       {/* ─── 1. Hero Action Banner (Primary CTA for Land Measurement) ─── */}
       <View style={[styles.heroCard, { backgroundColor: colors.heroBg, borderColor: colors.heroBorder }]}>
@@ -198,44 +247,104 @@ export default function HomeScreen() {
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.seeAllRow}
-          onPress={() => router.push('/land-measurement')}
+          onPress={() => router.push('/calculations')}
         >
           <Text style={[styles.seeAllText, { color: colors.primary }]}>সব প্রজেক্ট</Text>
           <ChevronRight size={13} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.savedProjectsList}>
-        {SAVED_PLOT_PROJECTS.map((project) => (
-          <TouchableOpacity
-            key={project.id}
-            activeOpacity={0.8}
-            style={[styles.savedProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-            onPress={() => router.push('/(tools)/land-measurement')}
-          >
-            <View style={styles.savedProjectLeft}>
-              <View style={[styles.fileIconBox, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
-                <FileSpreadsheet size={18} color='#16a34a' />
-              </View>
-              <View style={styles.savedProjectDetails}>
-                <Text style={[styles.savedProjectName, { color: colors.text }]} numberOfLines={1}>
-                  {project.name}
-                </Text>
-                <View style={styles.savedProjectMeta}>
-                  <Text style={[styles.metaText, { color: colors.textMuted }]}>স্কেল: {project.scale}</Text>
-                  <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text>
-                  <Text style={[styles.metaText, { color: colors.textMuted }]}>{project.plots}টি প্লট</Text>
-                </View>
-              </View>
-            </View>
+      {loadingCalculations ? (
+        <View style={styles.homeProjectsLoading}>
+          <ActivityIndicator size='small' color={colors.primary} />
+          <Text style={[styles.metaText, { color: colors.textMuted }]}>প্রজেক্ট লোড হচ্ছে...</Text>
+        </View>
+      ) : !isAuthenticated ? (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.emptyProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          onPress={() => router.push('/(auth)/login')}
+        >
+          <FolderKanban size={22} color={colors.textMuted} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[styles.emptyProjectTitle, { color: colors.text }]}>
+              আপনার প্রজেক্ট দেখতে লগইন করুন
+            </Text>
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>
+              ক্লাউডে সংরক্ষিত সমস্ত দাগ ও পরিমাপের হিসাব পেতে সাইন ইন করুন।
+            </Text>
+          </View>
+          <ChevronRight size={15} color={colors.textMuted} />
+        </TouchableOpacity>
+      ) : realCalculations.length === 0 ? (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.emptyProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          onPress={() => router.push('/land-measurement')}
+        >
+          <Calculator size={22} color={colors.primary} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[styles.emptyProjectTitle, { color: colors.text }]}>
+              এখনও কোনো প্রজেক্ট সংরক্ষণ করা হয়নি
+            </Text>
+            <Text style={[styles.metaText, { color: colors.textMuted }]}>
+              ম্যাপে দাগ এঁকে পরিমাপ সংরক্ষণ করতে এখানে ট্যাপ করুন।
+            </Text>
+          </View>
+          <Plus size={15} color={colors.primary} />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.savedProjectsList}>
+          {realCalculations.map((project) => {
+            const plotCount = project.plots?.length || 0;
+            const totalShotok = (project.plots || []).reduce(
+              (sum, p) => sum + (Number(p.areaShotok) || 0),
+              0
+            );
+            const scaleDisplay = project.scalePxPerUnit
+              ? `১ px ≈ ${(1 / project.scalePxPerUnit).toFixed(1)} ft`
+              : 'লিংক স্কেল';
 
-            <View style={styles.savedProjectRight}>
-              <Text style={[styles.savedProjectArea, { color: colors.text }]}>{project.area}</Text>
-              <Badge label={project.status} variant={project.statusVariant} />
-            </View>
-          </TouchableOpacity>
-        ))}
-      </View>
+            return (
+              <TouchableOpacity
+                key={project.id}
+                activeOpacity={0.8}
+                style={[styles.savedProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                onPress={() => handleOpenCalculation(project)}
+              >
+                <View style={styles.savedProjectLeft}>
+                  <View style={[styles.fileIconBox, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
+                    <FileSpreadsheet size={18} color='#16a34a' />
+                  </View>
+                  <View style={styles.savedProjectDetails}>
+                    <Text style={[styles.savedProjectName, { color: colors.text }]} numberOfLines={1}>
+                      {project.name}
+                    </Text>
+                    <View style={styles.savedProjectMeta}>
+                      <Text style={[styles.metaText, { color: colors.textMuted }]}>
+                        {scaleDisplay}
+                      </Text>
+                      <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text>
+                      <Text style={[styles.metaText, { color: colors.textMuted }]}>
+                        {toBengaliDigits(plotCount)}টি প্লট
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.savedProjectRight}>
+                  {totalShotok > 0 ? (
+                    <Text style={[styles.savedProjectArea, { color: colors.text }]}>
+                      {toBengaliDigits(totalShotok.toFixed(2))} শতাংশ
+                    </Text>
+                  ) : null}
+                  <Badge label={plotCount > 0 ? 'সম্পন্ন' : 'খসড়া'} variant={plotCount > 0 ? 'pro' : 'warning'} />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
 
       {/* ─── 4. ভেরিফাইড সার্ভেয়ার ─── */}
       <View style={styles.sectionHeader}>
@@ -443,6 +552,24 @@ const styles = StyleSheet.create({
   },
   savedProjectsList: {
     gap: 8,
+  },
+  homeProjectsLoading: {
+    paddingVertical: 18,
+    alignItems: 'center',
+    gap: 6,
+  },
+  emptyProjectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  emptyProjectTitle: {
+    fontSize: 12.5,
+    fontFamily: Fonts.headingBold,
   },
   savedProjectCard: {
     flexDirection: 'row',

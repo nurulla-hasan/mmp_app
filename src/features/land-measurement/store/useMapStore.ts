@@ -68,6 +68,8 @@ type MapStore = {
   undoPlotAction: () => void;
   redoPlotAction: () => void;
   clearPlots: () => void;
+  setScale: (scale: number | null) => void;
+  setPlots: (plots: PlotRecord[]) => void;
   setIsShowDiagonals: (show: boolean) => void;
   setIsMagnifierEnabled: (enabled: boolean) => void;
   startManualDivide: () => void;
@@ -458,6 +460,13 @@ export const useMapStore = create<MapStore>((set, get) => ({
     isPlotFinished: false,
     manualDividePlotId: null,
     manualCutLine: null,
+  }),
+
+  setScale: (scale) => set({ scale }),
+
+  setPlots: (plots) => set({
+    plots,
+    results: plots.at(-1)?.results ?? null,
   }),
 
   setIsShowDiagonals: (isShowDiagonals) => set({ isShowDiagonals }),

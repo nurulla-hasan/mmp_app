@@ -14,15 +14,33 @@ type FetchOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   auth?: boolean;
+  cacheTtlMs?: number;
+  forceFresh?: boolean;
 };
+
+// In-memory cache for GET requests
+const apiCache = new Map<string, { data: ApiResult<any>; expiry: number }>();
+
+export function clearApiCache() {
+  apiCache.clear();
+}
 
 export async function apiFetch<T>(
   endpoint: string,
   options: FetchOptions = {}
 ): Promise<ApiResult<T>> {
-  const { method = 'GET', body, auth = true } = options;
+  const { method = 'GET', body, auth = true, cacheTtlMs = 30000, forceFresh = false } = options;
 
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const cacheKey = `${url}:${auth ? 'auth' : 'anon'}`;
+
+  // Check cache for GET requests
+  if (method === 'GET' && !forceFresh) {
+    const cached = apiCache.get(cacheKey);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.data as ApiResult<T>;
+    }
+  }
 
   const isFormData = body instanceof FormData;
   const headers: Record<string, string> = {
@@ -61,12 +79,23 @@ export async function apiFetch<T>(
       };
     }
 
-    return {
+    const result: ApiResult<T> = {
       success: true,
       statusCode: response.status,
       message: json.message || 'সফল',
       data: json.data !== undefined ? json.data : json,
     };
+
+    if (method === 'GET') {
+      if (cacheTtlMs > 0) {
+        apiCache.set(cacheKey, { data: result, expiry: Date.now() + cacheTtlMs });
+      }
+    } else {
+      // Invalidate cache on mutations (POST, PATCH, DELETE, etc.)
+      apiCache.clear();
+    }
+
+    return result;
   } catch (error: any) {
     return {
       success: false,
