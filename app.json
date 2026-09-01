@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "scheme": "mouzamappro",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -32,8 +32,7 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router",
-      "expo-status-bar"
+      "expo-router"
     ]
   }
 }

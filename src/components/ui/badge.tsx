@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle, TextStyle } from 'react-native';
+import { Fonts } from '../../constants/typography';
 
 interface BadgeProps {
   label: string;
@@ -44,34 +45,35 @@ export const Badge: React.FC<BadgeProps> = ({ label, variant = 'neutral', style,
 
 const styles = StyleSheet.create({
   base: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
     alignSelf: 'flex-start',
   },
   text: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontFamily: Fonts.headingBold,
+    letterSpacing: -0.2,
   },
   badgePro: {
-    backgroundColor: 'rgba(5, 150, 105, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(5, 150, 105, 0.3)',
+    backgroundColor: 'rgba(22, 163, 74, 0.12)',
+    borderWidth: 0.8,
+    borderColor: 'rgba(22, 163, 74, 0.3)',
   },
   textPro: {
-    color: '#059669',
+    color: '#16a34a',
   },
   badgeFree: {
-    backgroundColor: 'rgba(37, 99, 235, 0.15)',
-    borderWidth: 1,
+    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+    borderWidth: 0.8,
     borderColor: 'rgba(37, 99, 235, 0.3)',
   },
   textFree: {
     color: '#2563eb',
   },
   badgeWarning: {
-    backgroundColor: 'rgba(217, 119, 6, 0.15)',
-    borderWidth: 1,
+    backgroundColor: 'rgba(217, 119, 6, 0.12)',
+    borderWidth: 0.8,
     borderColor: 'rgba(217, 119, 6, 0.3)',
   },
   textWarning: {
@@ -79,8 +81,10 @@ const styles = StyleSheet.create({
   },
   badgeNeutral: {
     backgroundColor: '#f1f5f9',
+    borderWidth: 0.8,
+    borderColor: '#e2e8f0',
   },
   textNeutral: {
-    color: '#475569',
+    color: '#64748b',
   },
 });

@@ -1,6 +1,15 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, StyleProp, ViewStyle, TextStyle } from 'react-native';
+import {
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  StyleProp,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
 import { Colors } from '../../constants/colors';
+import { Fonts } from '../../constants/typography';
 
 interface ButtonProps {
   title: string;
@@ -54,13 +63,22 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <TouchableOpacity
-      activeOpacity={0.7}
+      activeOpacity={0.75}
       onPress={onPress}
       disabled={disabled || loading}
-      style={[styles.base, getButtonStyle(), styles[`size_${size}`], disabled && styles.disabled, style]}
+      style={[
+        styles.base,
+        getButtonStyle(),
+        styles[`size_${size}`],
+        disabled && styles.disabled,
+        style,
+      ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'primary' ? '#fff' : Colors.light.primary} size='small' />
+        <ActivityIndicator
+          color={variant === 'primary' ? '#fff' : Colors.light.primary}
+          size='small'
+        />
       ) : (
         <>
           {icon}
@@ -76,12 +94,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    gap: 8,
+    borderRadius: 8,
+    gap: 6,
   },
   baseText: {
-    fontWeight: '600',
-    fontSize: 15,
+    fontFamily: Fonts.headingSemiBold,
+    fontSize: 13,
+    letterSpacing: -0.2,
   },
   btnPrimary: {
     backgroundColor: '#16a34a',
@@ -97,7 +116,7 @@ const styles = StyleSheet.create({
   },
   btnOutline: {
     backgroundColor: 'transparent',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#16a34a',
   },
   btnGhost: {
@@ -107,16 +126,16 @@ const styles = StyleSheet.create({
     color: '#16a34a',
   },
   size_sm: {
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+  },
+  size_md: {
     paddingVertical: 8,
     paddingHorizontal: 14,
   },
-  size_md: {
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-  },
   size_lg: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
   },
   disabled: {
     opacity: 0.5,

@@ -4,37 +4,42 @@ import { useRouter } from 'expo-router';
 import { Card } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Crown } from 'lucide-react-native';
+import { Fonts } from '../../constants/typography';
+import { Crown, Sparkles, ChevronRight } from 'lucide-react-native';
 
 export default function ProfileScreen() {
   const router = useRouter();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <Card style={styles.userCard}>
         <View style={styles.avatarBox}>
           <Text style={styles.avatarText}>M</Text>
         </View>
-        <Text style={styles.userName}>Mouza User</Text>
-        <Text style={styles.userEmail}>user@example.com</Text>
-        <Badge label='ফ্রি মেম্বারশিপ' variant='free' style={{ marginTop: 6 }} />
+        <View style={styles.userInfoCol}>
+          <Text style={styles.userName}>Mouza User</Text>
+          <Text style={styles.userEmail}>user@example.com</Text>
+          <Badge label='ফ্রি মেম্বার' variant='free' style={{ marginTop: 2 }} />
+        </View>
       </Card>
 
       {/* Upgrade Banner */}
-      <Card style={styles.upgradeCard}>
+      <View style={styles.upgradeCard}>
         <View style={styles.upgradeHeader}>
-          <Crown size={24} color='#fbbf24' />
+          <Crown size={18} color='#fbbf24' />
           <Text style={styles.upgradeTitle}>প্রো মেম্বারশিপে আপগ্রেড করুন</Text>
         </View>
         <Text style={styles.upgradeDesc}>
-          আনলিমিটেড মৌজা ম্যাপ জমি পরিমাপ, প্যান্টাগ্রাফ ও ডিজিটাল ট্রেসিং টুলসের সম্পূর্ণ অ্যাক্সেস পান।
+          আনলিমিটেড জমি পরিমাপ, প্যান্টাগ্রাফ ও ডিজিটাল ট্রেসিং টুলসের সম্পূর্ণ অ্যাক্সেস পান।
         </Text>
         <Button
-          title='প্ল্যান ও অফার দেখুন'
+          title='প্ল্যান ও বিকাশ অফার দেখুন'
+          size='sm'
           onPress={() => router.push('/pricing')}
-          style={{ backgroundColor: '#16a34a' }}
+          style={{ backgroundColor: '#16a34a', marginTop: 4 }}
+          icon={<Sparkles size={13} color='#fff' />}
         />
-      </Card>
+      </View>
     </ScrollView>
   );
 }
@@ -45,56 +50,64 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   content: {
-    padding: 16,
-    gap: 16,
+    padding: 12,
+    gap: 10,
   },
   userCard: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 24,
-    gap: 6,
+    padding: 12,
+    gap: 12,
   },
   avatarBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#16a34a',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
   },
   avatarText: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 18,
+    fontFamily: Fonts.headingBold,
     color: '#ffffff',
   },
+  userInfoCol: {
+    flex: 1,
+    gap: 1,
+  },
   userName: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 14,
+    fontFamily: Fonts.headingBold,
     color: '#0f172a',
   },
   userEmail: {
-    fontSize: 13,
+    fontSize: 11,
+    fontFamily: Fonts.sansRegular,
     color: '#64748b',
   },
   upgradeCard: {
     backgroundColor: '#0f172a',
+    borderRadius: 10,
+    padding: 12,
+    gap: 6,
+    borderWidth: 1,
     borderColor: '#1e293b',
-    padding: 20,
-    gap: 10,
   },
   upgradeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   upgradeTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 13,
+    fontFamily: Fonts.headingBold,
     color: '#ffffff',
   },
   upgradeDesc: {
-    fontSize: 12,
+    fontSize: 10.5,
+    fontFamily: Fonts.sansRegular,
     color: '#94a3b8',
-    lineHeight: 17,
+    lineHeight: 15,
   },
 });
