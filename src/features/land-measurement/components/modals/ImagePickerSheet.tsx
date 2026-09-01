@@ -1,7 +1,7 @@
 import React from 'react';
 import { Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { FileImage, Grid3X3, ImagePlus, X } from 'lucide-react-native';
+import { FileImage, ImagePlus, Trash2, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { Fonts } from '../../../../constants/typography';
 
@@ -13,7 +13,7 @@ type Props = {
 export function ImagePickerSheet({ visible, onClose }: Props) {
   const mapImage = useMapStore((state) => state.mapImage);
   const setMapImage = useMapStore((state) => state.setMapImage);
-  const clearMapImage = useMapStore((state) => state.clearMapImage);
+  const clearMap = useMapStore((state) => state.clearMap);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -39,13 +39,10 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
     onClose();
   };
 
-  const useBlankCanvas = () => {
-    if (!mapImage) {
-      onClose();
-      return;
-    }
+  const removeMap = () => {
+    if (!mapImage) return;
     Alert.alert(
-      'খালি ক্যানভাস ব্যবহার করবেন?',
+      'ম্যাপ মুছে ফেলবেন?',
       'বর্তমান ম্যাপ ও এর সব আঁকা পরিমাপ মুছে যাবে।',
       [
         { text: 'বাতিল', style: 'cancel' },
@@ -53,7 +50,7 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
           text: 'চালিয়ে যান',
           style: 'destructive',
           onPress: () => {
-            clearMapImage();
+            clearMap();
             onClose();
           },
         },
@@ -97,15 +94,10 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity activeOpacity={0.76} style={styles.option} onPress={useBlankCanvas}>
-            <View style={[styles.optionIcon, styles.blueIcon]}>
-              <Grid3X3 size={21} color='#60a5fa' />
-            </View>
-            <View style={styles.optionText}>
-              <Text style={styles.optionTitle}>খালি ক্যানভাসে আঁকুন</Text>
-              <Text style={styles.optionDescription}>ছবি ছাড়াই পরিমাপ অনুশীলন বা স্কেচ করুন</Text>
-            </View>
-          </TouchableOpacity>
+          {mapImage && <TouchableOpacity activeOpacity={0.76} style={styles.option} onPress={removeMap}>
+            <View style={[styles.optionIcon, styles.redIcon]}><Trash2 size={21} color='#f87171' /></View>
+            <View style={styles.optionText}><Text style={styles.optionTitle}>বর্তমান ম্যাপ সরান</Text><Text style={styles.optionDescription}>ম্যাপসহ সব পরিমাপ মুছে ফেলুন</Text></View>
+          </TouchableOpacity>}
         </View>
       </View>
     </Modal>
@@ -205,8 +197,8 @@ const styles = StyleSheet.create({
   greenIcon: {
     backgroundColor: 'rgba(34, 197, 94, 0.12)',
   },
-  blueIcon: {
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+  redIcon: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
   },
   optionText: {
     flex: 1,

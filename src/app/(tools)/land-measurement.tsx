@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { Alert, View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Ruler } from 'lucide-react-native';
@@ -16,9 +16,29 @@ import { toBengaliDigits } from '../../lib/utils';
 export default function LandMeasurementScreen() {
   const router = useRouter();
   const scale = useMapStore((state) => state.scale);
+  const mapImage = useMapStore((state) => state.mapImage);
+  const plots = useMapStore((state) => state.plots);
+  const isDistanceModalOpen = useMapStore((state) => state.isDistanceModalOpen);
+  const startCalibration = useMapStore((state) => state.startCalibration);
+  const retryCalibration = useMapStore((state) => state.retryCalibration);
 
-  const [isScaleModalOpen, setIsScaleModalOpen] = useState(false);
+  const [isManualScaleOpen, setIsManualScaleOpen] = useState(false);
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+
+  const beginCalibration = () => {
+    if (!mapImage) {
+      setIsImagePickerOpen(true);
+      return;
+    }
+    if (plots.length === 0) {
+      startCalibration();
+      return;
+    }
+    Alert.alert('স্কেল আবার সেট করবেন?', 'স্কেল বদলালে বর্তমান সব প্লট মুছে যাবে।', [
+      { text: 'বাতিল', style: 'cancel' },
+      { text: 'চালিয়ে যান', style: 'destructive', onPress: startCalibration },
+    ]);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -45,7 +65,7 @@ export default function LandMeasurementScreen() {
         <TouchableOpacity
           activeOpacity={0.75}
           style={styles.scaleChip}
-          onPress={() => setIsScaleModalOpen(true)}
+          onPress={beginCalibration}
         >
           <Ruler size={13} color='#22c55e' strokeWidth={2.2} />
           <Text style={styles.scaleChipText}>
@@ -63,15 +83,21 @@ export default function LandMeasurementScreen() {
 
         {/* ─── 4. Floating Bottom Toolbar ─── */}
         <MobileCanvasToolbar
-          onOpenScaleModal={() => setIsScaleModalOpen(true)}
+          onOpenManualScale={() => setIsManualScaleOpen(true)}
           onOpenImagePicker={() => setIsImagePickerOpen(true)}
         />
       </View>
 
       {/* ─── 5. Modals ─── */}
       <ScaleCalibrationModal
-        visible={isScaleModalOpen}
-        onClose={() => setIsScaleModalOpen(false)}
+        visible={isDistanceModalOpen}
+        kind='distance'
+        onClose={retryCalibration}
+      />
+      <ScaleCalibrationModal
+        visible={isManualScaleOpen}
+        kind='manual'
+        onClose={() => setIsManualScaleOpen(false)}
       />
       <ImagePickerSheet
         visible={isImagePickerOpen}
