@@ -4,7 +4,7 @@ import { Fonts } from '../../constants/typography';
 
 interface BadgeProps {
   label: string;
-  variant?: 'pro' | 'free' | 'warning' | 'neutral';
+  variant?: 'pro' | 'free' | 'warning' | 'neutral' | 'success';
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 }
@@ -13,6 +13,7 @@ export const Badge: React.FC<BadgeProps> = ({ label, variant = 'neutral', style,
   const getBadgeStyle = () => {
     switch (variant) {
       case 'pro':
+      case 'success':
         return styles.badgePro;
       case 'free':
         return styles.badgeFree;
@@ -26,6 +27,7 @@ export const Badge: React.FC<BadgeProps> = ({ label, variant = 'neutral', style,
   const getTextStyle = () => {
     switch (variant) {
       case 'pro':
+      case 'success':
         return styles.textPro;
       case 'free':
         return styles.textFree;
@@ -45,44 +47,42 @@ export const Badge: React.FC<BadgeProps> = ({ label, variant = 'neutral', style,
 
 const styles = StyleSheet.create({
   base: {
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
+    paddingHorizontal: 5.5,
+    paddingVertical: 1,
     borderRadius: 4,
     alignSelf: 'flex-start',
+    borderWidth: 0.6,
   },
   text: {
-    fontSize: 10,
-    fontFamily: Fonts.headingBold,
-    letterSpacing: -0.2,
+    fontSize: 9.5,
+    fontFamily: Fonts.headingSemiBold,
+    letterSpacing: -0.1,
+    includeFontPadding: false,
   },
   badgePro: {
-    backgroundColor: 'rgba(22, 163, 74, 0.12)',
-    borderWidth: 0.8,
-    borderColor: 'rgba(22, 163, 74, 0.3)',
+    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    borderColor: 'rgba(22, 163, 74, 0.25)',
   },
   textPro: {
     color: '#16a34a',
   },
   badgeFree: {
-    backgroundColor: 'rgba(37, 99, 235, 0.12)',
-    borderWidth: 0.8,
-    borderColor: 'rgba(37, 99, 235, 0.3)',
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    borderColor: 'rgba(37, 99, 235, 0.25)',
   },
   textFree: {
     color: '#2563eb',
   },
   badgeWarning: {
-    backgroundColor: 'rgba(217, 119, 6, 0.12)',
-    borderWidth: 0.8,
-    borderColor: 'rgba(217, 119, 6, 0.3)',
+    backgroundColor: 'rgba(217, 119, 6, 0.1)',
+    borderColor: 'rgba(217, 119, 6, 0.25)',
   },
   textWarning: {
     color: '#d97706',
   },
   badgeNeutral: {
-    backgroundColor: '#f1f5f9',
-    borderWidth: 0.8,
-    borderColor: '#e2e8f0',
+    backgroundColor: 'rgba(100, 116, 139, 0.08)',
+    borderColor: 'rgba(100, 116, 139, 0.2)',
   },
   textNeutral: {
     color: '#64748b',

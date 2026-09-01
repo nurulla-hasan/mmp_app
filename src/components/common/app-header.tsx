@@ -1,148 +1,178 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Map, Bell, Crown } from 'lucide-react-native';
+import { Bell, Crown, Search, Sun, Moon } from 'lucide-react-native';
 import { Fonts } from '../../constants/typography';
-import { Badge } from '../ui/badge';
+import { Colors } from '../../constants/colors';
+import { useThemeStore } from '../../stores/theme-store';
+import { Button } from '../ui/button';
 
 interface AppHeaderProps {
   title?: string;
   subtitle?: string;
-  showProBadge?: boolean;
+  showSearch?: boolean;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
   title = 'মৌজা ম্যাপ প্রো',
-  subtitle = 'ডিজিটাল ল্যান্ড প্ল্যাটফর্ম',
-  showProBadge = true,
+  subtitle,
+  showSearch = false,
 }) => {
   const router = useRouter();
+  const { theme, toggleTheme } = useThemeStore();
+  const colors = Colors[theme];
+
+  const displaySubtitle = subtitle || (title === 'মৌজা ম্যাপ প্রো' ? 'ডিজিটাল ল্যান্ড প্ল্যাটফর্ম' : 'মৌজা ম্যাপ প্রো');
 
   return (
-    <View style={styles.container}>
-      {/* Brand & Logo */}
-      <View style={styles.leftSection}>
-        <View style={styles.logoBox}>
-          <Map size={20} color='#ffffff' strokeWidth={2.2} />
-        </View>
-        <View style={styles.textCol}>
-          <View style={styles.titleRow}>
-            <Text style={styles.brandTitle}>{title}</Text>
-            {showProBadge && <Badge label='PRO' variant='pro' />}
-          </View>
-          <Text style={styles.brandSubtitle}>{subtitle}</Text>
-        </View>
-      </View>
-
-      {/* Right Actions */}
-      <View style={styles.rightSection}>
+    <SafeAreaView
+      edges={['top']}
+      style={[styles.safeArea, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
+    >
+      {/* Main Top Bar */}
+      <View style={styles.topBar}>
+        {/* Brand & Logo */}
         <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.proPill}
-          onPress={() => router.push('/pricing')}
+          activeOpacity={0.8}
+          style={styles.brandRow}
+          onPress={() => router.push('/(tabs)')}
         >
-          <Crown size={14} color='#d97706' />
-          <Text style={styles.proPillText}>আপগ্রেড</Text>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logoImage}
+          />
+          <View style={styles.brandTextCol}>
+            <Text style={[styles.brandTitle, { color: colors.text }]}>{title}</Text>
+            <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>{displaySubtitle}</Text>
+          </View>
         </TouchableOpacity>
 
-        <TouchableOpacity activeOpacity={0.7} style={styles.iconBtn}>
-          <Bell size={18} color='#334155' />
-          <View style={styles.notifDot} />
-        </TouchableOpacity>
+        {/* Right Actions (Theme Toggle, Upgrade, Bell) */}
+        <View style={styles.actionGroup}>
+          {/* Theme Toggle Button */}
+          <Button
+            variant='outline'
+            size='icon'
+            onPress={toggleTheme}
+            icon={
+              theme === 'light' ? (
+                <Moon size={16} color='#475569' strokeWidth={2} />
+              ) : (
+                <Sun size={16} color='#f59e0b' strokeWidth={2} />
+              )
+            }
+          />
+
+          {/* Upgrade Button */}
+          <Button
+            variant='warning'
+            size='sm'
+            title='আপগ্রেড'
+            onPress={() => router.push('/pricing')}
+            icon={<Crown size={13} color='#d97706' strokeWidth={2.2} />}
+          />
+
+          {/* Bell Notification Button */}
+          <View style={{ position: 'relative' }}>
+            <Button
+              variant='outline'
+              size='icon'
+              onPress={() => {}}
+              icon={<Bell size={16} color={colors.textMuted} strokeWidth={2} />}
+            />
+            <View style={styles.notifDot} />
+          </View>
+        </View>
       </View>
-    </View>
+
+      {/* Optional Integrated Search Bar (shown on Home) */}
+      {showSearch && (
+        <View style={styles.searchContainer}>
+          <View style={[styles.searchBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+            <Search size={15} color={colors.textMuted} strokeWidth={2.2} />
+            <TextInput
+              placeholder='মৌজা, দাগ নম্বর বা সার্ভেয়ার খুঁজুন...'
+              placeholderTextColor={colors.textMuted}
+              style={[styles.searchInput, { color: colors.text }]}
+              editable={true}
+            />
+          </View>
+        </View>
+      )}
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
+    borderBottomWidth: 1,
+  },
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f5f9',
+    paddingHorizontal: 14,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
-  leftSection: {
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flex: 1,
   },
-  logoBox: {
+  logoImage: {
     width: 36,
     height: 36,
-    borderRadius: 9,
-    backgroundColor: '#16a34a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#16a34a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
+    resizeMode: 'contain',
+    borderRadius: 8,
   },
-  textCol: {
-    gap: 1,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+  brandTextCol: {
+    gap: 0.5,
+    flex: 1,
   },
   brandTitle: {
-    fontSize: 16,
+    fontSize: 15.5,
     fontFamily: Fonts.headingBold,
-    color: '#0f172a',
     letterSpacing: -0.2,
   },
   brandSubtitle: {
     fontSize: 10.5,
     fontFamily: Fonts.sansRegular,
-    color: '#64748b',
     marginTop: -2,
   },
-  rightSection: {
+  actionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  proPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(217, 119, 6, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(217, 119, 6, 0.25)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  proPillText: {
-    fontSize: 11,
-    fontFamily: Fonts.headingBold,
-    color: '#d97706',
-  },
-  iconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+    gap: 6,
   },
   notifDot: {
     position: 'absolute',
-    top: 7,
-    right: 7,
+    top: 6,
+    right: 6,
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#ef4444',
   },
+  searchContainer: {
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 36,
+    gap: 8,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: Fonts.sansRegular,
+    paddingVertical: 0,
+  },
 });
-

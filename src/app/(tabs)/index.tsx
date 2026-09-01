@@ -1,243 +1,319 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Sparkles,
   Map,
-  MoveDiagonal,
+  Layers,
+  Globe,
   Scaling,
-  Calculator,
   PenLine,
-  Ruler,
-  ShieldCheck,
-  ChevronRight,
-  ArrowRight,
+  FileSpreadsheet,
+  Phone,
+  Briefcase,
+  Star,
+  FolderKanban,
 } from 'lucide-react-native';
-import { AppHeader } from '../../components/common/app-header';
-import { Card } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
+import { useThemeStore } from '../../stores/theme-store';
+
+const SAVED_PLOT_PROJECTS = [
+  {
+    id: '1',
+    name: 'দিনাজপুর সদর জমি (দাগ ৪২৮)',
+    scale: '১৬″ = ১ মাইল',
+    plots: 3,
+    area: '৪২.৭৫ শতাংশ',
+    status: 'সম্পন্ন',
+    statusVariant: 'pro' as const,
+  },
+  {
+    id: '2',
+    name: 'বিরল গ্রামের খতিয়ান প্লট',
+    scale: '৩২″ = ১ মাইল',
+    plots: 2,
+    area: '১৮.৪০ শতাংশ',
+    status: 'খসড়া',
+    statusVariant: 'warning' as const,
+  },
+  {
+    id: '3',
+    name: 'পারিবারিক জমি ভাগ-বাটোয়ারা',
+    scale: '১৬″ = ১ মাইল',
+    plots: 5,
+    area: '৬৫.২০ শতাংশ',
+    status: 'সম্পন্ন',
+    statusVariant: 'pro' as const,
+  },
+];
+
+const TOP_SURVEYORS = [
+  {
+    id: '1',
+    name: 'মো. হাবিবুর রহমান',
+    location: 'দিনাজপুর সদর',
+    rating: '৪.৯',
+    exp: '১৫+ বছর',
+    verified: true,
+  },
+  {
+    id: '2',
+    name: 'আব্দুল করিম পাটোয়ারী',
+    location: 'মিরপুর, ঢাকা',
+    rating: '৫.০',
+    exp: '১০+ বছর',
+    verified: true,
+  },
+];
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Top Navbar Header */}
-      <AppHeader />
-
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Hero Banner */}
-        <View style={styles.heroCard}>
-          <View style={styles.heroHeader}>
-            <View style={styles.proTag}>
-              <Sparkles size={12} color='#22c55e' />
-              <Text style={styles.proTagText}>MOUZA MAP PRO</Text>
-            </View>
-            <Badge label='v2.0 LIVE' variant='pro' />
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ─── 1. Hero Action Banner (Primary CTA for Land Measurement) ─── */}
+      <View style={[styles.heroCard, { backgroundColor: colors.heroBg, borderColor: colors.heroBorder }]}>
+        <View style={styles.heroHeader}>
+          <View style={styles.proTag}>
+            <Sparkles size={12} color='#22c55e' />
+            <Text style={styles.proTagText}>MOUZA MAP PRO</Text>
           </View>
-
-          <Text style={styles.heroTitle}>ডিজিটাল মৌজা ম্যাপ ও জমি পরিমাপ</Text>
-          <Text style={styles.heroSubtitle}>
-            ম্যাপে সরাসরি দাগ এঁকে শতক, কাঠা ও একরে নিখুঁত ক্ষেত্রফল হিসাব ও সাবেক-হাল ম্যাপ তুলনা করুন।
-          </Text>
-
-          <View style={styles.heroActionRow}>
-            <Button
-              title='ম্যাপে জমি মাপুন'
-              size='md'
-              onPress={() => router.push('/(tools)/land-measurement')}
-              style={styles.heroBtn}
-              icon={<Map size={15} color='#fff' />}
-            />
-            <Button
-              title='একক রূপান্তর'
-              variant='outline'
-              size='md'
-              onPress={() => router.push('/(tools)/unit-converter')}
-              style={styles.heroBtnOutline}
-              textStyle={{ color: '#ffffff' }}
-            />
-          </View>
+          <Badge label='v2.0 LIVE' variant='pro' />
         </View>
 
-        {/* Quick Launch Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>জনপ্রিয় টুলস</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/tools')} activeOpacity={0.7}>
-            <Text style={styles.seeAllText}>সব টুলস দেখুন →</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.heroTitle}>ডিজিটাল মৌজা ম্যাপ ও জমি পরিমাপ</Text>
+        <Text style={[styles.heroSubtitle, { color: colors.heroSubtitle }]}>
+          ম্যাপে সরাসরি দাগ এঁকে শতক, কাঠা ও একরে নিখুঁত ক্ষেত্রফল হিসাব ও দাগ বণ্টন করুন।
+        </Text>
 
-        {/* 2x2 Grid of Main Tools */}
-        <View style={styles.grid}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={styles.toolCard}
+        <View style={styles.heroActionRow}>
+          <Button
+            title='ম্যাপে জমি মাপুন'
+            size='md'
             onPress={() => router.push('/(tools)/land-measurement')}
-          >
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(22, 163, 74, 0.12)' }]}>
-              <Map size={20} color='#16a34a' />
-            </View>
-            <View style={styles.toolTextCol}>
-              <View style={styles.badgeTitleRow}>
-                <Text style={styles.toolTitle}>জমি পরিমাপ</Text>
-                <Badge label='PRO' variant='pro' />
-              </View>
-              <Text style={styles.toolDesc}>ম্যাপে দাগ এঁকে শতক হিসাব</Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={styles.toolCard}
+            style={styles.heroBtn}
+            icon={<Map size={15} color='#fff' />}
+          />
+          <Button
+            title='একক রূপান্তর'
+            variant='outline'
+            size='md'
             onPress={() => router.push('/(tools)/unit-converter')}
-          >
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(37, 99, 235, 0.12)' }]}>
-              <MoveDiagonal size={20} color='#2563eb' />
-            </View>
-            <View style={styles.toolTextCol}>
-              <View style={styles.badgeTitleRow}>
-                <Text style={styles.toolTitle}>একক রূপান্তর</Text>
-                <Badge label='ফ্রি' variant='free' />
-              </View>
-              <Text style={styles.toolDesc}>শতক, কাঠা, বিঘা, একর</Text>
-            </View>
-          </TouchableOpacity>
+            style={styles.heroBtnOutline}
+            textStyle={{ color: '#ffffff' }}
+          />
         </View>
+      </View>
 
-        <View style={styles.grid}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={styles.toolCard}
-            onPress={() => router.push('/(tools)/pantagraph')}
-          >
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(217, 119, 6, 0.12)' }]}>
-              <Scaling size={20} color='#d97706' />
-            </View>
-            <View style={styles.toolTextCol}>
-              <View style={styles.badgeTitleRow}>
-                <Text style={styles.toolTitle}>প্যান্টাগ্রাফ</Text>
-                <Badge label='PRO' variant='pro' />
-              </View>
-              <Text style={styles.toolDesc}>সাবেক ও হাল ম্যাপ তুলনা</Text>
-            </View>
-          </TouchableOpacity>
+      {/* ─── 2. অন্যান্য টুলস (Exact 4 Specialized Tools: Title & Badge Only) ─── */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>অন্যান্য টুলস</Text>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/tools')} activeOpacity={0.7}>
+          <Text style={[styles.seeAllText, { color: colors.primary }]}>সব টুলস →</Text>
+        </TouchableOpacity>
+      </View>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            style={styles.toolCard}
-            onPress={() => router.push('/(tools)/inheritance')}
-          >
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(225, 29, 72, 0.12)' }]}>
-              <Calculator size={20} color='#e11d48' />
-            </View>
-            <View style={styles.toolTextCol}>
-              <View style={styles.badgeTitleRow}>
-                <Text style={styles.toolTitle}>জমি বণ্টন</Text>
-                <Badge label='ফ্রি' variant='free' />
-              </View>
-              <Text style={styles.toolDesc}>ফারায়েজ ও হিস্যা বণ্টন</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Pro Map Tools Teaser List */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>এডভান্সড ফিচারস</Text>
-        </View>
-
+      {/* Row 1: মৌজা ম্যাপ স্টুডিও + মৌজা জিও স্টুডিও */}
+      <View style={styles.grid}>
+        {/* Tool 1: মৌজা ম্যাপ স্টুডিও */}
         <TouchableOpacity
           activeOpacity={0.8}
+          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          onPress={() => router.push('/(tools)/land-measurement')}
+        >
+          <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+            <Layers size={19} color='#059669' strokeWidth={2} />
+          </View>
+          <View style={styles.toolTextCol}>
+            <Text style={[styles.toolTitle, { color: colors.text }]}>ম্যাপ স্টুডিও</Text>
+            <Badge label='বেটা' variant='warning' />
+          </View>
+        </TouchableOpacity>
+
+        {/* Tool 2: মৌজা জিও স্টুডিও */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          onPress={() => router.push('/(tools)/land-measurement')}
+        >
+          <View style={[styles.iconBox, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}>
+            <Globe size={19} color='#16a34a' strokeWidth={2} />
+          </View>
+          <View style={styles.toolTextCol}>
+            <Text style={[styles.toolTitle, { color: colors.text }]}>মৌজা জিও</Text>
+            <Badge label='বেটা' variant='warning' />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* Row 2: ম্যাপ তুলনা ও প্যান্টাগ্রাফ + ডিজিটাল ম্যাপ ট্রেসিং */}
+      <View style={styles.grid}>
+        {/* Tool 3: ম্যাপ তুলনা ও প্যান্টাগ্রাফ */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          onPress={() => router.push('/(tools)/pantagraph')}
+        >
+          <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.12)' }]}>
+            <Scaling size={19} color='#0891b2' strokeWidth={2} />
+          </View>
+          <View style={styles.toolTextCol}>
+            <Text style={[styles.toolTitle, { color: colors.text }]}>প্যান্টাগ্রাফ</Text>
+            <Badge label='নতুন' variant='pro' />
+          </View>
+        </TouchableOpacity>
+
+        {/* Tool 4: ডিজিটাল ম্যাপ ট্রেসিং */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           onPress={() => router.push('/(tools)/tracer')}
         >
-          <Card style={styles.featureRowCard}>
-            <View style={[styles.iconBoxSmall, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-              <PenLine size={18} color='#059669' />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.badgeTitleRow}>
-                <Text style={styles.featureTitle}>ডিজিটাল ম্যাপ ট্রেসিং (Vector Tracer)</Text>
-                <Badge label='PRO' variant='pro' />
+          <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+            <PenLine size={19} color='#d97706' strokeWidth={2} />
+          </View>
+          <View style={styles.toolTextCol}>
+            <Text style={[styles.toolTitle, { color: colors.text }]}>ম্যাপ ট্রেসিং</Text>
+            <Badge label='নতুন' variant='pro' />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* ─── 3. সংরক্ষিত প্রজেক্ট তালিকা ─── */}
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleRow}>
+          <FolderKanban size={16} color={colors.primary} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>সংরক্ষিত প্রজেক্ট তালিকা</Text>
+        </View>
+        <Text style={[styles.recentCountText, { color: colors.textMuted }]}>৩টি প্রজেক্ট</Text>
+      </View>
+
+      <View style={styles.savedProjectsList}>
+        {SAVED_PLOT_PROJECTS.map((project) => (
+          <TouchableOpacity
+            key={project.id}
+            activeOpacity={0.8}
+            style={[styles.savedProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+            onPress={() => router.push('/(tools)/land-measurement')}
+          >
+            <View style={styles.savedProjectLeft}>
+              <View style={[styles.fileIconBox, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
+                <FileSpreadsheet size={18} color='#16a34a' />
               </View>
-              <Text style={styles.featureDesc}>ঝাপসা ম্যাপ থেকে দাগের সীমানা ও নম্বর নিখুঁত ভেক্টরে ট্রেস করুন।</Text>
+              <View style={styles.savedProjectDetails}>
+                <Text style={[styles.savedProjectName, { color: colors.text }]} numberOfLines={1}>
+                  {project.name}
+                </Text>
+                <View style={styles.savedProjectMeta}>
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>স্কেল: {project.scale}</Text>
+                  <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text>
+                  <Text style={[styles.metaText, { color: colors.textMuted }]}>{project.plots}টি প্লট</Text>
+                </View>
+              </View>
             </View>
-            <ChevronRight size={16} color='#94a3b8' />
-          </Card>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => router.push('/(tools)/scale-guide')}
-        >
-          <Card style={styles.featureRowCard}>
-            <View style={[styles.iconBoxSmall, { backgroundColor: 'rgba(99, 102, 241, 0.12)' }]}>
-              <Ruler size={18} color='#6366f1' />
+            <View style={styles.savedProjectRight}>
+              <Text style={[styles.savedProjectArea, { color: colors.text }]}>{project.area}</Text>
+              <Badge label={project.status} variant={project.statusVariant} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.featureTitle}>মৌজা ম্যাপ স্কেল সেট নির্দেশিকা</Text>
-              <Text style={styles.featureDesc}>১৬ ইঞ্চি = ১ মাইল ও কাস্টম স্কেল সেট করার নিয়মাবলী।</Text>
-            </View>
-            <ChevronRight size={16} color='#94a3b8' />
-          </Card>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-        {/* Surveyor Connection Banner */}
-        <Card style={styles.surveyorBanner}>
-          <View style={styles.surveyorBannerLeft}>
-            <View style={styles.surveyorIconCircle}>
-              <ShieldCheck size={22} color='#16a34a' />
+      {/* ─── 4. ভেরিফাইড সার্ভেয়ার ─── */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>ভেরিফাইড সার্ভেয়ার</Text>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/surveyors')} activeOpacity={0.7}>
+          <Text style={[styles.seeAllText, { color: colors.primary }]}>সকল সার্ভেয়ার →</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.surveyorsGrid}>
+        {TOP_SURVEYORS.map((s) => (
+          <View
+            key={s.id}
+            style={[styles.surveyorMiniCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          >
+            <View style={styles.surveyorMiniHeader}>
+              <View style={[styles.avatarCircle, { backgroundColor: colors.primary }]}>
+                <Text style={styles.avatarChar}>{s.name.charAt(3) || 'আ'}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.surveyorMiniName, { color: colors.text }]} numberOfLines={1}>{s.name}</Text>
+                <Text style={[styles.surveyorMiniLocation, { color: colors.textMuted }]}>{s.location}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.surveyorBannerTitle}>দক্ষ ডিজিটাল সার্ভেয়ার খুঁজছেন?</Text>
-              <Text style={styles.surveyorBannerDesc}>
-                আপনার এলাকার অভিজ্ঞ ও ভেরিফাইড আমিনদের সাথে সরাসরি যোগাযোগ করুন।
-              </Text>
+
+            <View style={[styles.surveyorMiniFooter, { borderTopColor: colors.border }]}>
+              <View style={styles.ratingBadge}>
+                <Star size={10} color='#f59e0b' fill='#f59e0b' />
+                <Text style={[styles.ratingText, { color: colors.textMuted }]}>{s.rating} • {s.exp}</Text>
+              </View>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                style={[styles.callMiniBtn, { backgroundColor: colors.primary }]}
+              >
+                <Phone size={11} color='#ffffff' />
+                <Text style={styles.callMiniBtnText}>কল</Text>
+              </TouchableOpacity>
             </View>
           </View>
-          <Button
-            title='সার্ভেয়ারদের লিস্ট দেখুন'
-            size='sm'
-            variant='secondary'
-            onPress={() => router.push('/(tabs)/surveyors')}
-          />
-        </Card>
-      </ScrollView>
-    </SafeAreaView>
+        ))}
+      </View>
+
+      {/* ─── 5. সার্ভেয়ার ক্যারিয়ার ব্যানার ─── */}
+      <View style={[styles.careerBanner, { backgroundColor: theme === 'dark' ? '#064e3b25' : '#f0fdf4', borderColor: theme === 'dark' ? '#064e3b' : '#bbf7d0' }]}>
+        <View style={styles.careerBannerLeft}>
+          <View style={[styles.careerIconCircle, { backgroundColor: theme === 'dark' ? '#064e3b' : '#dcfce7' }]}>
+            <Briefcase size={20} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.careerTitle, { color: theme === 'dark' ? '#4ade80' : '#15803d' }]}>
+              আপনি কি পেশাদার সার্ভেয়ার?
+            </Text>
+            <Text style={[styles.careerDesc, { color: theme === 'dark' ? '#86efac' : '#166534' }]}>
+              আমাদের প্ল্যাটফর্মে ভেরিফাইড আমিন হিসেবে যোগ দিয়ে সরাসরি নতুন ক্লায়েন্ট পান।
+            </Text>
+          </View>
+        </View>
+        <Button
+          title='সার্ভেয়ার হিসেবে যোগ দিন'
+          size='sm'
+          variant='primary'
+          onPress={() => router.push('/(tabs)/surveyors')}
+          style={{ alignSelf: 'flex-start', marginTop: 4 }}
+        />
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   content: {
     padding: 14,
     gap: 12,
-    paddingBottom: 24,
+    paddingBottom: 28,
   },
   heroCard: {
-    backgroundColor: '#0f172a',
     borderRadius: 14,
     padding: 16,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#1e293b',
-    shadowColor: '#0f172a',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.12,
     shadowRadius: 6,
     elevation: 3,
   },
@@ -270,7 +346,6 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     fontSize: 12,
     fontFamily: Fonts.sansRegular,
-    color: '#94a3b8',
     lineHeight: 18,
   },
   heroActionRow: {
@@ -288,19 +363,31 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 6,
+    alignItems: 'flex-end',
+    marginTop: 4,
     paddingHorizontal: 2,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontFamily: Fonts.headingBold,
-    color: '#0f172a',
+  },
+  sectionSubtitle: {
+    fontSize: 10.5,
+    fontFamily: Fonts.sansRegular,
+    marginTop: 1,
   },
   seeAllText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: Fonts.headingSemiBold,
-    color: '#16a34a',
+  },
+  recentCountText: {
+    fontSize: 11,
+    fontFamily: Fonts.sansMedium,
   },
   grid: {
     flexDirection: 'row',
@@ -308,12 +395,12 @@ const styles = StyleSheet.create({
   },
   toolCard: {
     flex: 1,
-    backgroundColor: '#ffffff',
-    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    gap: 10,
+    gap: 9,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
@@ -321,84 +408,169 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   iconBox: {
-    width: 38,
-    height: 38,
+    width: 36,
+    height: 36,
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
   toolTextCol: {
-    gap: 2,
-  },
-  badgeTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flex: 1,
+    gap: 3,
+    alignItems: 'flex-start',
   },
   toolTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontFamily: Fonts.headingBold,
-    color: '#0f172a',
   },
   toolDesc: {
     fontSize: 10.5,
     fontFamily: Fonts.sansRegular,
-    color: '#64748b',
     lineHeight: 14,
   },
-  featureRowCard: {
+  savedProjectsList: {
+    gap: 8,
+  },
+  savedProjectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  savedProjectLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    padding: 12,
+    flex: 1,
   },
-  iconBoxSmall: {
+  fileIconBox: {
     width: 36,
     height: 36,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featureTitle: {
-    fontSize: 13,
+  savedProjectDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  savedProjectName: {
+    fontSize: 12.5,
     fontFamily: Fonts.headingBold,
-    color: '#0f172a',
   },
-  featureDesc: {
-    fontSize: 10.5,
-    fontFamily: Fonts.sansRegular,
-    color: '#64748b',
-    marginTop: 1,
-  },
-  surveyorBanner: {
-    gap: 10,
-    backgroundColor: '#ffffff',
-    borderColor: '#e2e8f0',
-    padding: 14,
-    marginTop: 4,
-  },
-  surveyorBannerLeft: {
+  savedProjectMeta: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 10.5,
+    fontFamily: Fonts.sansRegular,
+  },
+  metaDot: {
+    fontSize: 10.5,
+  },
+  savedProjectRight: {
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  savedProjectArea: {
+    fontSize: 12.5,
+    fontFamily: Fonts.headingBold,
+  },
+  surveyorsGrid: {
+    flexDirection: 'row',
     gap: 10,
   },
-  surveyorIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+  surveyorMiniCard: {
+    flex: 1,
+    padding: 10,
+    gap: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  surveyorMiniHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  avatarCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  surveyorBannerTitle: {
+  avatarChar: {
+    fontSize: 13,
+    fontFamily: Fonts.headingBold,
+    color: '#ffffff',
+  },
+  surveyorMiniName: {
+    fontSize: 11.5,
+    fontFamily: Fonts.headingBold,
+  },
+  surveyorMiniLocation: {
+    fontSize: 9.5,
+    fontFamily: Fonts.sansRegular,
+  },
+  surveyorMiniFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    paddingTop: 6,
+  },
+  ratingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  ratingText: {
+    fontSize: 10,
+    fontFamily: Fonts.sansMedium,
+  },
+  callMiniBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 5,
+  },
+  callMiniBtnText: {
+    fontSize: 10,
+    fontFamily: Fonts.headingBold,
+    color: '#ffffff',
+  },
+  careerBanner: {
+    gap: 8,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  careerBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  careerIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  careerTitle: {
     fontSize: 13.5,
     fontFamily: Fonts.headingBold,
-    color: '#0f172a',
   },
-  surveyorBannerDesc: {
+  careerDesc: {
     fontSize: 11,
     fontFamily: Fonts.sansRegular,
-    color: '#64748b',
     lineHeight: 15,
   },
 });

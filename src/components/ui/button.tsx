@@ -7,15 +7,29 @@ import {
   StyleProp,
   ViewStyle,
   TextStyle,
+  View,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
+import { useThemeStore } from '../../stores/theme-store';
 
-interface ButtonProps {
-  title: string;
+export type ButtonVariant =
+  | 'default'
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'destructive'
+  | 'warning';
+
+export type ButtonSize = 'default' | 'sm' | 'md' | 'lg' | 'icon';
+
+export interface ButtonProps {
+  title?: string;
+  children?: React.ReactNode;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -25,41 +39,123 @@ interface ButtonProps {
 
 export const Button: React.FC<ButtonProps> = ({
   title,
+  children,
   onPress,
-  variant = 'primary',
-  size = 'md',
+  variant = 'default',
+  size = 'default',
   loading = false,
   disabled = false,
   style,
   textStyle,
   icon,
 }) => {
-  const getButtonStyle = () => {
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+
+  const getVariantStyles = (): { btn: ViewStyle; text: TextStyle } => {
     switch (variant) {
       case 'secondary':
-        return styles.btnSecondary;
+        return {
+          btn: {
+            backgroundColor: theme === 'dark' ? '#1e293b' : '#0f172a',
+            borderColor: 'transparent',
+          },
+          text: { color: '#ffffff' },
+        };
       case 'outline':
-        return styles.btnOutline;
+        return {
+          btn: {
+            backgroundColor: 'transparent',
+            borderWidth: 1,
+            borderColor: colors.border,
+          },
+          text: { color: colors.text },
+        };
       case 'ghost':
-        return styles.btnGhost;
+        return {
+          btn: {
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
+          },
+          text: { color: colors.text },
+        };
+      case 'destructive':
+        return {
+          btn: {
+            backgroundColor: '#ef4444',
+            borderColor: 'transparent',
+          },
+          text: { color: '#ffffff' },
+        };
+      case 'warning':
+        return {
+          btn: {
+            backgroundColor: 'rgba(217, 119, 6, 0.12)',
+            borderWidth: 1,
+            borderColor: 'rgba(217, 119, 6, 0.3)',
+          },
+          text: { color: '#d97706' },
+        };
       case 'primary':
+      case 'default':
       default:
-        return styles.btnPrimary;
+        return {
+          btn: {
+            backgroundColor: colors.primary,
+            borderColor: 'transparent',
+          },
+          text: { color: '#ffffff' },
+        };
     }
   };
 
-  const getTextStyle = () => {
-    switch (variant) {
-      case 'outline':
-      case 'ghost':
-        return styles.textOutline;
-      case 'secondary':
-        return styles.textSecondary;
-      case 'primary':
+  const getSizeStyle = (): { btn: ViewStyle; text: TextStyle } => {
+    switch (size) {
+      case 'icon':
+        return {
+          btn: {
+            width: 32,
+            height: 32,
+            paddingHorizontal: 0,
+            paddingVertical: 0,
+            borderRadius: 8,
+          },
+          text: { fontSize: 13 },
+        };
+      case 'sm':
+        return {
+          btn: {
+            height: 32,
+            paddingHorizontal: 10,
+            borderRadius: 8,
+          },
+          text: { fontSize: 11.5 },
+        };
+      case 'lg':
+        return {
+          btn: {
+            height: 44,
+            paddingHorizontal: 20,
+            borderRadius: 10,
+          },
+          text: { fontSize: 14.5 },
+        };
+      case 'md':
+      case 'default':
       default:
-        return styles.textPrimary;
+        return {
+          btn: {
+            height: 38,
+            paddingHorizontal: 14,
+            borderRadius: 8,
+          },
+          text: { fontSize: 13 },
+        };
     }
   };
+
+  const variantStyle = getVariantStyles();
+  const sizeStyle = getSizeStyle();
 
   return (
     <TouchableOpacity
@@ -68,21 +164,34 @@ export const Button: React.FC<ButtonProps> = ({
       disabled={disabled || loading}
       style={[
         styles.base,
-        getButtonStyle(),
-        styles[`size_${size}`],
+        variantStyle.btn,
+        sizeStyle.btn,
         disabled && styles.disabled,
         style,
       ]}
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? '#fff' : Colors.light.primary}
+          color={variant === 'default' || variant === 'primary' || variant === 'secondary' ? '#fff' : colors.primary}
           size='small'
         />
       ) : (
         <>
-          {icon}
-          <Text style={[styles.baseText, getTextStyle(), textStyle]}>{title}</Text>
+          {icon && <View style={styles.iconWrapper}>{icon}</View>}
+          {title ? (
+            <Text
+              style={[
+                styles.baseText,
+                variantStyle.text,
+                sizeStyle.text,
+                textStyle,
+              ]}
+            >
+              {title}
+            </Text>
+          ) : (
+            children
+          )}
         </>
       )}
     </TouchableOpacity>
@@ -94,50 +203,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
     gap: 6,
   },
   baseText: {
     fontFamily: Fonts.headingSemiBold,
-    fontSize: 13,
     letterSpacing: -0.2,
   },
-  btnPrimary: {
-    backgroundColor: '#16a34a',
-  },
-  textPrimary: {
-    color: '#ffffff',
-  },
-  btnSecondary: {
-    backgroundColor: '#0f172a',
-  },
-  textSecondary: {
-    color: '#ffffff',
-  },
-  btnOutline: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#16a34a',
-  },
-  btnGhost: {
-    backgroundColor: 'transparent',
-  },
-  textOutline: {
-    color: '#16a34a',
-  },
-  size_sm: {
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  size_md: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  size_lg: {
-    paddingVertical: 11,
-    paddingHorizontal: 18,
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   disabled: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
 });

@@ -16,10 +16,12 @@ import {
   NotoSansBengali_600SemiBold,
   NotoSansBengali_700Bold,
 } from '@expo-google-fonts/noto-sans-bengali';
+import { useThemeStore } from '../stores/theme-store';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
+  const { theme } = useThemeStore();
   const [fontsLoaded] = useFonts({
     HindSiliguri_400Regular,
     HindSiliguri_500Medium,
@@ -43,7 +45,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style='dark' />
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
         <Stack.Screen name='(tools)' options={{ headerShown: false }} />
