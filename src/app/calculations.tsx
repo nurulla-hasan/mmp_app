@@ -20,12 +20,11 @@ import {
 } from 'lucide-react-native';
 import { CalculationCard } from '../components/calculations/calculation-card';
 import { CalculationEmptyState } from '../components/calculations/calculation-empty-state';
-import { useCalculationStore } from '../stores/calculation-store';
+import { useCalculations } from '../hooks/queries/use-calculations';
 import { Fonts } from '../constants/typography';
 import { Colors } from '../constants/colors';
 import { useThemeStore } from '../stores/theme-store';
 import { useAuthStore } from '../stores/auth-store';
-import type { TCalculation } from '../types/calculation';
 
 export default function CalculationsScreen() {
   const router = useRouter();
@@ -34,46 +33,33 @@ export default function CalculationsScreen() {
   const isDark = theme === 'dark';
   const { isAuthenticated } = useAuthStore();
 
-  const {
-    calculations: cachedCalculations,
-    isLoading,
-    fetchCalculations,
-    removeCalculation,
-  } = useCalculationStore();
-
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<TCalculation[] | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
+  // Debounce search input 300ms
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setSearchResults(null);
-      if (isAuthenticated) {
-        fetchCalculations();
-      }
-    } else {
-      const timer = setTimeout(async () => {
-        const results = await fetchCalculations(false, searchTerm.trim());
-        setSearchResults(results);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [searchTerm, isAuthenticated, fetchCalculations]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // ── TanStack Query: auto-cached, refetch on invalidation ─────────────────
+  const {
+    data: calculations = [],
+    isLoading,
+    refetch,
+  } = useCalculations(debouncedSearch || undefined);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchCalculations(true, searchTerm.trim());
+    await refetch();
     setRefreshing(false);
   };
 
-  const displayCalculations = searchResults !== null ? searchResults : cachedCalculations;
-
-  const handleDeleted = (deletedId: string) => {
-    removeCalculation(deletedId);
-    if (searchResults !== null) {
-      setSearchResults((prev) => (prev ? prev.filter((c) => c.id !== deletedId) : []));
-    }
-  };
+  // handleDeleted: TanStack Query optimistic delete is done inside the card mutation
+  // We don't need local state — queryClient.invalidateQueries auto-syncs the list
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
@@ -134,22 +120,21 @@ export default function CalculationsScreen() {
         </View>
 
         {/* Loading Spinner */}
-        {isLoading && displayCalculations.length === 0 ? (
+        {isLoading && calculations.length === 0 ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size='large' color='#16a34a' />
             <Text style={[styles.loadingText, { color: colors.textMuted }]}>
               ক্যালকুলেশন লোড হচ্ছে...
             </Text>
           </View>
-        ) : displayCalculations.length === 0 ? (
+        ) : calculations.length === 0 ? (
           <CalculationEmptyState searchTerm={searchTerm} />
         ) : (
           <View style={styles.listContainer}>
-            {displayCalculations.map((calc) => (
+            {calculations.map((calc) => (
               <CalculationCard
                 key={calc.id}
                 calculation={calc}
-                onDeleted={handleDeleted}
               />
             ))}
           </View>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { FileText, Map as MapIcon, Trash2, Calendar, Layers } from 'lucide-react-native';
@@ -9,26 +9,25 @@ import { useThemeStore } from '../../stores/theme-store';
 import { useMapStore } from '../../features/land-measurement/store/useMapStore';
 import { calculatePolygonData } from '../../features/land-measurement/utils/calculations';
 import { PLOT_COLOR_PALETTE } from '../../features/land-measurement/utils/canvas';
-import { CalculationService } from '../../services/calculation-service';
-import { SuccessToast, ErrorToast, toBengaliDigits } from '../../lib/utils';
+import { useDeleteCalculation } from '../../hooks/mutations/use-calculation-mutations';
+import { SuccessToast, toBengaliDigits } from '../../lib/utils';
 import type { TCalculation } from '../../types/calculation';
 import type { PlotRecord } from '../../features/land-measurement/types/map';
 
 interface CalculationCardProps {
   calculation: TCalculation;
-  onDeleted: (id: string) => void;
 }
 
 export const CalculationCard: React.FC<CalculationCardProps> = ({
   calculation,
-  onDeleted,
 }) => {
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const isDark = theme === 'dark';
 
-  const [deleting, setDeleting] = useState(false);
+  // ── TanStack Mutation: optimistic delete + auto-invalidation ─────────────
+  const { mutate: deleteCalculation, isPending: deleting } = useDeleteCalculation();
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
@@ -92,22 +91,8 @@ export const CalculationCard: React.FC<CalculationCardProps> = ({
         {
           text: 'মুছে ফেলুন',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              setDeleting(true);
-              const res = await CalculationService.deleteCalculation(calculation.id);
-              if (res.success) {
-                SuccessToast('পরিমাপ সফলভাবে মুছে ফেলা হয়েছে।');
-                onDeleted(calculation.id);
-              } else {
-                ErrorToast(res.message || 'মুছতে সমস্যা হয়েছে।');
-              }
-            } catch (err: any) {
-              ErrorToast(err?.message || 'সমস্যা হয়েছে। আবার চেষ্টা করুন।');
-            } finally {
-              setDeleting(false);
-            }
-          },
+          // TanStack mutation handles optimistic update + invalidation + toast
+          onPress: () => deleteCalculation(calculation.id),
         },
       ]
     );

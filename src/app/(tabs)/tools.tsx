@@ -166,7 +166,7 @@ export default function ToolsHubScreen() {
         </View>
       </TouchableOpacity>
 
-      {/* ─── 2. বিশেষায়িত ল্যান্ড টুলস (Specialized Tools) ─── */}
+      {/* ─── 2. Specialized Land Tools ─── */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>বিশেষায়িত ল্যান্ড টুলস</Text>
         <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
@@ -204,7 +204,7 @@ export default function ToolsHubScreen() {
         })}
       </View>
 
-      {/* ─── 3. হিসাব ও ইউটিলিটি টুলস (Calculation & Utilities) ─── */}
+      {/* ─── 3. Calculation & Utility Tools ─── */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>ভূমি হিসাব ও ইউটিলিটি টুলস</Text>
         <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>

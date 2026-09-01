@@ -9,34 +9,25 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
-  Alert,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import {
   X,
   User,
   Phone,
   MessageCircle,
-  MapPin,
   Copy,
   ChevronDown,
-  Check,
   Camera,
+  Check,
 } from 'lucide-react-native';
 import { Input } from '../ui/input';
-import { AuthService } from '../../services/auth-service';
-import { useAuthStore } from '../../stores/auth-store';
 import { useThemeStore } from '../../stores/theme-store';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
 import { SuccessToast, ErrorToast } from '../../lib/utils';
+import { useUpdateProfile, useUploadAvatar } from '../../hooks/mutations/use-profile-mutations';
+import { useDistricts } from '../../hooks/queries/use-profile';
 import type { TAuthUser } from '../../types/auth';
-
-interface DistrictOption {
-  value: string;
-  label: string;
-  upazilas: string[];
-}
 
 interface ProfileEditModalProps {
   visible: boolean;
@@ -52,7 +43,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const isDark = theme === 'dark';
-  const { refreshUser } = useAuthStore();
 
   const [name, setName] = useState(user.name || '');
   const [imageUrl, setImageUrl] = useState(user.imageUrl || '');
@@ -60,11 +50,14 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   const [whatsappNumber, setWhatsappNumber] = useState(user.whatsappNumber || '');
   const [district, setDistrict] = useState(user.district || '');
   const [upazila, setUpazila] = useState(user.upazila || '');
-  const [loading, setLoading] = useState(false);
-
-  const [districts, setDistricts] = useState<DistrictOption[]>([]);
   const [districtPickerOpen, setDistrictPickerOpen] = useState(false);
   const [upazilaPickerOpen, setUpazilaPickerOpen] = useState(false);
+
+  // ── TanStack Query Hooks ─────────────────────────────────────────────────
+  const { data: districts = [] } = useDistricts();
+  const { mutate: updateProfile, isPending: loadingUpdate } = useUpdateProfile();
+  const { mutate: uploadAvatar, isPending: loadingUpload } = useUploadAvatar();
+  const loading = loadingUpdate || loadingUpload;
 
   useEffect(() => {
     if (visible) {
@@ -74,103 +67,49 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
       setWhatsappNumber(user.whatsappNumber || '');
       setDistrict(user.district || '');
       setUpazila(user.upazila || '');
-      loadDistricts();
     }
   }, [visible, user]);
 
-  const loadDistricts = async () => {
-    try {
-      const res = await AuthService.getDistricts();
-      if (res.success && res.data) {
-        setDistricts(res.data);
-      }
-    } catch {
-      // Ignore fallback
-    }
-  };
-
   const selectedDistrictObj = districts.find(
-    (d) => d.label === district || d.value === district
+    (d: any) => d.label === district || d.value === district
   );
   const availableUpazilas = selectedDistrictObj?.upazilas || [];
 
   const copyPhoneToWhatsapp = () => {
     if (phone.trim()) {
       setWhatsappNumber(phone.trim());
-      SuccessToast('মোবাইল নম্বর WhatsApp-এ কপি করা হয়েছে');
+      SuccessToast('মোবাইল নম্বর WhatsApp-এ কপি করা হয়েছে');
     }
   };
 
-  const handlePickAndCropImage = async () => {
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert('অনুমতি প্রয়োজন', 'গ্যালারি থেকে ছবি নিতে ফটো লাইব্রেরির অনুমতি দিন।');
-        return;
-      }
-
-      const pickerResult = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true, // Native square cropper!
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
-
-      const asset = pickerResult.assets[0];
-      const formData = new FormData();
-      formData.append('image', {
-        uri: asset.uri,
-        name: asset.fileName || 'profile.jpg',
-        type: asset.mimeType || 'image/jpeg',
-      } as any);
-
-      setLoading(true);
-      const res = await AuthService.uploadProfileImage(formData);
-      if (res.success && res.data) {
-        setImageUrl(res.data.imageUrl || asset.uri);
-        await refreshUser();
-        SuccessToast('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
-      } else {
-        ErrorToast(res.message || 'ছবি আপলোড করা যায়নি।');
-      }
-    } catch (err: any) {
-      ErrorToast(err?.message || 'সমস্যা হয়েছে। আবার চেষ্টা করুন।');
-    } finally {
-      setLoading(false);
-    }
+  // Avatar upload via mutation hook (handles permission, picker, crop, upload)
+  const handlePickAndCropImage = () => {
+    uploadAvatar(undefined, {
+      onSuccess: (res: any) => {
+        if (res?.success && res?.data?.imageUrl) {
+          setImageUrl(res.data.imageUrl);
+        }
+      },
+    });
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (!name.trim()) {
       ErrorToast('পূর্ণ নাম ফাঁকা রাখা যাবে না।');
       return;
     }
 
-    try {
-      setLoading(true);
-      const res = await AuthService.updateMe({
+    updateProfile(
+      {
         name: name.trim(),
         imageUrl: imageUrl.trim() || undefined,
         phone: phone.trim() || undefined,
         whatsappNumber: whatsappNumber.trim() || undefined,
         district: district.trim() || undefined,
         upazila: upazila.trim() || undefined,
-      });
-
-      if (res.success) {
-        await refreshUser();
-        SuccessToast('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
-        onClose();
-      } else {
-        ErrorToast(res.message || 'প্রোফাইল আপডেট করা যায়নি।');
-      }
-    } catch (err: any) {
-      ErrorToast(err?.message || 'সমস্যা হয়েছে। আবার চেষ্টা করুন।');
-    } finally {
-      setLoading(false);
-    }
+      },
+      { onSuccess: (res: any) => { if (res.success) onClose(); } }
+    );
   };
 
   return (

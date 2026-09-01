@@ -18,6 +18,7 @@ import {
 } from '@expo-google-fonts/noto-sans-bengali';
 import { useThemeStore } from '../stores/theme-store';
 import { useAuthStore } from '../stores/auth-store';
+import { QueryProvider } from '../providers/QueryProvider';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -50,23 +51,25 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
-        <Stack.Screen name='(tools)' options={{ headerShown: false }} />
-        <Stack.Screen name='(auth)' options={{ headerShown: false }} />
-        <Stack.Screen name='calculations' options={{ headerShown: false }} />
-        <Stack.Screen
-          name='pricing'
-          options={{
-            presentation: 'modal',
-            headerShown: true,
-            title: 'সাবস্ক্রিপশন প্ল্যানস',
-            headerTitleStyle: { fontFamily: 'HindSiliguri_700Bold', fontSize: 16 },
-          }}
-        />
-      </Stack>
-    </SafeAreaProvider>
+    <QueryProvider>
+      <SafeAreaProvider>
+        <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
+          <Stack.Screen name='(tools)' options={{ headerShown: false }} />
+          <Stack.Screen name='(auth)' options={{ headerShown: false }} />
+          <Stack.Screen name='calculations' options={{ headerShown: false }} />
+          <Stack.Screen
+            name='pricing'
+            options={{
+              presentation: 'modal',
+              headerShown: true,
+              title: 'সাবস্ক্রিপশন প্ল্যানস',
+              headerTitleStyle: { fontFamily: 'HindSiliguri_700Bold', fontSize: 16 },
+            }}
+          />
+        </Stack>
+      </SafeAreaProvider>
+    </QueryProvider>
   );
 }

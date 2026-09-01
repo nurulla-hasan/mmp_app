@@ -18,7 +18,7 @@ export const MAP_INCHES_PER_MILE = 16;
 export const FEET_PER_MAP_INCH = MILE_TO_FT / MAP_INCHES_PER_MILE; // 330 ft/inch
 
 export interface ScalePreset {
-  /** Display label (e.g. "১০ চেইন") */
+  /** Display label */
   label: string;
   /** Real-world distance in feet */
   valueFt: number;

@@ -31,7 +31,7 @@ import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
 import { useAuthStore } from '../../stores/auth-store';
-import { useCalculationStore } from '../../stores/calculation-store';
+import { useCalculations } from '../../hooks/queries/use-calculations';
 import { useMapStore } from '../../features/land-measurement/store/useMapStore';
 import { calculatePolygonData } from '../../features/land-measurement/utils/calculations';
 import { PLOT_COLOR_PALETTE } from '../../features/land-measurement/utils/canvas';
@@ -62,21 +62,12 @@ export default function HomeScreen() {
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
+
+  // ── TanStack Query: auto-cached, stale-while-revalidate ──────────────────
+  const { data: allCalculations = [], isLoading: loadingCalculations, refetch } = useCalculations();
+  const realCalculations = allCalculations.slice(0, 3);
+
   const { isAuthenticated } = useAuthStore();
-
-  const {
-    calculations,
-    isLoading: loadingCalculations,
-    fetchCalculations,
-  } = useCalculationStore();
-
-  const realCalculations = calculations.slice(0, 3);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchCalculations();
-    }
-  }, [isAuthenticated, fetchCalculations]);
 
   const handleOpenCalculation = (calculation: TCalculation) => {
     const scaleValue = calculation.scalePxPerUnit || null;
@@ -125,7 +116,7 @@ export default function HomeScreen() {
       refreshControl={
         <RefreshControl
           refreshing={loadingCalculations}
-          onRefresh={() => fetchCalculations(true)}
+          onRefresh={refetch}
           tintColor='#16a34a'
         />
       }
@@ -164,7 +155,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* ─── 2. অন্যান্য টুলস (Exact 4 Specialized Tools: Title & Badge Only) ─── */}
+      {/* ─── 2. Specialized Tools (Exact 4 Specialized Tools: Title & Badge Only) ─── */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>অন্যান্য টুলস</Text>
         <TouchableOpacity onPress={() => router.push('/(tabs)/tools')} activeOpacity={0.7}>
@@ -172,9 +163,9 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Row 1: মৌজা ম্যাপ স্টুডিও + মৌজা জিও স্টুডিও */}
+      {/* Row 1: Mouza Map Studio + Mouza Geo Studio */}
       <View style={styles.grid}>
-        {/* Tool 1: মৌজা ম্যাপ স্টুডিও */}
+        {/* Tool 1: Mouza Map Studio */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
@@ -189,7 +180,7 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Tool 2: মৌজা জিও স্টুডিও */}
+        {/* Tool 2: Mouza Geo Studio */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
@@ -205,9 +196,9 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Row 2: ম্যাপ তুলনা ও প্যান্টাগ্রাফ + ডিজিটাল ম্যাপ ট্রেসিং */}
+      {/* Row 2: Pantagraph + Digital Map Tracing */}
       <View style={styles.grid}>
-        {/* Tool 3: ম্যাপ তুলনা ও প্যান্টাগ্রাফ */}
+        {/* Tool 3: Pantagraph */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
@@ -222,7 +213,7 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Tool 4: ডিজিটাল ম্যাপ ট্রেসিং */}
+        {/* Tool 4: Digital Map Tracing */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
@@ -238,7 +229,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ─── 3. সংরক্ষিত প্রজেক্ট তালিকা ─── */}
+      {/* ─── 3. Saved Calculations Section ─── */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleRow}>
           <FolderKanban size={16} color={colors.primary} />
@@ -346,7 +337,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* ─── 4. ভেরিফাইড সার্ভেয়ার ─── */}
+      {/* ─── 4. Verified Surveyors Section ─── */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>ভেরিফাইড সার্ভেয়ার</Text>
         <TouchableOpacity onPress={() => router.push('/(tabs)/surveyors')} activeOpacity={0.7}>
@@ -387,7 +378,7 @@ export default function HomeScreen() {
         ))}
       </View>
 
-      {/* ─── 5. সার্ভেয়ার ক্যারিয়ার ব্যানার ─── */}
+      {/* ─── 5. Surveyor Career Banner ─── */}
       <View style={[styles.careerBanner, { backgroundColor: theme === 'dark' ? '#064e3b25' : '#f0fdf4', borderColor: theme === 'dark' ? '#064e3b' : '#bbf7d0' }]}>
         <View style={styles.careerBannerLeft}>
           <View style={[styles.careerIconCircle, { backgroundColor: theme === 'dark' ? '#064e3b' : '#dcfce7' }]}>
