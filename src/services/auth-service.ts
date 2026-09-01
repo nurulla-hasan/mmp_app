@@ -66,6 +66,26 @@ export const AuthService = {
       auth: true,
     }),
 
+  changePassword: (payload: { oldPassword?: string; newPassword?: string }): Promise<ApiResult<{ message: string }>> =>
+    apiFetch<{ message: string }>('/auth/change-password', {
+      method: 'POST',
+      body: payload,
+      auth: true,
+    }),
+
+  getDistricts: (): Promise<ApiResult<{ value: string; label: string; upazilas: string[] }[]>> =>
+    apiFetch<{ value: string; label: string; upazilas: string[] }[]>('/districts', {
+      method: 'GET',
+      auth: false,
+    }),
+
+  uploadProfileImage: (formData: FormData): Promise<ApiResult<TAuthUser>> =>
+    apiFetch<TAuthUser>('/users/profile-image', {
+      method: 'PATCH',
+      body: formData,
+      auth: true,
+    }),
+
   logout: (): Promise<ApiResult<null>> =>
     apiFetch<null>('/auth/logout', {
       method: 'POST',

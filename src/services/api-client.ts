@@ -24,10 +24,14 @@ export async function apiFetch<T>(
 
   const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
+  const isFormData = body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     Accept: 'application/json',
   };
+
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (auth) {
     try {
@@ -44,7 +48,7 @@ export async function apiFetch<T>(
     const response = await fetch(url, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined,
+      body: isFormData ? (body as any) : body ? JSON.stringify(body) : undefined,
     });
 
     const json = await response.json();

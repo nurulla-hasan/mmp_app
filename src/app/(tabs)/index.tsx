@@ -13,6 +13,7 @@ import {
   Briefcase,
   Star,
   FolderKanban,
+  ChevronRight,
 } from 'lucide-react-native';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -194,7 +195,14 @@ export default function HomeScreen() {
           <FolderKanban size={16} color={colors.primary} />
           <Text style={[styles.sectionTitle, { color: colors.text }]}>সংরক্ষিত প্রজেক্ট তালিকা</Text>
         </View>
-        <Text style={[styles.recentCountText, { color: colors.textMuted }]}>৩টি প্রজেক্ট</Text>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          style={styles.seeAllRow}
+          onPress={() => router.push('/land-measurement')}
+        >
+          <Text style={[styles.seeAllText, { color: colors.primary }]}>সব প্রজেক্ট</Text>
+          <ChevronRight size={13} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.savedProjectsList}>
@@ -380,6 +388,11 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontFamily: Fonts.sansRegular,
     marginTop: 1,
+  },
+  seeAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   seeAllText: {
     fontSize: 11.5,

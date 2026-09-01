@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, Crown, Search, Sun, Moon, LogIn } from 'lucide-react-native';
+import { Search, Sun, Moon, LogIn } from 'lucide-react-native';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
 import { useThemeStore } from '../../stores/theme-store';
@@ -54,7 +54,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <View style={styles.actionGroup}>
           {/* Theme Toggle Button */}
           <Button
-            variant='outline'
+            variant='ghost'
             size='icon'
             onPress={toggleTheme}
             icon={
@@ -70,12 +70,22 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           {isAuthenticated && user ? (
             <TouchableOpacity
               activeOpacity={0.8}
-              style={styles.headerAvatarBtn}
+              style={[
+                styles.headerAvatarBtn,
+                user.isSubscribed && { borderColor: '#f59e0b', borderWidth: 1.5 },
+              ]}
               onPress={() => router.push('/(tabs)/profile')}
             >
-              <Text style={styles.headerAvatarText}>
-                {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-              </Text>
+              {user.imageUrl ? (
+                <Image
+                  source={{ uri: user.imageUrl }}
+                  style={styles.headerAvatarImg}
+                />
+              ) : (
+                <Text style={styles.headerAvatarText}>
+                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </Text>
+              )}
             </TouchableOpacity>
           ) : (
             <Button
@@ -86,15 +96,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               icon={<LogIn size={13} color='#16a34a' strokeWidth={2} />}
             />
           )}
-
-          {/* Upgrade Button */}
-          <Button
-            variant='warning'
-            size='sm'
-            title='আপগ্রেড'
-            onPress={() => router.push('/pricing')}
-            icon={<Crown size={13} color='#d97706' strokeWidth={2.2} />}
-          />
         </View>
       </View>
 
@@ -160,16 +161,21 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   headerAvatarBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#16a34a',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  headerAvatarImg: {
+    width: '100%',
+    height: '100%',
   },
   headerAvatarText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: Fonts.headingBold,
   },
   notifDot: {

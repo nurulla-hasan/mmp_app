@@ -15,6 +15,7 @@ interface AuthState {
   setSession: (tokens: AuthTokens, user?: TAuthUser) => Promise<void>;
   setUser: (user: TAuthUser) => Promise<void>;
   fetchCurrentUser: () => Promise<void>;
+  refreshUser: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -110,6 +111,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Failed to refresh profile
     }
+  },
+
+  refreshUser: async () => {
+    await get().fetchCurrentUser();
   },
 
   logout: async () => {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,26 +9,24 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
-  Crown,
-  Sparkles,
-  User,
-  Mail,
-  Phone,
-  MapPin,
   LogOut,
   LogIn,
   UserPlus,
   ShieldCheck,
-  Calendar,
+  UserCheck,
 } from 'lucide-react-native';
-import { Card } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Fonts } from '../../constants/typography';
+import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../stores/auth-store';
 import { useThemeStore } from '../../stores/theme-store';
-import { Colors } from '../../constants/colors';
 import { SuccessToast } from '../../lib/utils';
+import { ProfileHeaderCard } from '../../components/profile/profile-header-card';
+import { PersonalInfoCard } from '../../components/profile/personal-info-card';
+import { ActivityCard } from '../../components/profile/activity-card';
+import { AccountSettingsCard } from '../../components/profile/account-settings-card';
+import { ProfileEditModal } from '../../components/profile/profile-edit-modal';
+import { ChangePasswordModal } from '../../components/profile/change-password-modal';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -37,11 +35,13 @@ export default function ProfileScreen() {
   const isDark = theme === 'dark';
 
   const { user, isAuthenticated, logout } = useAuthStore();
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
       'লগআউট',
-      'আপনি কি নিশ্চিত যে লগআউট করতে চান?',
+      'আপনি কি নিশ্চিত যে আপনার অ্যাকাউন্ট থেকে লগআউট করতে চান?',
       [
         { text: 'বাতিল', style: 'cancel' },
         {
@@ -64,131 +64,93 @@ export default function ProfileScreen() {
     >
       {isAuthenticated && user ? (
         <>
-          {/* 1. Logged In User Card */}
-          <Card style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.avatarBox}>
-              <Text style={styles.avatarText}>
-                {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-              </Text>
-            </View>
-            <View style={styles.userInfoCol}>
-              <Text style={[styles.userName, { color: colors.text }]}>{user.name}</Text>
-              <Text style={[styles.userEmail, { color: colors.textMuted }]}>{user.email}</Text>
-              <View style={styles.badgesRow}>
-                <Badge
-                  label={user.isSubscribed ? 'প্রো মেম্বার' : 'ফ্রি মেম্বার'}
-                  variant={user.isSubscribed ? 'pro' : 'free'}
-                />
-                {user.role === 'SURVEYOR' && (
-                  <Badge label='সার্ভেয়ার' variant='warning' />
-                )}
-                {user.role === 'ADMIN' && (
-                  <Badge label='অ্যাডমিন' variant='neutral' />
-                )}
-              </View>
-            </View>
-          </Card>
+          {/* 1. Profile Header & Identity Card */}
+          <ProfileHeaderCard
+            user={user}
+            onEditPress={() => setEditModalVisible(true)}
+          />
 
-          {/* 2. User Info Details Card */}
-          <Card style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.cardSectionTitle, { color: colors.text }]}>প্রোফাইল বিবরণ</Text>
+          {/* 2. Personal & Contact Information Card */}
+          <PersonalInfoCard
+            user={user}
+            onEditPress={() => setEditModalVisible(true)}
+          />
 
-            <View style={styles.detailItem}>
-              <Mail size={16} color={colors.textMuted} />
-              <View style={styles.detailTextCol}>
-                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>ইমেইল</Text>
-                <Text style={[styles.detailVal, { color: colors.text }]}>{user.email}</Text>
-              </View>
-              {user.emailVerified ? (
-                <ShieldCheck size={16} color='#16a34a' />
-              ) : null}
-            </View>
+          {/* 3. My Activities Card */}
+          <ActivityCard />
 
-            {user.phone ? (
-              <View style={styles.detailItem}>
-                <Phone size={16} color={colors.textMuted} />
-                <View style={styles.detailTextCol}>
-                  <Text style={[styles.detailLabel, { color: colors.textMuted }]}>মোবাইল নম্বর</Text>
-                  <Text style={[styles.detailVal, { color: colors.text }]}>{user.phone}</Text>
-                </View>
-              </View>
-            ) : null}
+          {/* 4. Account Settings Card */}
+          <AccountSettingsCard
+            onChangePasswordPress={() => setPasswordModalVisible(true)}
+          />
 
-            {user.district || user.upazila ? (
-              <View style={styles.detailItem}>
-                <MapPin size={16} color={colors.textMuted} />
-                <View style={styles.detailTextCol}>
-                  <Text style={[styles.detailLabel, { color: colors.textMuted }]}>ঠিকানা</Text>
-                  <Text style={[styles.detailVal, { color: colors.text }]}>
-                    {[user.upazila, user.district].filter(Boolean).join(', ')}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-          </Card>
-
-          {/* 3. Upgrade Banner (if not subscribed) */}
-          {!user.isSubscribed && (
-            <View style={styles.upgradeCard}>
-              <View style={styles.upgradeHeader}>
-                <Crown size={18} color='#fbbf24' />
-                <Text style={styles.upgradeTitle}>প্রো মেম্বারশিপে আপগ্রেড করুন</Text>
-              </View>
-              <Text style={styles.upgradeDesc}>
-                আনলিমিটেড জমি পরিমাপ, প্যান্টাগ্রাফ ও ডিজিটাল ট্রেসিং টুলসের সম্পূর্ণ অ্যাক্সেস পান।
-              </Text>
-              <Button
-                title='প্ল্যান ও অফার দেখুন'
-                size='sm'
-                onPress={() => router.push('/pricing')}
-                style={{ backgroundColor: '#16a34a', marginTop: 4 }}
-                icon={<Sparkles size={13} color='#fff' />}
-              />
-            </View>
-          )}
-
-          {/* 4. Logout Action */}
-          <Button
-            title='লগআউট করুন'
-            variant='destructive'
-            size='md'
+          {/* 5. Logout Action Button */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={[
+              styles.logoutBtn,
+              {
+                backgroundColor: isDark ? 'rgba(239, 68, 68, 0.08)' : '#fef2f2',
+                borderColor: isDark ? 'rgba(239, 68, 68, 0.25)' : '#fecaca',
+              },
+            ]}
             onPress={handleLogout}
-            icon={<LogOut size={16} color='#ffffff' />}
-            style={{ marginTop: 6 }}
+          >
+            <LogOut size={15} color='#ef4444' />
+            <Text style={styles.logoutBtnText}>লগআউট করুন</Text>
+          </TouchableOpacity>
+
+          {/* Modals */}
+          <ProfileEditModal
+            visible={editModalVisible}
+            onClose={() => setEditModalVisible(false)}
+            user={user}
+          />
+
+          <ChangePasswordModal
+            visible={passwordModalVisible}
+            onClose={() => setPasswordModalVisible(false)}
           />
         </>
       ) : (
-        /* Guest / Not Logged In View */
-        <View style={styles.guestContainer}>
-          <Card style={[styles.guestCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.guestIconCircle}>
-              <User size={36} color='#16a34a' />
-            </View>
-            <Text style={[styles.guestTitle, { color: colors.text }]}>আপনার অ্যাকাউন্ট নেই</Text>
-            <Text style={[styles.guestSubtitle, { color: colors.textMuted }]}>
-              আপনার জমির পরিমাপ, মৌজা ম্যাপ এবং কাস্টম প্রজেক্ট সেভ রাখতে সাইন ইন করুন।
-            </Text>
+        /* Guest Unauthenticated State */
+        <View
+          style={[
+            styles.guestCard,
+            {
+              backgroundColor: isDark ? '#111827' : '#ffffff',
+              borderColor: isDark ? '#1f2937' : '#e2e8f0',
+            },
+          ]}
+        >
+          <View style={[styles.guestIconCircle, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
+            <UserCheck size={36} color='#16a34a' />
+          </View>
+          <Text style={[styles.guestTitle, { color: colors.text }]}>
+            আপনার প্রোফাইলে প্রবেশ করুন
+          </Text>
+          <Text style={[styles.guestSubtitle, { color: colors.textMuted }]}>
+            আপনার সংরক্ষিত প্রজেক্ট, হিসাব ও প্রোফাইল ব্যবস্থাপনা করতে লগইন করুন।
+          </Text>
 
-            <View style={styles.guestActionCol}>
-              <Button
-                title='সাইন ইন করুন'
-                variant='primary'
-                size='lg'
-                onPress={() => router.push('/(auth)/login')}
-                icon={<LogIn size={16} color='#ffffff' />}
-                style={{ width: '100%' }}
-              />
-
-              <Button
-                title='নতুন অ্যাকাউন্ট তৈরি করুন'
-                variant='outline'
-                size='lg'
-                onPress={() => router.push('/(auth)/register')}
-                icon={<UserPlus size={16} color='#16a34a' />}
-                style={{ width: '100%' }}
-              />
-            </View>
-          </Card>
+          <View style={styles.guestActionsRow}>
+            <Button
+              title='সাইন ইন করুন'
+              variant='primary'
+              size='md'
+              onPress={() => router.push('/(auth)/login')}
+              icon={<LogIn size={14} color='#ffffff' />}
+              style={{ flex: 1 }}
+            />
+            <Button
+              title='নতুন অ্যাকাউন্ট'
+              variant='outline'
+              size='md'
+              onPress={() => router.push('/(auth)/register')}
+              icon={<UserPlus size={14} color={colors.text} />}
+              style={{ flex: 1 }}
+            />
+          </View>
         </View>
       )}
     </ScrollView>
@@ -202,127 +164,55 @@ const styles = StyleSheet.create({
   content: {
     padding: 14,
     gap: 12,
+    paddingBottom: 32,
   },
-  userCard: {
+  logoutBtn: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    gap: 12,
-  },
-  avatarBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#16a34a',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 20,
-    fontFamily: Fonts.headingBold,
-    color: '#ffffff',
-  },
-  userInfoCol: {
-    flex: 1,
-    gap: 2,
-  },
-  userName: {
-    fontSize: 16,
-    fontFamily: Fonts.headingBold,
-  },
-  userEmail: {
-    fontSize: 12,
-    fontFamily: Fonts.sansRegular,
-  },
-  badgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 6,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
     marginTop: 4,
   },
-  detailsCard: {
-    padding: 14,
-    gap: 12,
-  },
-  cardSectionTitle: {
-    fontSize: 14,
-    fontFamily: Fonts.headingBold,
-    marginBottom: 4,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 4,
-  },
-  detailTextCol: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: 11,
-    fontFamily: Fonts.sansRegular,
-  },
-  detailVal: {
+  logoutBtnText: {
+    color: '#ef4444',
     fontSize: 13,
     fontFamily: Fonts.sansMedium,
-    marginTop: 1,
-  },
-  upgradeCard: {
-    backgroundColor: '#0f172a',
-    borderRadius: 12,
-    padding: 14,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#1e293b',
-  },
-  upgradeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  upgradeTitle: {
-    fontSize: 14,
-    fontFamily: Fonts.headingBold,
-    color: '#ffffff',
-  },
-  upgradeDesc: {
-    fontSize: 11,
-    fontFamily: Fonts.sansRegular,
-    color: '#94a3b8',
-    lineHeight: 16,
-  },
-  guestContainer: {
-    paddingTop: 20,
   },
   guestCard: {
+    borderRadius: 14,
+    borderWidth: 1,
     padding: 24,
     alignItems: 'center',
-    borderRadius: 16,
+    gap: 10,
+    marginTop: 20,
   },
   guestIconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: 'rgba(22, 163, 74, 0.1)',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 4,
   },
   guestTitle: {
     fontSize: 18,
     fontFamily: Fonts.headingBold,
-    marginBottom: 6,
+    textAlign: 'center',
   },
   guestSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: Fonts.sansRegular,
     textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: 20,
-    paddingHorizontal: 10,
+    lineHeight: 18,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
-  guestActionCol: {
-    width: '100%',
+  guestActionsRow: {
+    flexDirection: 'row',
     gap: 10,
+    width: '100%',
   },
 });
