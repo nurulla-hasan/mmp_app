@@ -17,11 +17,13 @@ import {
   NotoSansBengali_700Bold,
 } from '@expo-google-fonts/noto-sans-bengali';
 import { useThemeStore } from '../stores/theme-store';
+import { useAuthStore } from '../stores/auth-store';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const { theme } = useThemeStore();
+  const { initializeAuth } = useAuthStore();
   const [fontsLoaded] = useFonts({
     HindSiliguri_400Regular,
     HindSiliguri_500Medium,
@@ -32,6 +34,10 @@ export default function RootLayout() {
     NotoSansBengali_600SemiBold,
     NotoSansBengali_700Bold,
   });
+
+  useEffect(() => {
+    initializeAuth();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -49,6 +55,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
         <Stack.Screen name='(tools)' options={{ headerShown: false }} />
+        <Stack.Screen name='(auth)' options={{ headerShown: false }} />
         <Stack.Screen
           name='pricing'
           options={{

@@ -2,10 +2,11 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, Crown, Search, Sun, Moon } from 'lucide-react-native';
+import { Bell, Crown, Search, Sun, Moon, LogIn } from 'lucide-react-native';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
 import { useThemeStore } from '../../stores/theme-store';
+import { useAuthStore } from '../../stores/auth-store';
 import { Button } from '../ui/button';
 
 interface AppHeaderProps {
@@ -21,6 +22,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const router = useRouter();
   const { theme, toggleTheme } = useThemeStore();
+  const { user, isAuthenticated } = useAuthStore();
   const colors = Colors[theme];
 
   const displaySubtitle = subtitle || (title === 'মৌজা ম্যাপ প্রো' ? 'ডিজিটাল ল্যান্ড প্ল্যাটফর্ম' : 'মৌজা ম্যাপ প্রো');
@@ -48,7 +50,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* Right Actions (Theme Toggle, Upgrade, Bell) */}
+        {/* Right Actions (Theme Toggle, Auth / Avatar, Upgrade) */}
         <View style={styles.actionGroup}>
           {/* Theme Toggle Button */}
           <Button
@@ -64,6 +66,27 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             }
           />
 
+          {/* User Avatar OR Login Button */}
+          {isAuthenticated && user ? (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.headerAvatarBtn}
+              onPress={() => router.push('/(tabs)/profile')}
+            >
+              <Text style={styles.headerAvatarText}>
+                {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <Button
+              variant='outline'
+              size='sm'
+              title='লগইন'
+              onPress={() => router.push('/(auth)/login')}
+              icon={<LogIn size={13} color='#16a34a' strokeWidth={2} />}
+            />
+          )}
+
           {/* Upgrade Button */}
           <Button
             variant='warning'
@@ -72,17 +95,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             onPress={() => router.push('/pricing')}
             icon={<Crown size={13} color='#d97706' strokeWidth={2.2} />}
           />
-
-          {/* Bell Notification Button */}
-          <View style={{ position: 'relative' }}>
-            <Button
-              variant='outline'
-              size='icon'
-              onPress={() => {}}
-              icon={<Bell size={16} color={colors.textMuted} strokeWidth={2} />}
-            />
-            <View style={styles.notifDot} />
-          </View>
         </View>
       </View>
 
@@ -146,6 +158,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  headerAvatarBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#16a34a',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerAvatarText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontFamily: Fonts.headingBold,
   },
   notifDot: {
     position: 'absolute',

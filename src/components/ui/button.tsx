@@ -116,11 +116,15 @@ export const Button: React.FC<ButtonProps> = ({
           btn: {
             width: 32,
             height: 32,
+            width: 28,
+            height: 28,
             paddingHorizontal: 0,
             paddingVertical: 0,
             borderRadius: 8,
+            borderRadius: 6,
           },
           text: { fontSize: 13 },
+          text: { fontSize: 12 },
         };
       case 'sm':
         return {
@@ -128,8 +132,12 @@ export const Button: React.FC<ButtonProps> = ({
             height: 32,
             paddingHorizontal: 10,
             borderRadius: 8,
+            height: 28,
+            paddingHorizontal: 8,
+            borderRadius: 6,
           },
           text: { fontSize: 11.5 },
+          text: { fontSize: 11 },
         };
       case 'lg':
         return {
@@ -137,8 +145,12 @@ export const Button: React.FC<ButtonProps> = ({
             height: 44,
             paddingHorizontal: 20,
             borderRadius: 10,
+            height: 38,
+            paddingHorizontal: 16,
+            borderRadius: 6,
           },
           text: { fontSize: 14.5 },
+          text: { fontSize: 13 },
         };
       case 'md':
       case 'default':
@@ -148,8 +160,12 @@ export const Button: React.FC<ButtonProps> = ({
             height: 38,
             paddingHorizontal: 14,
             borderRadius: 8,
+            height: 34,
+            paddingHorizontal: 12,
+            borderRadius: 6,
           },
           text: { fontSize: 13 },
+          text: { fontSize: 12 },
         };
     }
   };
@@ -208,6 +224,8 @@ const styles = StyleSheet.create({
   baseText: {
     fontFamily: Fonts.headingSemiBold,
     letterSpacing: -0.2,
+    fontFamily: Fonts.sansMedium,
+    letterSpacing: -0.1,
   },
   iconWrapper: {
     alignItems: 'center',

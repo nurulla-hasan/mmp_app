@@ -1,0 +1,80 @@
+export type LoginPayload = {
+  email: string;
+  password: string;
+};
+
+export type RegisterPayload = {
+  name: string;
+  email: string;
+  password: string;
+};
+
+export type VerifyEmailPayload = {
+  email: string;
+  otp: string;
+};
+
+export type ResendOtpPayload = {
+  email: string;
+};
+
+export type ResetPasswordPayload = {
+  email: string;
+  otp: string;
+  password: string;
+};
+
+export type TSurveyorProfile = {
+  id: string;
+  slug: string;
+  name: string;
+  phone: string;
+  bio?: string;
+  experienceYears?: number;
+  district?: string;
+  upazila?: string;
+  rating?: number;
+  totalReviews?: number;
+  isVerified?: boolean;
+};
+
+export type TAuthUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: "USER" | "SURVEYOR" | "ADMIN" | "SUPER_ADMIN";
+  status: "ACTIVE" | "BLOCKED";
+  emailVerified: boolean;
+  isSubscribed: boolean;
+  imageUrl?: string;
+  phone?: string;
+  whatsappNumber?: string;
+  district?: string;
+  upazila?: string;
+  createdAt: string;
+  updatedAt: string;
+  hasPassword?: boolean;
+  authProvider?: "EMAIL" | "GOOGLE";
+  surveyorProfile?: TSurveyorProfile;
+};
+
+export type AuthTokens = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+export type ApiSuccess<T> = {
+  success: true;
+  statusCode: number;
+  message: string;
+  data: T;
+};
+
+export type ApiFailure = {
+  success: false;
+  statusCode: number;
+  message: string;
+};
+
+export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
+
