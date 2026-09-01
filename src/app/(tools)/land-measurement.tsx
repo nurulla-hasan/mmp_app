@@ -1,45 +1,147 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { Card } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { UploadCloud } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { ArrowLeft, Ruler } from 'lucide-react-native';
+import { MobileMapCanvas } from '../../features/land-measurement/components/canvas/MobileMapCanvas';
+import { MobileCanvasToolbar } from '../../features/land-measurement/components/toolbar/MobileCanvasToolbar';
+import { MobileResultsBar } from '../../features/land-measurement/components/results/MobileResultsBar';
+import { ScaleCalibrationModal } from '../../features/land-measurement/components/modals/ScaleCalibrationModal';
+import { ImagePickerSheet } from '../../features/land-measurement/components/modals/ImagePickerSheet';
+import { useMapStore } from '../../features/land-measurement/store/useMapStore';
+import { Fonts } from '../../constants/typography';
+import { Badge } from '../../components/ui/badge';
 
 export default function LandMeasurementScreen() {
+  const router = useRouter();
+  const { scale } = useMapStore();
+
+  const [isScaleModalOpen, setIsScaleModalOpen] = useState(false);
+  const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+
   return (
-    <View style={styles.container}>
-      <Card style={styles.placeholderCard}>
-        <UploadCloud size={48} color='#16a34a' />
-        <Text style={styles.title}>মৌজা ম্যাপ আপলোড করুন</Text>
-        <Text style={styles.desc}>
-          আপনার গ্যালারি বা ফাইল থেকে মৌজা ম্যাপের ইমেজ অথবা PDF নির্বাচন করুন।
-        </Text>
-        <Button title='ম্যাপ নির্বাচন করুন' onPress={() => {}} style={{ width: '100%', marginTop: 8 }} />
-      </Card>
-    </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* ─── 1. Top Navbar Header ─── */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            activeOpacity={0.75}
+            style={styles.backBtn}
+            onPress={() => router.back()}
+          >
+            <ArrowLeft size={19} color='#ffffff' strokeWidth={2.2} />
+          </TouchableOpacity>
+          <View>
+            <View style={styles.titleRow}>
+              <Text style={styles.headerTitle}>জমি পরিমাপ</Text>
+              <Badge label='PRO' variant='pro' />
+            </View>
+            <Text style={styles.headerSub}>মৌজা ম্যাপ ও দাগ ড্রয়িং</Text>
+          </View>
+        </View>
+
+        {/* Quick Scale Chip */}
+        <TouchableOpacity
+          activeOpacity={0.75}
+          style={styles.scaleChip}
+          onPress={() => setIsScaleModalOpen(true)}
+        >
+          <Ruler size={13} color='#22c55e' strokeWidth={2.2} />
+          <Text style={styles.scaleChipText}>১৬″ = ১ মাইল</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ─── 2. Interactive Drawing Canvas Layer ─── */}
+      <View style={styles.canvasContainer}>
+        <MobileMapCanvas />
+
+        {/* ─── 3. Floating Live Area Results Bar ─── */}
+        <MobileResultsBar />
+
+        {/* ─── 4. Floating Bottom Toolbar ─── */}
+        <MobileCanvasToolbar
+          onOpenScaleModal={() => setIsScaleModalOpen(true)}
+          onOpenImagePicker={() => setIsImagePickerOpen(true)}
+        />
+      </View>
+
+      {/* ─── 5. Modals ─── */}
+      <ScaleCalibrationModal
+        visible={isScaleModalOpen}
+        onClose={() => setIsScaleModalOpen(false)}
+      />
+      <ImagePickerSheet
+        visible={isImagePickerOpen}
+        onClose={() => setIsImagePickerOpen(false)}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    padding: 16,
+    backgroundColor: '#090d16',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: '#0f172a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+    zIndex: 1000,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#1e293b',
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  placeholderCard: {
+  titleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 24,
-    gap: 10,
+    gap: 6,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0f172a',
+  headerTitle: {
+    fontSize: 15.5,
+    fontFamily: Fonts.headingBold,
+    color: '#ffffff',
   },
-  desc: {
-    fontSize: 13,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 18,
+  headerSub: {
+    fontSize: 10.5,
+    fontFamily: Fonts.sansRegular,
+    color: '#94a3b8',
+    marginTop: -2,
+  },
+  scaleChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(34, 197, 94, 0.3)',
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 7,
+  },
+  scaleChipText: {
+    fontSize: 11,
+    fontFamily: Fonts.headingSemiBold,
+    color: '#22c55e',
+  },
+  canvasContainer: {
+    flex: 1,
+    position: 'relative',
+    backgroundColor: '#090d16',
   },
 });

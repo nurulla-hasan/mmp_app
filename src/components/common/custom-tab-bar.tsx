@@ -64,7 +64,7 @@ export const CustomTabBar: React.FC<BottomTabBarProps> = ({ state, navigation })
       <TouchableOpacity
         activeOpacity={0.85}
         style={styles.centerButtonWrapper}
-        onPress={() => router.push('/(tools)/land-measurement')}
+        onPress={() => router.push('/land-measurement')}
       >
         <View style={[styles.centerFloatingButton, { backgroundColor: colors.primary, borderColor: colors.tabBarBg }]}>
           <Ruler size={22} color='#ffffff' strokeWidth={2.4} />
