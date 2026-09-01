@@ -12,5 +12,16 @@
   "include": [
     "**/*.ts",
     "**/*.tsx"
+  ],
+  "exclude": [
+    "src/features/land-measurement/actions/**",
+    "src/features/land-measurement/hooks/**",
+    "src/features/land-measurement/store/slices/**",
+    "src/features/land-measurement/types/konva.ts",
+    "src/features/land-measurement/types/sidebar.ts",
+    "src/features/land-measurement/types/stage.ts",
+    "src/features/land-measurement/utils/pdfHelper.ts",
+    "src/features/land-measurement/utils/scratchPdf.ts",
+    "src/features/land-measurement/utils/tiling/**"
   ]
 }

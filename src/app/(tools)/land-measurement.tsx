@@ -11,10 +11,11 @@ import { ImagePickerSheet } from '../../features/land-measurement/components/mod
 import { useMapStore } from '../../features/land-measurement/store/useMapStore';
 import { Fonts } from '../../constants/typography';
 import { Badge } from '../../components/ui/badge';
+import { toBengaliDigits } from '../../lib/utils';
 
 export default function LandMeasurementScreen() {
   const router = useRouter();
-  const { scale } = useMapStore();
+  const scale = useMapStore((state) => state.scale);
 
   const [isScaleModalOpen, setIsScaleModalOpen] = useState(false);
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
@@ -47,7 +48,9 @@ export default function LandMeasurementScreen() {
           onPress={() => setIsScaleModalOpen(true)}
         >
           <Ruler size={13} color='#22c55e' strokeWidth={2.2} />
-          <Text style={styles.scaleChipText}>১৬″ = ১ মাইল</Text>
+          <Text style={styles.scaleChipText}>
+            {scale ? `১px = ${toBengaliDigits((1 / scale).toFixed(3))}′` : 'স্কেল সেট করুন'}
+          </Text>
         </TouchableOpacity>
       </View>
 

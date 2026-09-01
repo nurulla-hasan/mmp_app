@@ -9,7 +9,7 @@ npm run ios         # Start on iOS simulator
 npm run web         # Start Web preview
 ```
 
-**Stack:** Expo SDK 57, React Native 0.86, React 19, TypeScript 5 (strict mode), Expo Router, Zustand 5, Lucide React Native, React Native Safe Area Context.
+**Stack:** Expo SDK 54, React Native 0.81, React 19, TypeScript 5 (strict mode), Expo Router, Zustand 5, React Native SVG, Lucide React Native, React Native Safe Area Context.
 
 ---
 
@@ -57,6 +57,8 @@ src/
 │   └── calculations.ts       # Land calculations (Shotok, Katha, Bigha, Acre, SqFt)
 │
 ├── stores/                   # Zustand global stores
+├── features/
+│   └── land-measurement/     # Native SVG map canvas, calibration, plotting & results
 └── types/                    # TypeScript interfaces
 ```
 
@@ -69,4 +71,3 @@ src/
 - **Background Light:** `#F8FAFC`
 - **Cards:** Rounded 16px, subtle 1px border (`#E2E8F0`), soft shadow
 - **Badges:** `PRO` (Emerald), `ফ্রি` (Blue), `সেরা অফার` (Orange/Amber)
-
