@@ -1,159 +1,134 @@
 import React from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
-  Image as ImageIcon,
-  Move,
-  PenTool,
-  RotateCcw,
-  Ruler,
-  Trash2,
+  Check, Crosshair, Eye, EyeOff, Image as ImageIcon, Minus, MoveHorizontal,
+  PenTool, Plus, Redo2, Ruler, Scissors, Search, SearchX, Undo2, X,
 } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { Fonts } from '../../../../constants/typography';
+import { toBengaliDigits } from '../../../../lib/utils';
 
 type Props = {
-  onOpenScaleModal: () => void;
+  onOpenManualScale: () => void;
   onOpenImagePicker: () => void;
 };
 
-type ToolButtonProps = {
+type ActionProps = {
   label: string;
-  active?: boolean;
-  danger?: boolean;
-  disabled?: boolean;
   icon: React.ReactNode;
   onPress: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  primary?: boolean;
+  danger?: boolean;
 };
 
-function ToolButton({ label, active, danger, disabled, icon, onPress }: ToolButtonProps) {
+function Action({ label, icon, onPress, active, disabled, primary, danger }: ActionProps) {
   return (
     <TouchableOpacity
-      activeOpacity={0.72}
+      activeOpacity={0.74}
       disabled={disabled}
       onPress={onPress}
-      style={[styles.toolButton, active && styles.activeButton, disabled && styles.disabledButton]}
+      style={[styles.action, active && styles.active, primary && styles.primary, disabled && styles.disabled]}
     >
       {icon}
-      <Text style={[styles.toolLabel, active && styles.activeLabel, danger && styles.dangerLabel]}>
-        {label}
-      </Text>
+      <Text style={[styles.actionLabel, (active || primary) && styles.white, danger && styles.danger]}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
-export function MobileCanvasToolbar({ onOpenScaleModal, onOpenImagePicker }: Props) {
-  const mode = useMapStore((state) => state.mode);
-  const plotPoints = useMapStore((state) => state.plotPoints);
-  const plots = useMapStore((state) => state.plots);
-  const plotsHistory = useMapStore((state) => state.plotsHistory);
-  const setMode = useMapStore((state) => state.setMode);
-  const startPlotDrawing = useMapStore((state) => state.startPlotDrawing);
-  const undoPlotAction = useMapStore((state) => state.undoPlotAction);
-  const clearPlots = useMapStore((state) => state.clearPlots);
+export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker }: Props) {
+  const store = useMapStore();
+  const {
+    mode, mapImage, scale, plotPoints, plotPointsFuture, plots, plotsHistory, plotsFuture,
+    calibrationLine, calibrationLineFuture, isShowDiagonals, isMagnifierEnabled,
+    manualDividePlotId, manualCutLine, nudgeTarget,
+  } = store;
 
-  const canUndo = plotPoints.length > 0 || plotsHistory.length > 0;
-  const hasDrawing = plotPoints.length > 0 || plots.length > 0;
-
-  const confirmClear = () => {
-    if (!hasDrawing) return;
-    Alert.alert(
-      'সব প্লট মুছবেন?',
-      'এই ম্যাপের আঁকা সব পয়েন্ট ও পরিমাপ মুছে যাবে।',
-      [
-        { text: 'বাতিল', style: 'cancel' },
-        { text: 'মুছুন', style: 'destructive', onPress: clearPlots },
-      ],
-    );
+  const beginCalibration = () => {
+    if (!mapImage) { onOpenImagePicker(); return; }
+    if (plots.length === 0) { store.startCalibration(); return; }
+    Alert.alert('স্কেল আবার সেট করবেন?', 'স্কেল বদলালে বর্তমান সব প্লট মুছে যাবে।', [
+      { text: 'বাতিল', style: 'cancel' },
+      { text: 'চালিয়ে যান', style: 'destructive', onPress: store.startCalibration },
+    ]);
   };
+
+  if (mode === 'calibrating') {
+    const count = calibrationLine.length / 2;
+    return (
+      <View style={styles.wrapper}>
+        <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelCalibration} />
+        <Action label='আনডু' disabled={count === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={store.undoCalibrationPoint} />
+        <Action label='রিডু' disabled={calibrationLineFuture.length === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={store.redoCalibrationPoint} />
+        <Action label='ম্যানুয়াল' icon={<Ruler size={18} color='#fbbf24' />} onPress={onOpenManualScale} />
+        <Action label={`পয়েন্ট ${toBengaliDigits(count)}/২`} primary disabled={count >= 2} icon={<Crosshair size={19} color='#fff' />} onPress={store.addCenterPoint} />
+      </View>
+    );
+  }
+
+  if (mode === 'drawing_plot') {
+    return (
+      <View style={styles.wrapper}>
+        <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelActiveMode} />
+        <Action label='আনডু' disabled={plotPoints.length === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={store.undoPlotAction} />
+        <Action label='রিডু' disabled={plotPointsFuture.length === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={store.redoPlotAction} />
+        <Action label={`পয়েন্ট ${toBengaliDigits(plotPoints.length)}`} primary icon={<Crosshair size={19} color='#fff' />} onPress={store.addCenterPoint} />
+        <Action label='শেষ করুন' disabled={plotPoints.length < 3} icon={<Check size={19} color='#86efac' />} onPress={store.finishPlot} />
+      </View>
+    );
+  }
+
+  if (mode === 'manual_divide_plot') {
+    if (!manualDividePlotId || !manualCutLine) {
+      return <View style={styles.wrapper}><Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelManualDivide} /><View style={styles.divideMessage}><Text style={styles.divideText}>ভাগ করার প্লটে ট্যাপ করুন</Text></View></View>;
+    }
+    const nextTarget = nudgeTarget === 'all' ? 'start' : nudgeTarget === 'start' ? 'end' : 'all';
+    const targetLabel = nudgeTarget === 'all' ? 'পুরো লাইন' : nudgeTarget === 'start' ? 'শুরুর পয়েন্ট' : 'শেষ পয়েন্ট';
+    return (
+      <View style={styles.divideWrapper}>
+        <View style={styles.divideTop}><Text style={styles.divideTopText}>নড়বে: {targetLabel}</Text><TouchableOpacity onPress={() => store.setNudgeTarget(nextTarget)} style={styles.targetButton}><MoveHorizontal size={15} color='#bfdbfe' /><Text style={styles.targetText}>বদলান</Text></TouchableOpacity></View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.divideActions}>
+          <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelManualDivide} />
+          <Action label='বামে' icon={<Undo2 size={18} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(-1)} />
+          <Action label='ডানে' icon={<Redo2 size={18} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(1)} />
+          <Action label='পয়েন্ট +' icon={<Plus size={18} color='#93c5fd' />} onPress={store.addManualCutPoint} />
+          <Action label='পয়েন্ট −' disabled={manualCutLine.length <= 2} icon={<Minus size={18} color='#93c5fd' />} onPress={store.removeManualCutPoint} />
+          <Action label='ভাগ করুন' primary icon={<Scissors size={18} color='#fff' />} onPress={store.executeManualDivide} />
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.wrapper}>
-      <ToolButton
-        label='প্যান'
-        active={mode === 'none'}
-        icon={<Move size={18} color={mode === 'none' ? '#ffffff' : '#94a3b8'} />}
-        onPress={() => setMode('none')}
-      />
-      <ToolButton
-        label='আঁকুন'
-        active={mode === 'drawing_plot'}
-        icon={<PenTool size={18} color={mode === 'drawing_plot' ? '#ffffff' : '#94a3b8'} />}
-        onPress={startPlotDrawing}
-      />
-      <ToolButton
-        label='স্কেল'
-        active={mode === 'calibrating'}
-        icon={<Ruler size={18} color={mode === 'calibrating' ? '#ffffff' : '#94a3b8'} />}
-        onPress={onOpenScaleModal}
-      />
-      <ToolButton
-        label='ম্যাপ'
-        icon={<ImageIcon size={18} color='#94a3b8' />}
-        onPress={onOpenImagePicker}
-      />
-      <ToolButton
-        label='আনডু'
-        disabled={!canUndo}
-        icon={<RotateCcw size={18} color='#94a3b8' />}
-        onPress={undoPlotAction}
-      />
-      <ToolButton
-        label='মুছুন'
-        danger
-        disabled={!hasDrawing}
-        icon={<Trash2 size={18} color='#ef4444' />}
-        onPress={confirmClear}
-      />
+      <Action label='ম্যাপ' icon={<ImageIcon size={18} color='#94a3b8' />} onPress={onOpenImagePicker} />
+      <Action label='স্কেল' active={Boolean(scale)} icon={<Ruler size={18} color={scale ? '#fff' : '#fbbf24'} />} onPress={beginCalibration} />
+      <Action label='আঁকুন' disabled={!mapImage || !scale} icon={<PenTool size={18} color='#94a3b8' />} onPress={store.startPlotDrawing} />
+      <Action label='ভাগ' disabled={plots.length === 0} icon={<Scissors size={18} color='#94a3b8' />} onPress={store.startManualDivide} />
+      <Action label='কর্ণ' active={isShowDiagonals} icon={isShowDiagonals ? <Eye size={18} color='#fff' /> : <EyeOff size={18} color='#94a3b8' />} onPress={() => store.setIsShowDiagonals(!isShowDiagonals)} />
+      <Action label='ম্যাগনিফাই' active={isMagnifierEnabled} icon={isMagnifierEnabled ? <SearchX size={18} color='#fff' /> : <Search size={18} color='#94a3b8' />} onPress={() => store.setIsMagnifierEnabled(!isMagnifierEnabled)} />
+      <Action label='আনডু' disabled={plotsHistory.length === 0} icon={<Undo2 size={18} color='#94a3b8' />} onPress={store.undoPlotAction} />
+      <Action label='রিডু' disabled={plotsFuture.length === 0} icon={<Redo2 size={18} color='#94a3b8' />} onPress={store.redoPlotAction} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    position: 'absolute',
-    bottom: 12,
-    left: 10,
-    right: 10,
-    zIndex: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 5,
-    paddingVertical: 7,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-    backgroundColor: 'rgba(15, 23, 42, 0.97)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 12,
-  },
-  toolButton: {
-    minWidth: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    paddingHorizontal: 5,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  activeButton: {
-    backgroundColor: '#16a34a',
-  },
-  disabledButton: {
-    opacity: 0.35,
-  },
-  toolLabel: {
-    color: '#94a3b8',
-    fontFamily: Fonts.headingSemiBold,
-    fontSize: 9.5,
-  },
-  activeLabel: {
-    color: '#ffffff',
-  },
-  dangerLabel: {
-    color: '#ef4444',
-  },
+  wrapper: { position: 'absolute', bottom: 10, left: 8, right: 8, zIndex: 20, minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 4, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#334155', backgroundColor: 'rgba(15,23,42,0.98)', elevation: 12 },
+  action: { minWidth: 43, minHeight: 49, alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 5, borderRadius: 9 },
+  active: { backgroundColor: '#2563eb' },
+  primary: { backgroundColor: '#16a34a', paddingHorizontal: 9 },
+  disabled: { opacity: 0.32 },
+  actionLabel: { color: '#94a3b8', fontFamily: Fonts.headingSemiBold, fontSize: 8.5 },
+  white: { color: '#fff' },
+  danger: { color: '#ef4444' },
+  divideMessage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  divideText: { color: '#e2e8f0', fontFamily: Fonts.headingSemiBold, fontSize: 12 },
+  divideWrapper: { position: 'absolute', bottom: 10, left: 8, right: 8, zIndex: 20, borderRadius: 14, borderWidth: 1, borderColor: '#334155', backgroundColor: 'rgba(15,23,42,0.98)', overflow: 'hidden' },
+  divideTop: { height: 31, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#334155' },
+  divideTopText: { color: '#cbd5e1', fontFamily: Fonts.headingMedium, fontSize: 10 },
+  targetButton: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: '#1e3a8a' },
+  targetText: { color: '#bfdbfe', fontFamily: Fonts.headingSemiBold, fontSize: 9 },
+  divideActions: { paddingHorizontal: 4, paddingVertical: 5 },
 });
