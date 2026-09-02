@@ -8,18 +8,13 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import {
-  LogOut,
-  LogIn,
-  UserPlus,
-  ShieldCheck,
-  UserCheck,
-} from 'lucide-react-native';
+import { LogOut, LogIn, UserPlus, UserCheck } from 'lucide-react-native';
 import { Button } from '../../components/ui/button';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../stores/auth-store';
 import { useThemeStore } from '../../stores/theme-store';
+import { useProfile } from '../../hooks/queries/use-profile';
 import { SuccessToast } from '../../lib/utils';
 import { ProfileHeaderCard } from '../../components/profile/profile-header-card';
 import { PersonalInfoCard } from '../../components/profile/personal-info-card';
@@ -34,7 +29,10 @@ export default function ProfileScreen() {
   const colors = Colors[theme];
   const isDark = theme === 'dark';
 
-  const { user, isAuthenticated, logout } = useAuthStore();
+  const { user: cachedUser, isAuthenticated, logout } = useAuthStore();
+  const { data: serverUser } = useProfile();
+  const user = serverUser ?? cachedUser;
+
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
 
@@ -64,27 +62,22 @@ export default function ProfileScreen() {
     >
       {isAuthenticated && user ? (
         <>
-          {/* 1. Profile Header & Identity Card */}
           <ProfileHeaderCard
             user={user}
             onEditPress={() => setEditModalVisible(true)}
           />
 
-          {/* 2. Personal & Contact Information Card */}
           <PersonalInfoCard
             user={user}
             onEditPress={() => setEditModalVisible(true)}
           />
 
-          {/* 3. My Activities Card */}
           <ActivityCard />
 
-          {/* 4. Account Settings Card */}
           <AccountSettingsCard
             onChangePasswordPress={() => setPasswordModalVisible(true)}
           />
 
-          {/* 5. Logout Action Button */}
           <TouchableOpacity
             activeOpacity={0.85}
             style={[
@@ -100,7 +93,6 @@ export default function ProfileScreen() {
             <Text style={styles.logoutBtnText}>লগআউট করুন</Text>
           </TouchableOpacity>
 
-          {/* Modals */}
           <ProfileEditModal
             visible={editModalVisible}
             onClose={() => setEditModalVisible(false)}
@@ -110,10 +102,10 @@ export default function ProfileScreen() {
           <ChangePasswordModal
             visible={passwordModalVisible}
             onClose={() => setPasswordModalVisible(false)}
+            hasPassword={user.hasPassword ?? true}
           />
         </>
       ) : (
-        /* Guest Unauthenticated State */
         <View
           style={[
             styles.guestCard,

@@ -11,11 +11,10 @@ import {
 } from 'react-native';
 import { X, Lock, ShieldCheck } from 'lucide-react-native';
 import { Input } from '../ui/input';
-import { AuthService } from '../../services/auth-service';
 import { useThemeStore } from '../../stores/theme-store';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
-import { SuccessToast, ErrorToast } from '../../lib/utils';
+import { useChangePassword } from '../../hooks/mutations/use-profile-mutations';
 
 interface ChangePasswordModalProps {
   visible: boolean;
@@ -35,8 +34,8 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ old?: string; new?: string; confirm?: string }>({});
+  const { mutateAsync: changePassword, isPending: loading } = useChangePassword();
 
   const validate = () => {
     const errs: { old?: string; new?: string; confirm?: string } = {};
@@ -61,30 +60,21 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     if (!validate()) return;
 
     try {
-      setLoading(true);
-      const res = await AuthService.changePassword({
+      const res = await changePassword({
         oldPassword: hasPassword ? oldPassword.trim() : undefined,
         newPassword: newPassword.trim(),
+        confirmPassword: confirmPassword.trim(),
       });
 
       if (res.success) {
-        SuccessToast(
-          hasPassword
-            ? 'পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে।'
-            : 'পাসওয়ার্ড সফলভাবে সেট করা হয়েছে।'
-        );
         setOldPassword('');
         setNewPassword('');
         setConfirmPassword('');
         setErrors({});
         onClose();
-      } else {
-        ErrorToast(res.message || 'পাসওয়ার্ড আপডেট ব্যর্থ হয়েছে।');
       }
-    } catch (err: any) {
-      ErrorToast(err?.message || 'সমস্যা হয়েছে। আবার চেষ্টা করুন।');
-    } finally {
-      setLoading(false);
+    } catch {
+      // Mutation hook owns user-facing error feedback.
     }
   };
 
@@ -113,7 +103,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
             },
           ]}
         >
-          {/* Header */}
           <View style={[styles.modalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
@@ -126,7 +115,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Form */}
           <ScrollView showsVerticalScrollIndicator={false} style={styles.formScroll}>
             {hasPassword && (
               <Input
@@ -160,7 +148,6 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
               leftIcon={<Lock size={15} color={colors.textMuted} />}
             />
 
-            {/* Actions */}
             <View style={[styles.modalActions, { borderTopColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
               <TouchableOpacity
                 style={[
@@ -270,4 +257,3 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sansMedium,
   },
 });
-

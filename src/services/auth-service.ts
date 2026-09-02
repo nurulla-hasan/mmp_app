@@ -7,6 +7,8 @@ import type {
   VerifyEmailPayload,
   ResendOtpPayload,
   ResetPasswordPayload,
+  ChangePasswordPayload,
+  UpdateProfilePayload,
   AuthTokens,
   TAuthUser,
   ApiResult,
@@ -68,17 +70,14 @@ export const AuthService = {
       auth: true,
     }),
 
-  updateMe: (payload: Partial<TAuthUser>): Promise<ApiResult<{ user: TAuthUser }>> =>
+  updateMe: (payload: UpdateProfilePayload): Promise<ApiResult<{ user: TAuthUser }>> =>
     apiFetch<{ user: TAuthUser }>(API_ENDPOINTS.auth.me, {
       method: 'PATCH',
       body: payload,
       auth: true,
     }),
 
-  changePassword: (payload: {
-    oldPassword?: string;
-    newPassword?: string;
-  }): Promise<ApiResult<null>> =>
+  changePassword: (payload: ChangePasswordPayload): Promise<ApiResult<null>> =>
     apiFetch<null>(API_ENDPOINTS.auth.changePassword, {
       method: 'POST',
       body: payload,

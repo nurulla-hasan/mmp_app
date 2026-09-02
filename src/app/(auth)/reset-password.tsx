@@ -64,6 +64,7 @@ export default function ResetPasswordScreen() {
         email,
         otp: otp.trim(),
         password,
+        confirmPassword,
       });
 
       if (res.success) {
@@ -90,7 +91,6 @@ export default function ResetPasswordScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps='handled'
         >
-          {/* Top Bar Back Button */}
           <TouchableOpacity
             style={[
               styles.backBtn,

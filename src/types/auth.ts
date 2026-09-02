@@ -22,6 +22,7 @@ export type ResetPasswordPayload = {
   email: string;
   otp: string;
   password: string;
+  confirmPassword: string;
 };
 
 export type TSurveyorProfile = {
@@ -42,8 +43,8 @@ export type TAuthUser = {
   id: string;
   name: string;
   email: string;
-  role: "USER" | "SURVEYOR" | "ADMIN" | "SUPER_ADMIN";
-  status: "ACTIVE" | "BLOCKED";
+  role: 'USER' | 'SURVEYOR' | 'ADMIN' | 'SUPER_ADMIN';
+  status: 'ACTIVE' | 'BLOCKED';
   emailVerified: boolean;
   isSubscribed: boolean;
   imageUrl?: string;
@@ -54,8 +55,21 @@ export type TAuthUser = {
   createdAt: string;
   updatedAt: string;
   hasPassword?: boolean;
-  authProvider?: "EMAIL" | "GOOGLE";
+  authProvider?: 'EMAIL' | 'GOOGLE';
   surveyorProfile?: TSurveyorProfile;
+};
+
+export type UpdateProfilePayload = Partial<
+  Pick<
+    TAuthUser,
+    'name' | 'phone' | 'whatsappNumber' | 'district' | 'upazila' | 'imageUrl'
+  >
+>;
+
+export type ChangePasswordPayload = {
+  oldPassword?: string;
+  newPassword: string;
+  confirmPassword: string;
 };
 
 export type AuthTokens = {
@@ -77,4 +91,3 @@ export type ApiFailure = {
 };
 
 export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
-

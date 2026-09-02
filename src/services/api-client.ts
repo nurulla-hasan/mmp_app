@@ -3,6 +3,10 @@ import { API_ENDPOINTS } from './api-endpoints';
 import { emitSessionExpired, emitTokensRefreshed } from './auth-events';
 import { SessionStorage } from './session-storage';
 
+// Backward-compatible export for any existing imports. New code should use
+// session-storage directly for token/user persistence responsibilities.
+export { STORAGE_KEYS } from './session-storage';
+
 const configuredBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
 const developmentFallbackUrl = 'https://mmp-backend-xi.vercel.app/api/v1';
 
@@ -178,7 +182,12 @@ async function refreshSessionTokens(): Promise<AuthTokens | null> {
       return result.data;
     }
 
-    await expireSession();
+    // Only destroy the local session when the refresh credential itself is
+    // rejected. Temporary network/server failures must not log the user out.
+    if ([400, 401, 403].includes(result.statusCode)) {
+      await expireSession();
+    }
+
     return null;
   })();
 

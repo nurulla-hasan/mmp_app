@@ -6,6 +6,7 @@ import { UserService } from '../../services/user-service';
 import { queryKeys } from '../../lib/query-keys';
 import { useAuthStore } from '../../stores/auth-store';
 import { SuccessToast, ErrorToast } from '../../lib/utils';
+import type { ChangePasswordPayload } from '../../types/auth';
 
 // Update Profile: PATCH /auth/me
 export function useUpdateProfile() {
@@ -86,8 +87,7 @@ export function useUploadAvatar() {
 // Change Password: POST /auth/change-password
 export function useChangePassword() {
   return useMutation({
-    mutationFn: (payload: { oldPassword?: string; newPassword: string }) =>
-      AuthService.changePassword(payload),
+    mutationFn: (payload: ChangePasswordPayload) => AuthService.changePassword(payload),
     onSuccess: (res) => {
       if (res.success) {
         SuccessToast('পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে।');
