@@ -15,7 +15,7 @@ const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
 
 function validateFileSize(size?: number | null) {
   if (!size || size <= MAX_UPLOAD_SIZE_BYTES) return true;
-  Alert.alert('ফাইলটি অনেক বড়', '২৫ মেগাবাইটের (25 MB) কম সাইজের ফাইল নির্বাচন করুন।');
+  Alert.alert('File is too large', 'Choose a file smaller than 25 MB.');
   return false;
 }
 
@@ -28,7 +28,7 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('অনুমতি প্রয়োজন', 'গ্যালারি থেকে ম্যাপ নিতে ফটো অ্যাক্সেস অনুমতি দিন।');
+      Alert.alert('Permission required', 'Allow photo access to select a mouza map from your gallery.');
       return;
     }
 
@@ -45,7 +45,7 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
       uri: asset.uri,
       width: Math.max(asset.width, 1),
       height: Math.max(asset.height, 1),
-      name: asset.fileName ?? 'মৌজা ম্যাপ',
+      name: asset.fileName ?? 'Mouza map',
     });
     onClose();
   };
@@ -80,7 +80,7 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
         uri: page.uri,
         width: page.width,
         height: page.height,
-        name: `${asset.name || 'মৌজা ম্যাপ.pdf'} • পৃষ্ঠা ১`,
+        name: `${asset.name || 'mouza-map.pdf'} • page 1`,
         size: asset.size,
       });
       onClose();
@@ -89,13 +89,13 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
         ? String((error as { code?: unknown }).code)
         : '';
       const message = code === 'E_PASSWORD_REQUIRED' || code === 'E_WRONG_PASSWORD'
-        ? 'পাসওয়ার্ড দেওয়া PDF এখন খোলা যাচ্ছে না। আনলক করা PDF ব্যবহার করুন।'
+        ? 'Password-protected PDFs are not supported yet. Use an unlocked PDF.'
         : code === 'E_INVALID_PDF'
-          ? 'ফাইলটি সঠিক PDF নয় অথবা নষ্ট হয়ে গেছে।'
+          ? 'The selected file is not a valid PDF or it is corrupted.'
           : code === 'E_FILE_NOT_FOUND'
-            ? 'নির্বাচিত PDF ফাইলটি পড়া যায়নি। আবার নির্বাচন করুন।'
-            : 'PDF-এর প্রথম পৃষ্ঠা তৈরি করা যায়নি। Development/EAS build-এ আবার চেষ্টা করুন।';
-      Alert.alert('PDF ইমপোর্ট ব্যর্থ', message);
+            ? 'The selected PDF could not be read. Please choose it again.'
+            : 'The first PDF page could not be prepared. Try again in a Development/EAS build.';
+      Alert.alert('PDF import failed', message);
     } finally {
       setIsImportingPdf(false);
     }
@@ -104,12 +104,12 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
   const removeMap = () => {
     if (!mapImage) return;
     Alert.alert(
-      'ম্যাপ মুছে ফেলবেন?',
-      'বর্তমান ম্যাপ ও এর সব আঁকা পরিমাপ মুছে যাবে।',
+      'Remove current map?',
+      'The map and all measurements drawn on it will be removed.',
       [
-        { text: 'বাতিল', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'চালিয়ে যান',
+          text: 'Remove',
           style: 'destructive',
           onPress: () => {
             clearMap();
@@ -128,8 +128,8 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
           <View style={styles.handle} />
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>মৌজা ম্যাপ নির্বাচন</Text>
-              <Text style={styles.subtitle}>PDF, JPG, PNG বা ফোনের তোলা ছবি ব্যবহার করুন</Text>
+              <Text style={styles.title}>Choose Mouza Map</Text>
+              <Text style={styles.subtitle}>Use PDF, JPG, PNG, or a photo from your phone</Text>
             </View>
             <TouchableOpacity disabled={isImportingPdf} style={styles.closeButton} onPress={onClose}>
               <X size={18} color='#94a3b8' />
@@ -140,7 +140,7 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
             <View style={styles.currentFile}>
               <FileImage size={18} color='#22c55e' />
               <View style={styles.currentFileText}>
-                <Text numberOfLines={1} style={styles.currentName}>{mapImage.name ?? 'বর্তমান ম্যাপ'}</Text>
+                <Text numberOfLines={1} style={styles.currentName}>{mapImage.name ?? 'Current map'}</Text>
                 <Text style={styles.currentMeta}>{mapImage.width} × {mapImage.height} px</Text>
               </View>
             </View>
@@ -151,8 +151,8 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
               <ImagePlus size={22} color='#22c55e' />
             </View>
             <View style={styles.optionText}>
-              <Text style={styles.optionTitle}>গ্যালারি থেকে ম্যাপ নিন</Text>
-              <Text style={styles.optionDescription}>ফোনে থাকা মৌজা ম্যাপের ছবি নির্বাচন করুন</Text>
+              <Text style={styles.optionTitle}>Choose from Gallery</Text>
+              <Text style={styles.optionDescription}>Select a mouza map image saved on your phone</Text>
             </View>
           </TouchableOpacity>
 
@@ -161,14 +161,14 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
               {isImportingPdf ? <ActivityIndicator color='#f87171' /> : <FileText size={22} color='#f87171' />}
             </View>
             <View style={styles.optionText}>
-              <Text style={styles.optionTitle}>{isImportingPdf ? 'PDF প্রস্তুত হচ্ছে…' : 'PDF মৌজা ম্যাপ নিন'}</Text>
-              <Text style={styles.optionDescription}>{isImportingPdf ? 'প্রথম পৃষ্ঠা high-resolution ছবিতে রূপান্তর করা হচ্ছে' : 'PDF-এর প্রথম পৃষ্ঠা measurement canvas-এ খুলুন'}</Text>
+              <Text style={styles.optionTitle}>{isImportingPdf ? 'Preparing PDF…' : 'Import PDF Map'}</Text>
+              <Text style={styles.optionDescription}>{isImportingPdf ? 'Converting page 1 to a high-resolution image' : 'Open the first PDF page on the measurement canvas'}</Text>
             </View>
           </TouchableOpacity>
 
           {mapImage && <TouchableOpacity disabled={isImportingPdf} activeOpacity={0.76} style={[styles.option, isImportingPdf && styles.disabledOption]} onPress={removeMap}>
             <View style={[styles.optionIcon, styles.redIcon]}><Trash2 size={21} color='#f87171' /></View>
-            <View style={styles.optionText}><Text style={styles.optionTitle}>বর্তমান ম্যাপ সরান</Text><Text style={styles.optionDescription}>ম্যাপসহ সব পরিমাপ মুছে ফেলুন</Text></View>
+            <View style={styles.optionText}><Text style={styles.optionTitle}>Remove Current Map</Text><Text style={styles.optionDescription}>Clear the map and all current measurements</Text></View>
           </TouchableOpacity>}
         </View>
       </View>
