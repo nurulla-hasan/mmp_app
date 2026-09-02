@@ -47,5 +47,9 @@ export const queryKeys = {
     mine: () => [QUERY_KEYS.SUBSCRIPTIONS, 'mine'] as const,
     paymentNumbers: () => [QUERY_KEYS.SUBSCRIPTIONS, 'payment-numbers'] as const,
   },
+  broadcasts: {
+    all: [QUERY_KEYS.BROADCASTS] as const,
+    active: (audience: string) => [QUERY_KEYS.BROADCASTS, 'active', audience] as const,
+  },
   districts: { all: [QUERY_KEYS.DISTRICTS] as const, list: () => [QUERY_KEYS.DISTRICTS, 'list'] as const },
 } as const;
