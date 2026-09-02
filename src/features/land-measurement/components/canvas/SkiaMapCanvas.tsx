@@ -457,7 +457,7 @@ export function SkiaMapCanvas() {
   const panGesture = useMemo(() => Gesture.Pan()
     .maxPointers(1)
     .minDistance(0)
-    .onStart((event) => {
+    .onStart((event: any) => {
       panStartX.value = translateX.value;
       panStartY.value = translateY.value;
       draggingAnchor.value = -1;
@@ -477,7 +477,7 @@ export function SkiaMapCanvas() {
         }
       }
     })
-    .onUpdate((event) => {
+    .onUpdate((event: any) => {
       if (draggingAnchor.value >= 0) {
         const safeScale = Math.max(zoom.value, 0.001);
         runOnJS(moveManualAnchor)(
@@ -502,13 +502,13 @@ export function SkiaMapCanvas() {
     }), [commitGestureTransform, draggingAnchor, manualCutLine, mode, moveManualAnchor, panStartX, panStartY, translateX, translateY, updateRuntimeTransform, zoom]);
 
   const pinchGesture = useMemo(() => Gesture.Pinch()
-    .onStart((event) => {
+    .onStart((event: any) => {
       pinchStartScale.value = zoom.value;
       pinchCanvasX.value = (event.focalX - translateX.value) / Math.max(zoom.value, 0.001);
       pinchCanvasY.value = (event.focalY - translateY.value) / Math.max(zoom.value, 0.001);
       runOnJS(setPinching)(true);
     })
-    .onUpdate((event) => {
+    .onUpdate((event: any) => {
       const nextScale = clamp(pinchStartScale.value * event.scale, STAGE_MIN_ZOOM, STAGE_MAX_ZOOM);
       const x = event.focalX - pinchCanvasX.value * nextScale;
       const y = event.focalY - pinchCanvasY.value * nextScale;
@@ -527,7 +527,7 @@ export function SkiaMapCanvas() {
 
   const tapGesture = useMemo(() => Gesture.Tap()
     .maxDistance(8)
-    .onEnd((event, success) => {
+    .onEnd((event: any, success: boolean) => {
       if (success && mode === 'manual_divide_plot' && !manualDividePlotId) {
         runOnJS(selectPlotAt)(event.x, event.y);
       }
