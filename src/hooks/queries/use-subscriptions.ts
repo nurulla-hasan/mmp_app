@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { unwrapApiResult } from '../../lib/api-result';
 import { queryKeys, STALE_TIME } from '../../lib/query-keys';
@@ -26,14 +27,26 @@ export function usePaymentNumbers() {
 
 export function useMySubscription() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const cachedIsSubscribed = useAuthStore((state) => state.user?.isSubscribed);
+  const refreshUser = useAuthStore((state) => state.refreshUser);
 
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.subscriptions.mine(),
     queryFn: async () => unwrapApiResult(await SubscriptionService.getMine()),
     enabled: isAuthenticated,
     staleTime: 0,
     refetchOnMount: true,
-    refetchInterval: (query) =>
-      query.state.data?.pendingSubscription ? 30_000 : false,
+    refetchInterval: (queryState) =>
+      queryState.state.data?.pendingSubscription ? 30_000 : false,
   });
+
+  // Admin approval happens on the web. When a pending request becomes active,
+  // sync the auth identity so Pro-gated screens do not keep stale isSubscribed=false.
+  useEffect(() => {
+    if (query.data?.isSubscribed && cachedIsSubscribed !== true) {
+      void refreshUser();
+    }
+  }, [query.data?.isSubscribed, cachedIsSubscribed, refreshUser]);
+
+  return query;
 }

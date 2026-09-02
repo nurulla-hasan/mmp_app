@@ -7,7 +7,9 @@ import type { PlanQuery, TPlan } from '../types/plan';
 export const PlanService = {
   getAll: (query: PlanQuery = {}): Promise<ApiResult<TPlan[]>> =>
     apiFetch<TPlan[]>(
-      `${API_ENDPOINTS.plans.root}${buildQueryString(query as Record<string, unknown>)}`,
+      `${API_ENDPOINTS.plans.root}${buildQueryString(
+        query as Record<string, string | number | boolean | null | undefined>
+      )}`,
       { method: 'GET', auth: false }
     ),
 };
