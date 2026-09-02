@@ -74,7 +74,8 @@ export function MobileResultsBar() {
       }
 
       const result = await Print.printToFileAsync({ html: buildReportHtml(state, imageData) });
-      const fileName = `Mouza-Map-Pro-${Date.now()}.pdf`;
+      const fileBaseName = `Mouza-Map-Pro-${Date.now()}`;
+      const displayFileName = `${fileBaseName}.pdf`;
 
       if (Platform.OS === 'android') {
         let directoryUri = await AsyncStorage.getItem(PDF_DIRECTORY_KEY);
@@ -91,12 +92,12 @@ export function MobileResultsBar() {
 
         const targetUri = await FileSystem.StorageAccessFramework.createFileAsync(
           directoryUri,
-          fileName,
+          fileBaseName,
           'application/pdf',
         );
         const pdfBase64 = await FileSystem.readAsStringAsync(result.uri, { encoding: FileSystem.EncodingType.Base64 });
         await FileSystem.writeAsStringAsync(targetUri, pdfBase64, { encoding: FileSystem.EncodingType.Base64 });
-        Alert.alert('PDF ডাউনলোড হয়েছে', `${fileName}\nDownload ফোল্ডারে সেভ হয়েছে।`);
+        Alert.alert('PDF ডাউনলোড হয়েছে', `${displayFileName}\nDownload ফোল্ডারে সেভ হয়েছে।`);
       } else if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: 'জমি পরিমাপ রিপোর্ট' });
       } else {
