@@ -1,5 +1,6 @@
 // Central API contract used by the mobile app.
 // Keep endpoint strings here so services never drift from the backend contract.
+// Mobile intentionally exposes only USER/SURVEYOR-facing subscription endpoints.
 
 export const API_ENDPOINTS = {
   auth: {
@@ -17,6 +18,15 @@ export const API_ENDPOINTS = {
     profile: '/surveyor/profile',
   },
   reviews: { root: '/reviews', testimonials: '/reviews/testimonials' },
+  plans: {
+    root: '/plans',
+    byId: (id: string) => `/plans/${encodeURIComponent(id)}`,
+  },
+  subscriptions: {
+    paymentNumbers: '/subscribers/payment-numbers',
+    manualCheckout: '/subscribers/manual-checkout',
+    mySubscription: '/subscribers/my-subscription',
+  },
   calculations: {
     root: '/calculations',
     byId: (id: string) => `/calculations/${id}`,

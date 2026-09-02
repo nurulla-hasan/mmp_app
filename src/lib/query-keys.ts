@@ -1,7 +1,7 @@
 export const QUERY_KEYS = {
   ME: 'me', USERS: 'users', SERVICES: 'services', SURVEYORS: 'surveyors',
   CALCULATIONS: 'calculations', REVIEWS: 'reviews', PLANS: 'plans',
-  BROADCASTS: 'broadcasts', DISTRICTS: 'districts',
+  SUBSCRIPTIONS: 'subscriptions', BROADCASTS: 'broadcasts', DISTRICTS: 'districts',
 } as const;
 
 export const STALE_TIME = {
@@ -38,6 +38,14 @@ export const queryKeys = {
     all: [QUERY_KEYS.REVIEWS] as const,
     bySurveyor: (slug: string) => [QUERY_KEYS.REVIEWS, 'surveyor', slug] as const,
   },
-  plans: { all: [QUERY_KEYS.PLANS] as const, list: () => [QUERY_KEYS.PLANS, 'list'] as const },
+  plans: {
+    all: [QUERY_KEYS.PLANS] as const,
+    list: () => [QUERY_KEYS.PLANS, 'list'] as const,
+  },
+  subscriptions: {
+    all: [QUERY_KEYS.SUBSCRIPTIONS] as const,
+    mine: () => [QUERY_KEYS.SUBSCRIPTIONS, 'mine'] as const,
+    paymentNumbers: () => [QUERY_KEYS.SUBSCRIPTIONS, 'payment-numbers'] as const,
+  },
   districts: { all: [QUERY_KEYS.DISTRICTS] as const, list: () => [QUERY_KEYS.DISTRICTS, 'list'] as const },
 } as const;

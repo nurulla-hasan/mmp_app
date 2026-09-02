@@ -1,0 +1,13 @@
+import { apiFetch } from './api-client';
+import { API_ENDPOINTS } from './api-endpoints';
+import { buildQueryString } from '../lib/build-query-string';
+import type { ApiResult } from '../types/auth';
+import type { PlanQuery, TPlan } from '../types/plan';
+
+export const PlanService = {
+  getAll: (query: PlanQuery = {}): Promise<ApiResult<TPlan[]>> =>
+    apiFetch<TPlan[]>(
+      `${API_ENDPOINTS.plans.root}${buildQueryString(query as Record<string, unknown>)}`,
+      { method: 'GET', auth: false }
+    ),
+};
