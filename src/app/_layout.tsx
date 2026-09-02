@@ -55,7 +55,14 @@ export default function RootLayout() {
     <QueryProvider>
       <SafeAreaProvider>
         <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            gestureEnabled: true,
+            freezeOnBlur: true,
+          }}
+        >
           <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
           <Stack.Screen name='(tools)' options={{ headerShown: false }} />
           <Stack.Screen name='(auth)' options={{ headerShown: false }} />
@@ -64,6 +71,7 @@ export default function RootLayout() {
             name='pricing'
             options={{
               presentation: 'modal',
+              animation: 'slide_from_bottom',
               headerShown: true,
               title: 'সাবস্ক্রিপশন প্ল্যানস',
               headerTitleStyle: { fontFamily: 'HindSiliguri_700Bold', fontSize: 16 },
