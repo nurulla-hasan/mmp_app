@@ -26,6 +26,7 @@ export const queryKeys = {
     all: [QUERY_KEYS.SURVEYORS] as const,
     lists: () => [QUERY_KEYS.SURVEYORS, 'list'] as const,
     list: (filters: Record<string, unknown> = {}) => [QUERY_KEYS.SURVEYORS, 'list', filters] as const,
+    infinite: (filters: Record<string, unknown> = {}) => [QUERY_KEYS.SURVEYORS, 'infinite', filters] as const,
     detail: (slug: string) => [QUERY_KEYS.SURVEYORS, 'detail', slug] as const,
     myProfile: () => [QUERY_KEYS.SURVEYORS, 'my-profile'] as const,
   },

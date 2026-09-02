@@ -1,17 +1,35 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { SurveyorService } from '../../services/surveyor-service';
 import { ApiRequestError, unwrapApiResult } from '../../lib/api-result';
 import { queryKeys, STALE_TIME } from '../../lib/query-keys';
 import { useAuthStore } from '../../stores/auth-store';
 import type { SurveyorQuery } from '../../types/surveyor';
 
+function unwrapSurveyorPage(result: Awaited<ReturnType<typeof SurveyorService.getSurveyors>>) {
+  if (!result.success) throw new ApiRequestError(result.statusCode, result.message);
+  return { surveyors: result.data, meta: result.meta };
+}
+
 export function useSurveyors(filters: SurveyorQuery = {}) {
   return useQuery({
     queryKey: queryKeys.surveyors.list(filters),
-    queryFn: async () => {
-      const result = await SurveyorService.getSurveyors(filters);
-      if (!result.success) throw new ApiRequestError(result.statusCode, result.message);
-      return { surveyors: result.data, meta: result.meta };
+    queryFn: async () => unwrapSurveyorPage(await SurveyorService.getSurveyors(filters)),
+    staleTime: STALE_TIME.FIVE_MINUTES,
+  });
+}
+
+export function useInfiniteSurveyors(filters: Omit<SurveyorQuery, 'page'> = {}) {
+  return useInfiniteQuery({
+    queryKey: queryKeys.surveyors.infinite(filters),
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) =>
+      unwrapSurveyorPage(
+        await SurveyorService.getSurveyors({ ...filters, page: Number(pageParam) })
+      ),
+    getNextPageParam: (lastPage) => {
+      const meta = lastPage.meta;
+      if (!meta || meta.page >= meta.totalPages) return undefined;
+      return meta.page + 1;
     },
     staleTime: STALE_TIME.FIVE_MINUTES,
   });
