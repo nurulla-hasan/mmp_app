@@ -12,7 +12,6 @@ import { CalculationLibrarySheet, applyServerCalculation, type ServerCalculation
 import { useMapStore } from '../../features/land-measurement/store/useMapStore';
 import { Fonts } from '../../constants/typography';
 import { Badge } from '../../components/ui/badge';
-import { toBengaliDigits } from '../../lib/utils';
 
 export default function LandMeasurementScreen() {
   const router = useRouter();
@@ -45,9 +44,9 @@ export default function LandMeasurementScreen() {
       startCalibration();
       return;
     }
-    Alert.alert('স্কেল আবার সেট করবেন?', 'স্কেল বদলালে বর্তমান সব প্লট মুছে যাবে।', [
-      { text: 'বাতিল', style: 'cancel' },
-      { text: 'চালিয়ে যান', style: 'destructive', onPress: startCalibration },
+    Alert.alert('Reset scale?', 'Changing the scale will remove all current plots.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Continue', style: 'destructive', onPress: startCalibration },
     ]);
   };
 
@@ -64,10 +63,10 @@ export default function LandMeasurementScreen() {
           </TouchableOpacity>
           <View>
             <View style={styles.titleRow}>
-              <Text style={styles.headerTitle}>জমি পরিমাপ</Text>
+              <Text style={styles.headerTitle}>Land Measurement</Text>
               <Badge label='PRO' variant='pro' />
             </View>
-            <Text style={styles.headerSub}>মৌজা ম্যাপ ও দাগ ড্রয়িং</Text>
+            <Text style={styles.headerSub}>Mouza map measurement & plot drawing</Text>
           </View>
         </View>
 
@@ -78,7 +77,7 @@ export default function LandMeasurementScreen() {
         >
           <Ruler size={13} color='#22c55e' strokeWidth={2.2} />
           <Text style={styles.scaleChipText}>
-            {scale ? `১px = ${toBengaliDigits((1 / scale).toFixed(3))}′` : 'স্কেল সেট করুন'}
+            {scale ? `1px = ${(1 / scale).toFixed(3)} ft` : 'Set scale'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -117,7 +116,10 @@ export default function LandMeasurementScreen() {
           onClose={() => setCalculationSheetMode(null)}
           onRequireMap={(calculation) => {
             setPendingCalculation(calculation);
-            Alert.alert('ম্যাপ ইমেজ প্রয়োজন', `“${calculation.mapName || 'ম্যাপ ফাইল'}” নির্বাচন করলে পরিমাপটি স্বয়ংক্রিয়ভাবে লোড হবে।`);
+            Alert.alert(
+              'Map image required',
+              `Select “${calculation.mapName || 'map file'}” and the saved measurement will load automatically.`,
+            );
             setIsImagePickerOpen(true);
           }}
         />
