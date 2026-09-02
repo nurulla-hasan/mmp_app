@@ -44,7 +44,10 @@ type LiveOverlayData = {
 
 const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const clamp = (value: number, min: number, max: number) => {
+  'worklet';
+  return Math.min(max, Math.max(min, value));
+};
 
 const pathFromPoints = (points: Point[], close = false) => {
   if (points.length === 0) return '';
