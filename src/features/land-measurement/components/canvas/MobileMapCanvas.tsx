@@ -137,16 +137,19 @@ type NativeMagnifierProps = {
   mode: ReturnType<typeof useMapStore.getState>['mode'];
   plots: ReturnType<typeof useMapStore.getState>['plots'];
   plotPoints: Point[];
+  calibrationPoints: Point[];
+  scale: number | null;
+  isShowDiagonals: boolean;
 };
 
 const NativeMagnifier = forwardRef<MagnifierHandle, NativeMagnifierProps>(function NativeMagnifier(
-  { initial, image, viewport, fitScale, mode, plots, plotPoints },
+  { initial, image, viewport, fitScale, mode, plots, plotPoints, calibrationPoints, scale, isShowDiagonals },
   ref,
 ) {
   const [transform, setTransform] = useState(initial);
   useImperativeHandle(ref, () => ({ update: setTransform }), []);
   const radius = 55;
-  const lens = { x: viewport.width - radius - 14, y: radius + 66 };
+  const lens = { x: viewport.width - radius - 16, y: radius + 16 };
   const zoom = 2.5;
   const centerCanvas = {
     x: (viewport.width / 2 - transform.pos.x) / Math.max(transform.scale, 0.001),
@@ -155,6 +158,19 @@ const NativeMagnifier = forwardRef<MagnifierHandle, NativeMagnifierProps>(functi
   const magnifiedScale = transform.scale * zoom;
   const magnifiedPos = { x: lens.x - centerCanvas.x * magnifiedScale, y: lens.y - centerCanvas.y * magnifiedScale };
   const tilePos = { x: radius - centerCanvas.x * magnifiedScale, y: radius - centerCanvas.y * magnifiedScale };
+  let liveTarget = getSnappedPoint(centerCanvas, plots.map((plot) => plot.points), 10 / Math.max(transform.scale, 0.01));
+  if (mode === 'drawing_plot' && plotPoints.length >= 3 && distance(liveTarget, plotPoints[0]) <= 20 / Math.max(transform.scale, 0.01)) {
+    liveTarget = plotPoints[0];
+  }
+  if (mode === 'drawing_plot' && plotPoints.length > 0) {
+    const containing = getDirectionalContainingPlot(plots, plotPoints[0], plotPoints.length >= 2 ? plotPoints[1] : liveTarget, transform.scale);
+    if (containing) liveTarget = clipLineToPolygon(plotPoints[plotPoints.length - 1], liveTarget, containing.points);
+  }
+  const liveStart = mode === 'drawing_plot' ? plotPoints.at(-1) : undefined;
+  const liveDistance = liveStart ? distance(liveStart, liveTarget) : 0;
+  const liveLabel = liveStart && scale && liveDistance * transform.scale >= 34
+    ? { point: midpoint(liveStart, liveTarget), text: formatFeetInches(liveDistance / scale), rotation: Math.atan2(liveTarget.y - liveStart.y, liveTarget.x - liveStart.x) * 180 / Math.PI }
+    : null;
 
   return (
     <G pointerEvents='none'>
@@ -163,8 +179,33 @@ const NativeMagnifier = forwardRef<MagnifierHandle, NativeMagnifierProps>(functi
       <G clipPath='url(#map-magnifier-clip)'>
         <G transform={`translate(${magnifiedPos.x} ${magnifiedPos.y}) scale(${magnifiedScale})`}>
           <NativeTiledMap image={image} viewport={{ width: radius * 2, height: radius * 2 }} stageScale={magnifiedScale} stagePos={tilePos} fitScale={fitScale} />
-          {plots.map((plot) => <Polygon key={`mag-${plot.id}`} points={pointString(plot.points)} fill={plot.color ?? '#0f766e'} fillOpacity={0.1} stroke={plot.color ?? '#0f766e'} strokeWidth={2 / magnifiedScale} />)}
-          {mode === 'drawing_plot' && plotPoints.length >= 2 && <Polyline points={pointString(plotPoints)} fill='none' stroke={UI_CONFIG.colors.drawPrimary} strokeWidth={UI_CONFIG.strokeWidth.xxthick / magnifiedScale} />}
+          {plots.map((plot) => {
+            const color = plot.color ?? '#0f766e';
+            const area = getPolygonAreaLabelLayout(plot.points);
+            return <G key={`mag-${plot.id}`}>
+              <Polygon points={pointString(plot.points)} fill={color} fillOpacity={0.1} stroke={color} strokeWidth={UI_CONFIG.strokeWidth.xxthick / transform.scale} />
+              {getPlotEdgeLabels(plot, scale, transform.scale).map((edge) => <SvgOutlinedText key={`mag-${edge.id}`} x={edge.x} y={edge.y} text={edge.text} stageScale={transform.scale} color={edge.color} rotation={edge.rotation} fontPx={edge.fontPx} />)}
+              {isShowDiagonals && (plot.results.diagonals ?? []).map((diagonal, index) => {
+                const start = plot.points[diagonal.p1Index];
+                const end = plot.points[diagonal.p2Index];
+                if (!start || !end || distance(start, end) <= MIN_DIAGONAL_DRAW_PX / transform.scale) return null;
+                return <Line key={`mag-diag-${index}`} x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke={color} strokeWidth={1 / transform.scale} strokeDasharray={`${6 / transform.scale},${6 / transform.scale}`} opacity={0.4} />;
+              })}
+              <SvgBadge x={area.center.x} y={area.center.y} text={`${toBengaliDigits(plot.results.shotok.toFixed(2))} শতক`} stageScale={transform.scale} color={color} rotation={area.rotation} compact />
+            </G>;
+          })}
+          {mode === 'drawing_plot' && plotPoints.length > 0 && <G>
+            {plotPoints.length >= 2 && <Polyline points={pointString(plotPoints)} fill='none' stroke={UI_CONFIG.colors.drawPrimary} strokeWidth={UI_CONFIG.strokeWidth.xxthick / transform.scale} />}
+            {getActivePlotDots(plotPoints).map(({ point, index, isCorner }) => isCorner ? <Circle key={`mag-point-${index}`} cx={point.x} cy={point.y} r={5 / transform.scale} fill='#3182CE' stroke='#fff' strokeWidth={1.5 / transform.scale} /> : null)}
+            {getActiveSegmentLabels(plotPoints, scale, transform.scale).map((edge) => <SvgOutlinedText key={`mag-${edge.id}`} x={edge.x} y={edge.y} text={edge.text} stageScale={transform.scale} color={edge.color} rotation={edge.rotation} fontPx={edge.fontPx} />)}
+            <Line x1={plotPoints.at(-1)!.x} y1={plotPoints.at(-1)!.y} x2={liveTarget.x} y2={liveTarget.y} stroke={UI_CONFIG.colors.drawPrimary} strokeWidth={UI_CONFIG.strokeWidth.xxthick / transform.scale} strokeDasharray={`${8 / transform.scale},${6 / transform.scale}`} opacity={0.8} />
+            {liveLabel && <SvgOutlinedText x={liveLabel.point.x} y={liveLabel.point.y} text={liveLabel.text} stageScale={transform.scale} color={UI_CONFIG.colors.drawPrimary} rotation={liveLabel.rotation} />}
+          </G>}
+          {mode === 'calibrating' && <G>
+            {calibrationPoints.length === 2 && <Line x1={calibrationPoints[0].x} y1={calibrationPoints[0].y} x2={calibrationPoints[1].x} y2={calibrationPoints[1].y} stroke={UI_CONFIG.colors.drawPrimary} strokeWidth={3 / transform.scale} />}
+            {calibrationPoints.length === 1 && <Line x1={calibrationPoints[0].x} y1={calibrationPoints[0].y} x2={centerCanvas.x} y2={centerCanvas.y} stroke={UI_CONFIG.colors.drawPrimary} strokeWidth={2 / transform.scale} strokeDasharray={`${5 / transform.scale},${5 / transform.scale}`} opacity={0.7} />}
+            {calibrationPoints.map((point, index) => <Circle key={`mag-cal-${index}`} cx={point.x} cy={point.y} r={5 / transform.scale} fill={UI_CONFIG.colors.drawPrimary} stroke='#fff' strokeWidth={1 / transform.scale} />)}
+          </G>}
         </G>
       </G>
       <Circle cx={lens.x} cy={lens.y} r={radius} fill='none' stroke='rgba(15,23,42,0.72)' strokeWidth={3} />
@@ -271,7 +312,7 @@ export function MobileMapCanvas() {
       start: startCanvas ? toScreen(startCanvas) : null,
       end: toScreen(target),
       label,
-      color: current.mode === 'calibrating' ? '#f59e0b' : '#2563eb',
+      color: UI_CONFIG.colors.drawPrimary,
       snapped: distance(raw, target) * transform.scale > 2,
     };
   }, [viewport.height, viewport.width]);
@@ -525,8 +566,8 @@ export function MobileMapCanvas() {
 
             {mode === 'calibrating' && (
               <G>
-                {calibrationPoints.length === 2 && <Line x1={calibrationPoints[0].x} y1={calibrationPoints[0].y} x2={calibrationPoints[1].x} y2={calibrationPoints[1].y} stroke='#f59e0b' strokeWidth={3 / stageScale} />}
-                {calibrationPoints.map((point, index) => <Circle key={`cal-${index}`} cx={point.x} cy={point.y} r={6 / stageScale} fill='#f59e0b' stroke='#fff' strokeWidth={2 / stageScale} />)}
+                {calibrationPoints.length === 2 && <Line x1={calibrationPoints[0].x} y1={calibrationPoints[0].y} x2={calibrationPoints[1].x} y2={calibrationPoints[1].y} stroke={UI_CONFIG.colors.drawPrimary} strokeWidth={3 / stageScale} />}
+                {calibrationPoints.map((point, index) => <Circle key={`cal-${index}`} cx={point.x} cy={point.y} r={5 / stageScale} fill={UI_CONFIG.colors.drawPrimary} stroke='#fff' strokeWidth={1 / stageScale} />)}
               </G>
             )}
 
@@ -538,7 +579,7 @@ export function MobileMapCanvas() {
           </G>
 
           <LiveMeasurementOverlay ref={liveOverlayRef} initial={getLiveOverlay({ scale: stageScale, pos: stagePos })} />
-          {mapImage && isMagnifierEnabled && viewport.width > 0 && (mode === 'drawing_plot' || mode === 'calibrating') && <NativeMagnifier ref={magnifierRef} initial={{ scale: stageScale, pos: stagePos }} image={mapImage} viewport={viewport} fitScale={fitScaleRef.current} mode={mode} plots={plots} plotPoints={plotPoints} />}
+          {mapImage && isMagnifierEnabled && viewport.width > 0 && (mode === 'drawing_plot' || mode === 'calibrating') && <NativeMagnifier ref={magnifierRef} initial={{ scale: stageScale, pos: stagePos }} image={mapImage} viewport={viewport} fitScale={fitScaleRef.current} mode={mode} plots={plots} plotPoints={plotPoints} calibrationPoints={calibrationPoints} scale={scale} isShowDiagonals={isShowDiagonals} />}
 
           {(mode === 'drawing_plot' || mode === 'calibrating') && (
             <G>
