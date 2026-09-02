@@ -18,7 +18,7 @@ export default function LandMeasurementScreen() {
   const router = useRouter();
   const scale = useMapStore((state) => state.scale);
   const mapImage = useMapStore((state) => state.mapImage);
-  const plots = useMapStore((state) => state.plots);
+  const plotCount = useMapStore((state) => state.plots.length);
   const isDistanceModalOpen = useMapStore((state) => state.isDistanceModalOpen);
   const startCalibration = useMapStore((state) => state.startCalibration);
   const cancelCalibration = useMapStore((state) => state.cancelCalibration);
@@ -41,7 +41,7 @@ export default function LandMeasurementScreen() {
       setIsImagePickerOpen(true);
       return;
     }
-    if (plots.length === 0) {
+    if (plotCount === 0) {
       startCalibration();
       return;
     }
@@ -110,16 +110,18 @@ export default function LandMeasurementScreen() {
         visible={isImagePickerOpen}
         onClose={() => setIsImagePickerOpen(false)}
       />
-      <CalculationLibrarySheet
-        visible={calculationSheetMode !== null}
-        mode={calculationSheetMode ?? 'load'}
-        onClose={() => setCalculationSheetMode(null)}
-        onRequireMap={(calculation) => {
-          setPendingCalculation(calculation);
-          Alert.alert('ম্যাপ ইমেজ প্রয়োজন', `“${calculation.mapName || 'ম্যাপ ফাইল'}” নির্বাচন করলে পরিমাপটি স্বয়ংক্রিয়ভাবে লোড হবে।`);
-          setIsImagePickerOpen(true);
-        }}
-      />
+      {calculationSheetMode !== null && (
+        <CalculationLibrarySheet
+          visible
+          mode={calculationSheetMode}
+          onClose={() => setCalculationSheetMode(null)}
+          onRequireMap={(calculation) => {
+            setPendingCalculation(calculation);
+            Alert.alert('ম্যাপ ইমেজ প্রয়োজন', `“${calculation.mapName || 'ম্যাপ ফাইল'}” নির্বাচন করলে পরিমাপটি স্বয়ংক্রিয়ভাবে লোড হবে।`);
+            setIsImagePickerOpen(true);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
