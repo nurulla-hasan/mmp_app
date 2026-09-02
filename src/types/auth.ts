@@ -27,7 +27,7 @@ export type TAuthUser = {
   createdAt: string;
   updatedAt: string;
   hasPassword?: boolean;
-  authProvider?: 'EMAIL' | 'GOOGLE';
+  authProvider?: 'CREDENTIAL' | 'GOOGLE';
   surveyorProfile?: TSurveyorProfile;
 };
 

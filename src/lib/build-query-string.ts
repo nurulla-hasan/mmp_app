@@ -1,13 +1,9 @@
 export function buildQueryString(
   query: Record<string, string | number | boolean | null | undefined> = {}
 ): string {
-  const params = new URLSearchParams();
+  const parts = Object.entries(query)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
 
-  Object.entries(query).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === '') return;
-    params.set(key, String(value));
-  });
-
-  const serialized = params.toString();
-  return serialized ? `?${serialized}` : '';
+  return parts.length ? `?${parts.join('&')}` : '';
 }

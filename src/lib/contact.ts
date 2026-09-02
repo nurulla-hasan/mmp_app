@@ -19,9 +19,15 @@ export async function openPhoneCall(phone: string): Promise<void> {
   await Linking.openURL(`tel:${digits}`);
 }
 
-export async function openSurveyorWhatsApp(phone: string, fullName: string): Promise<void> {
+export async function openSurveyorWhatsApp(
+  phone: string,
+  fullName: string,
+  message?: string
+): Promise<void> {
   const normalized = normalizeBangladeshWhatsApp(phone);
   if (!normalized) return;
-  const message = `হ্যালো, আমি ${fullName} এর প্রোফাইল Mouza Map Pro থেকে দেখছি। আপনার সেবা সম্পর্কে জানতে চাই।`;
-  await Linking.openURL(`https://wa.me/${normalized}?text=${encodeURIComponent(message)}`);
+  const text =
+    message ||
+    `হ্যালো, আমি ${fullName} এর প্রোফাইল Mouza Map Pro থেকে দেখছি। আপনার সেবা সম্পর্কে জানতে চাই।`;
+  await Linking.openURL(`https://wa.me/${normalized}?text=${encodeURIComponent(text)}`);
 }
