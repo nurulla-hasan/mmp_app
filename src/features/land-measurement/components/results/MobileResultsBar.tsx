@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -11,6 +12,8 @@ import { toBengaliDigits } from '../../../../lib/utils';
 import { Fonts } from '../../../../constants/typography';
 import { getPolygonAreaLabelLayout } from '../../utils/polygon-label';
 import { groupPolygonSegments } from '../../utils/geometry';
+
+const PDF_DIRECTORY_KEY = 'mmp_pdf_download_directory';
 
 const escapeHtml = (value: unknown) => String(value ?? '')
   .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
@@ -50,30 +53,61 @@ const buildReportHtml = (state: ReturnType<typeof useMapStore.getState>, imageDa
 export function MobileResultsBar() {
   const mode = useMapStore((state) => state.mode);
   const plots = useMapStore((state) => state.plots);
-  const reportInfo = useMapStore((state) => state.reportInfo);
-  const setReportInfo = useMapStore((state) => state.setReportInfo);
   const [open, setOpen] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const totals = useMemo(() => plots.reduce((sum, plot) => ({ sqft: sum.sqft + plot.results.sqft, shotok: sum.shotok + plot.results.shotok, katha: sum.katha + plot.results.katha }), { sqft: 0, shotok: 0, katha: 0 }), [plots]);
 
   if (plots.length === 0 || mode !== 'none') return null;
 
   const exportPdf = async () => {
+    if (exporting) return;
     setExporting(true);
     try {
       const state = useMapStore.getState();
       let imageData: string | null = null;
       if (state.mapImage?.uri) {
-        try { imageData = await FileSystem.readAsStringAsync(state.mapImage.uri, { encoding: FileSystem.EncodingType.Base64 }); } catch { imageData = null; }
+        try {
+          imageData = await FileSystem.readAsStringAsync(state.mapImage.uri, { encoding: FileSystem.EncodingType.Base64 });
+        } catch {
+          imageData = null;
+        }
       }
+
       const result = await Print.printToFileAsync({ html: buildReportHtml(state, imageData) });
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: 'জমি পরিমাপ রিপোর্ট' });
-      else Alert.alert('রিপোর্ট তৈরি হয়েছে', result.uri);
-      setReportOpen(false);
+      const fileName = `Mouza-Map-Pro-${Date.now()}.pdf`;
+
+      if (Platform.OS === 'android') {
+        let directoryUri = await AsyncStorage.getItem(PDF_DIRECTORY_KEY);
+        if (!directoryUri) {
+          const initialUri = FileSystem.StorageAccessFramework.getUriForDirectoryInRoot('Download');
+          const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(initialUri);
+          if (!permission.granted) {
+            Alert.alert('ডাউনলোড বাতিল হয়েছে', 'PDF সেভ করতে Download ফোল্ডারের অনুমতি দিন।');
+            return;
+          }
+          directoryUri = permission.directoryUri;
+          await AsyncStorage.setItem(PDF_DIRECTORY_KEY, directoryUri);
+        }
+
+        const targetUri = await FileSystem.StorageAccessFramework.createFileAsync(
+          directoryUri,
+          fileName,
+          'application/pdf',
+        );
+        const pdfBase64 = await FileSystem.readAsStringAsync(result.uri, { encoding: FileSystem.EncodingType.Base64 });
+        await FileSystem.writeAsStringAsync(targetUri, pdfBase64, { encoding: FileSystem.EncodingType.Base64 });
+        Alert.alert('PDF ডাউনলোড হয়েছে', `${fileName}\nDownload ফোল্ডারে সেভ হয়েছে।`);
+      } else if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: 'জমি পরিমাপ রিপোর্ট' });
+      } else {
+        Alert.alert('রিপোর্ট তৈরি হয়েছে', result.uri);
+      }
     } catch {
+      if (Platform.OS === 'android') await AsyncStorage.removeItem(PDF_DIRECTORY_KEY);
       Alert.alert('রিপোর্ট তৈরি হয়নি', 'PDF রিপোর্ট তৈরি করতে আবার চেষ্টা করুন।');
-    } finally { setExporting(false); }
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -90,7 +124,16 @@ export function MobileResultsBar() {
         <View style={styles.backdrop}>
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={styles.sheet}>
-            <View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>জমি পরিমাপের ফলাফল</Text><Text style={styles.sheetSub}>সব প্লটের পূর্ণ হিসাব</Text></View><View style={styles.headerActions}><TouchableOpacity style={styles.print} onPress={() => setReportOpen(true)}><Printer size={17} color='#86efac' /><Text style={styles.printText}>PDF</Text></TouchableOpacity><TouchableOpacity style={styles.close} onPress={() => setOpen(false)}><X size={18} color='#94a3b8' /></TouchableOpacity></View></View>
+            <View style={styles.sheetHeader}>
+              <View><Text style={styles.sheetTitle}>জমি পরিমাপের ফলাফল</Text><Text style={styles.sheetSub}>সব প্লটের পূর্ণ হিসাব</Text></View>
+              <View style={styles.headerActions}>
+                <TouchableOpacity disabled={exporting} style={[styles.print, exporting && styles.disabled]} onPress={exportPdf}>
+                  {exporting ? <ActivityIndicator size='small' color='#86efac' /> : <Printer size={17} color='#86efac' />}
+                  <Text style={styles.printText}>{exporting ? 'তৈরি হচ্ছে' : 'PDF ডাউনলোড'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.close} onPress={() => setOpen(false)}><X size={18} color='#94a3b8' /></TouchableOpacity>
+              </View>
+            </View>
             <View style={styles.summary}>
               <View style={styles.summaryItem}><Text style={styles.summaryLabel}>মোট শতক</Text><Text style={styles.summaryValue}>{toBengaliDigits(formatMeasurement(totals.shotok))}</Text></View>
               <View style={styles.summaryItem}><Text style={styles.summaryLabel}>মোট কাঠা</Text><Text style={styles.summaryValue}>{toBengaliDigits(formatMeasurement(totals.katha))}</Text></View>
@@ -108,12 +151,6 @@ export function MobileResultsBar() {
           </View>
         </View>
       </Modal>
-
-      <Modal visible={reportOpen} transparent animationType='slide' onRequestClose={() => !exporting && setReportOpen(false)}>
-        <View style={styles.backdrop}><TouchableOpacity disabled={exporting} activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setReportOpen(false)} /><View style={styles.reportSheet}><View style={styles.sheetHeader}><View><Text style={styles.sheetTitle}>রিপোর্টের তথ্য দিন</Text><Text style={styles.sheetSub}>PDF-এ এই তথ্যগুলো দেখা যাবে</Text></View><TouchableOpacity disabled={exporting} style={styles.close} onPress={() => setReportOpen(false)}><X size={18} color='#94a3b8' /></TouchableOpacity></View><View style={styles.formGrid}>{([
-          ['mouza', 'মৌজার নাম'], ['jlNo', 'জে. এল. নম্বর'], ['dagNo', 'দাগ নম্বর'], ['khatianNo', 'খতিয়ান নম্বর'], ['date', 'তারিখ'], ['surveyorName', 'সার্ভেয়ারের নাম'],
-        ] as const).map(([key, placeholder]) => <TextInput key={key} value={reportInfo[key]} onChangeText={(value) => setReportInfo({ ...reportInfo, [key]: value })} placeholder={placeholder} placeholderTextColor='#64748b' style={styles.input} />)}</View><TouchableOpacity disabled={exporting} style={[styles.exportButton, exporting && styles.disabled]} onPress={exportPdf}>{exporting ? <ActivityIndicator color='#fff' /> : <Printer size={18} color='#fff' />}<Text style={styles.exportText}>PDF তৈরি ও শেয়ার করুন</Text></TouchableOpacity></View></View>
-      </Modal>
     </>
   );
 }
@@ -125,9 +162,30 @@ const styles = StyleSheet.create({
   unit: { minWidth: 57, marginRight: 8 }, unitLabel: { color: '#64748b', fontFamily: Fonts.headingMedium, fontSize: 8.5 }, unitValue: { color: '#cbd5e1', fontFamily: Fonts.headingSemiBold, fontSize: 10.5 },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2,6,23,0.68)' },
   sheet: { maxHeight: '82%', paddingTop: 16, paddingHorizontal: 15, paddingBottom: 22, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: '#334155', backgroundColor: '#0f172a' },
-  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, sheetTitle: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 17 }, sheetSub: { color: '#94a3b8', fontFamily: Fonts.sansRegular, fontSize: 10 }, close: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#1e293b' },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 7 }, print: { height: 34, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 9, backgroundColor: 'rgba(34,197,94,0.12)' }, printText: { color: '#86efac', fontFamily: Fonts.headingBold, fontSize: 10 },
-  summary: { marginTop: 14, flexDirection: 'row', gap: 7 }, summaryItem: { flex: 1, padding: 10, borderRadius: 10, backgroundColor: '#111827' }, summaryLabel: { color: '#64748b', fontFamily: Fonts.headingMedium, fontSize: 9 }, summaryValue: { marginTop: 1, color: '#86efac', fontFamily: Fonts.headingBold, fontSize: 13 },
-  list: { marginTop: 12 }, listContent: { paddingBottom: 16, gap: 10 }, plotCard: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#334155', backgroundColor: '#111827' }, plotHeader: { flexDirection: 'row', alignItems: 'center' }, colorDot: { width: 9, height: 9, marginRight: 7, borderRadius: 5 }, plotName: { flex: 1, color: '#f8fafc', fontFamily: Fonts.headingBold, fontSize: 13 }, plotArea: { color: '#86efac', fontFamily: Fonts.headingBold, fontSize: 12 }, metrics: { marginTop: 8, gap: 2 }, metric: { color: '#cbd5e1', fontFamily: Fonts.sansRegular, fontSize: 10.5 }, sideTitle: { marginTop: 9, marginBottom: 5, color: '#94a3b8', fontFamily: Fonts.headingSemiBold, fontSize: 9.5 }, chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 }, chip: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 6, backgroundColor: '#1e293b' }, diagonalChip: { backgroundColor: '#312e81' }, chipText: { color: '#e2e8f0', fontFamily: Fonts.headingMedium, fontSize: 9.5 },
-  reportSheet: { padding: 16, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: '#334155', backgroundColor: '#0f172a' }, formGrid: { marginTop: 14, gap: 8 }, input: { height: 42, paddingHorizontal: 11, borderRadius: 9, borderWidth: 1, borderColor: '#334155', color: '#fff', backgroundColor: '#111827', fontFamily: Fonts.headingMedium, fontSize: 11 }, exportButton: { height: 45, marginTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 10, backgroundColor: '#16a34a' }, exportText: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 12 }, disabled: { opacity: 0.5 },
+  sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sheetTitle: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 17 },
+  sheetSub: { color: '#94a3b8', fontFamily: Fonts.sansRegular, fontSize: 10 },
+  close: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#1e293b' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  print: { height: 34, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderRadius: 9, backgroundColor: 'rgba(34,197,94,0.12)' },
+  printText: { color: '#86efac', fontFamily: Fonts.headingBold, fontSize: 10 },
+  summary: { marginTop: 14, flexDirection: 'row', gap: 7 },
+  summaryItem: { flex: 1, padding: 10, borderRadius: 10, backgroundColor: '#111827' },
+  summaryLabel: { color: '#64748b', fontFamily: Fonts.headingMedium, fontSize: 9 },
+  summaryValue: { marginTop: 1, color: '#86efac', fontFamily: Fonts.headingBold, fontSize: 13 },
+  list: { marginTop: 12 },
+  listContent: { paddingBottom: 16, gap: 10 },
+  plotCard: { padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#334155', backgroundColor: '#111827' },
+  plotHeader: { flexDirection: 'row', alignItems: 'center' },
+  colorDot: { width: 9, height: 9, marginRight: 7, borderRadius: 5 },
+  plotName: { flex: 1, color: '#f8fafc', fontFamily: Fonts.headingBold, fontSize: 13 },
+  plotArea: { color: '#86efac', fontFamily: Fonts.headingBold, fontSize: 12 },
+  metrics: { marginTop: 8, gap: 2 },
+  metric: { color: '#cbd5e1', fontFamily: Fonts.sansRegular, fontSize: 10.5 },
+  sideTitle: { marginTop: 9, marginBottom: 5, color: '#94a3b8', fontFamily: Fonts.headingSemiBold, fontSize: 9.5 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  chip: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 6, backgroundColor: '#1e293b' },
+  diagonalChip: { backgroundColor: '#312e81' },
+  chipText: { color: '#e2e8f0', fontFamily: Fonts.headingMedium, fontSize: 9.5 },
+  disabled: { opacity: 0.5 },
 });
