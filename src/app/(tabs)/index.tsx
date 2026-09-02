@@ -24,6 +24,8 @@ import {
   ChevronRight,
   Calculator,
   Plus,
+  Wrench,
+  BadgeCheck,
 } from 'lucide-react-native';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -311,7 +313,10 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>অন্যান্য টুলস</Text>
+        <View style={styles.sectionTitleRow}>
+          <Wrench size={16} color={colors.primary} />
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>অন্যান্য টুলস</Text>
+        </View>
         <TouchableOpacity onPress={() => router.push('/(tabs)/tools')} activeOpacity={0.7}>
           <Text style={[styles.seeAllText, { color: colors.primary }]}>সব টুলস →</Text>
         </TouchableOpacity>
@@ -477,7 +482,10 @@ export default function HomeScreen() {
       {featuredSurveyorsQuery.isLoading || featuredSurveyors.length > 0 ? (
         <>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>ভেরিফাইড সার্ভেয়ার</Text>
+            <View style={styles.sectionTitleRow}>
+              <BadgeCheck size={16} color={colors.primary} />
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>ভেরিফাইড সার্ভেয়ার</Text>
+            </View>
             <TouchableOpacity onPress={() => router.push('/(tabs)/surveyors')} activeOpacity={0.7}>
               <Text style={[styles.seeAllText, { color: colors.primary }]}>সকল সার্ভেয়ার →</Text>
             </TouchableOpacity>
