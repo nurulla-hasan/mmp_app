@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   BookmarkCheck, Check, Crosshair, Eye, EyeOff, FolderOpen, HardDrive, HelpCircle,
@@ -45,6 +45,7 @@ function Action({ label, icon, onPress, active, disabled, primary, danger, compa
     >
       {icon}
       <Text
+        numberOfLines={1}
         style={[
           styles.actionLabel,
           compact && styles.compactActionLabel,
@@ -59,10 +60,9 @@ function Action({ label, icon, onPress, active, disabled, primary, danger, compa
 }
 
 /**
- * React Native's JS responder is single-owner, so TouchableOpacity can miss a
- * second-finger press while the canvas gesture is already active. Keep Point
- * on a native RNGH Tap recognizer so finger #1 may continue panning while
- * finger #2 commits the crosshair point independently.
+ * Keep Point on a native RNGH recognizer. The workspace also observes finger
+ * #2 at the native gesture root, so this remains a reliable direct target for
+ * normal taps while the root observer covers Android's active-pan edge case.
  */
 function PointAction({ label, icon, onPress, disabled }: ActionProps) {
   const tapGesture = useMemo(
@@ -86,7 +86,7 @@ function PointAction({ label, icon, onPress, disabled }: ActionProps) {
         ]}
       >
         {icon}
-        <Text style={[styles.actionLabel, styles.white]}>{label}</Text>
+        <Text numberOfLines={1} style={[styles.actionLabel, styles.white]}>{label}</Text>
       </View>
     </GestureDetector>
   );
@@ -151,35 +151,35 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
     if (!manualDividePlotId || !manualCutLine) {
       return (
         <View style={styles.wrapper}>
-          <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelManualDivide} />
-          <View style={styles.divideMessage}><Text style={styles.divideText}>ভাগ করার প্লটে ট্যাপ করুন</Text></View>
+          <Action label='Cancel' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelManualDivide} />
+          <View style={styles.divideMessage}><Text style={styles.divideText}>Tap the plot to divide</Text></View>
         </View>
       );
     }
 
     const nextTarget = nudgeTarget === 'all' ? 'start' : nudgeTarget === 'start' ? 'end' : 'all';
-    const targetLabel = nudgeTarget === 'all' ? 'পুরো লাইন' : nudgeTarget === 'start' ? 'শুরুর পয়েন্ট' : 'শেষ পয়েন্ট';
+    const targetLabel = nudgeTarget === 'all' ? 'Full line' : nudgeTarget === 'start' ? 'Start point' : 'End point';
 
     return (
       <View style={styles.divideWrapper}>
         <View style={styles.divideTop}>
           <View style={styles.divideTopInfo}>
-            <Text style={styles.divideHeading}>কাটিং লাইন ঠিক করুন</Text>
-            <Text style={styles.divideTopText}>নড়বে: {targetLabel}</Text>
+            <Text style={styles.divideHeading}>Adjust cut line</Text>
+            <Text style={styles.divideTopText}>Move: {targetLabel}</Text>
           </View>
           <TouchableOpacity onPress={() => store.setNudgeTarget(nextTarget)} style={styles.targetButton}>
             <MoveHorizontal size={14} color='#bfdbfe' />
-            <Text style={styles.targetText}>টার্গেট বদলান</Text>
+            <Text style={styles.targetText}>Target</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.divideActions}>
-          <Action compact label='বাতিল' danger icon={<X size={17} color='#ef4444' />} onPress={store.cancelManualDivide} />
-          <Action compact label='বামে' icon={<Undo2 size={17} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(-1)} />
-          <Action compact label='ডানে' icon={<Redo2 size={17} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(1)} />
-          <Action compact label='পয়েন্ট +' icon={<Plus size={17} color='#93c5fd' />} onPress={store.addManualCutPoint} />
-          <Action compact label='পয়েন্ট −' disabled={manualCutLine.length <= 2} icon={<Minus size={17} color='#93c5fd' />} onPress={store.removeManualCutPoint} />
-          <Action compact label='ভাগ করুন' primary icon={<Scissors size={17} color='#fff' />} onPress={store.executeManualDivide} />
-        </ScrollView>
+        <View style={styles.divideActions}>
+          <Action compact label='Cancel' danger icon={<X size={17} color='#ef4444' />} onPress={store.cancelManualDivide} />
+          <Action compact label='Left' icon={<Undo2 size={17} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(-1)} />
+          <Action compact label='Right' icon={<Redo2 size={17} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(1)} />
+          <Action compact label='Point +' icon={<Plus size={17} color='#93c5fd' />} onPress={store.addManualCutPoint} />
+          <Action compact label='Point −' disabled={manualCutLine.length <= 2} icon={<Minus size={17} color='#93c5fd' />} onPress={store.removeManualCutPoint} />
+          <Action compact label='Divide' primary icon={<Scissors size={17} color='#fff' />} onPress={store.executeManualDivide} />
+        </View>
       </View>
     );
   }
@@ -207,12 +207,12 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
 const styles = StyleSheet.create({
   wrapper: { position: 'absolute', bottom: 10, left: 8, right: 8, zIndex: 20, minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 4, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#334155', backgroundColor: 'rgba(15,23,42,0.98)', elevation: 12 },
   action: { minWidth: 43, minHeight: 49, alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 5, borderRadius: 9 },
-  compactAction: { minWidth: 51, minHeight: 43, paddingHorizontal: 5, paddingVertical: 4, borderRadius: 8 },
+  compactAction: { flex: 1, minWidth: 0, minHeight: 43, paddingHorizontal: 2, paddingVertical: 4, borderRadius: 8 },
   active: { backgroundColor: '#2563eb' },
   primary: { backgroundColor: '#16a34a', paddingHorizontal: 9 },
   disabled: { opacity: 0.32 },
   actionLabel: { color: '#94a3b8', fontFamily: Fonts.headingSemiBold, fontSize: 8.5 },
-  compactActionLabel: { fontSize: 7.9 },
+  compactActionLabel: { fontSize: 8 },
   white: { color: '#fff' },
   danger: { color: '#ef4444' },
   divideMessage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -222,8 +222,8 @@ const styles = StyleSheet.create({
   divideTopInfo: { flex: 1 },
   divideHeading: { color: '#f8fafc', fontFamily: Fonts.headingSemiBold, fontSize: 10 },
   divideTopText: { marginTop: -1, color: '#94a3b8', fontFamily: Fonts.headingMedium, fontSize: 8.5 },
-  targetButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 7, backgroundColor: '#1e3a8a' },
+  targetButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7, backgroundColor: '#1e3a8a' },
   targetText: { color: '#bfdbfe', fontFamily: Fonts.headingSemiBold, fontSize: 8.5 },
-  divideActions: { alignItems: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 5 },
+  divideActions: { width: '100%', flexDirection: 'row', alignItems: 'stretch', justifyContent: 'space-between', gap: 2, paddingHorizontal: 5, paddingVertical: 5 },
   morePanel: { position: 'absolute', bottom: 82, right: 8, zIndex: 21, minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 2, padding: 6, borderRadius: 14, borderWidth: 1, borderColor: '#334155', backgroundColor: 'rgba(15,23,42,0.98)', elevation: 14 },
 });
