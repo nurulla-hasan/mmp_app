@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ErrorToast, SuccessToast } from '@/lib/utils';
+import { CalculationService } from '@/services/calculation-service';
 import { calculatePolygonData } from '../utils/calculations';
 import {
   clipLineToPolygon,
@@ -29,16 +30,10 @@ export type ReportInfo = { mouza: string; jlNo: string; dagNo: string; khatianNo
 const SCALE_KEY = 'mapScale';
 const SAVED_PLOTS_KEY = 'mouzaSavedPlots';
 const SAVED_PLOT_TTL_MS = 10 * 24 * 60 * 60 * 1000;
-const API_BASE_URL = 'https://mmp-backend-xi.vercel.app/api/v1';
-const ACCESS_TOKEN_KEY = '@mmp_access_token';
 
 const incrementMeasuredPlotCount = async () => {
   try {
-    const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-    await fetch(`${API_BASE_URL}/calculations/stats/increment-plot`, {
-      method: 'POST',
-      headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    });
+    await CalculationService.incrementPlotCount();
   } catch {
     // Analytics must never interrupt an on-device measurement.
   }
@@ -166,9 +161,9 @@ const getCornerSnapPoint = (point: Point, polygon: Point[], threshold: number): 
   let closest: Point | null = null;
   let closestDistance = threshold;
   for (const vertex of getLogicalCorners(polygon)) {
-    const distance = Math.hypot(point.x - vertex.x, point.y - vertex.y);
-    if (distance <= closestDistance) {
-      closestDistance = distance;
+    const pointDistance = Math.hypot(point.x - vertex.x, point.y - vertex.y);
+    if (pointDistance <= closestDistance) {
+      closestDistance = pointDistance;
       closest = vertex;
     }
   }
@@ -299,7 +294,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
   startCalibration: () => {
     const state = get();
     if (!state.mapImage) {
-      ErrorToast('স্কেল সেট করতে আগে ম্যাপ আপলোড করুন।');
+      ErrorToast('Upload a map before setting the scale.');
       return;
     }
     set({
@@ -337,11 +332,11 @@ export const useMapStore = create<MapStore>((set, get) => ({
   submitCalibrationDistance: (distanceFt) => {
     const state = get();
     if (!Number.isFinite(distanceFt) || distanceFt <= 0) {
-      ErrorToast('দূরত্ব ০-এর চেয়ে বড় হতে হবে।');
+      ErrorToast('Distance must be greater than 0.');
       return false;
     }
     if (state.calibrationLine.length < 4) {
-      ErrorToast('স্কেল বারের শুরু ও শেষ—দুটি পয়েন্ট দিন।');
+      ErrorToast('Add the start and end points of the scale bar.');
       return false;
     }
 
@@ -360,13 +355,13 @@ export const useMapStore = create<MapStore>((set, get) => ({
       isDistanceModalOpen: false,
     });
     void AsyncStorage.setItem(SCALE_KEY, String(nextScale));
-    SuccessToast(`স্কেল সেট হয়েছে: ১ পিক্সেল = ${(1 / nextScale).toFixed(6)} ফুট`);
+    SuccessToast(`Scale set: 1 pixel = ${(1 / nextScale).toFixed(6)} ft`);
     return true;
   },
 
   submitManualScale: (feetPerPixel) => {
     if (!Number.isFinite(feetPerPixel) || feetPerPixel <= 0) {
-      ErrorToast('পিক্সেল প্রতি ফুটের মান ০-এর চেয়ে বড় হতে হবে।');
+      ErrorToast('Feet per pixel must be greater than 0.');
       return false;
     }
     set({
@@ -383,7 +378,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
       results: null,
     });
     void AsyncStorage.setItem(SCALE_KEY, String(1 / feetPerPixel));
-    SuccessToast(`স্কেল সেট হয়েছে: ১ পিক্সেল = ${feetPerPixel.toFixed(6)} ফুট`);
+    SuccessToast(`Scale set: 1 pixel = ${feetPerPixel.toFixed(6)} ft`);
     return true;
   },
 
@@ -413,11 +408,11 @@ export const useMapStore = create<MapStore>((set, get) => ({
   startPlotDrawing: () => {
     const state = get();
     if (!state.mapImage) {
-      ErrorToast('প্লট আঁকতে আগে ম্যাপ আপলোড করুন।');
+      ErrorToast('Upload a map before drawing a plot.');
       return false;
     }
     if (!state.scale) {
-      ErrorToast('প্লট আঁকতে আগে স্কেল সেট করুন।');
+      ErrorToast('Set the scale before drawing a plot.');
       return false;
     }
     set({
@@ -484,18 +479,18 @@ export const useMapStore = create<MapStore>((set, get) => ({
     const state = get();
     const points = normalizePolygonPoints(state.plotPoints);
     if (points.length < 3) {
-      ErrorToast('প্লট শেষ করতে অন্তত ৩টি পয়েন্ট দিন।');
+      ErrorToast('Add at least 3 points to finish a plot.');
       return false;
     }
     const results = calculatePolygonData(points, state.scale);
     if (!results) {
-      ErrorToast('প্লটের আকার সঠিক নয়। পয়েন্টগুলো আবার দিন।');
+      ErrorToast('The plot shape is invalid. Please adjust the points.');
       return false;
     }
 
     const nextPlot: PlotRecord = {
       id: createId(),
-      name: `প্লট ${state.plots.length + 1}`,
+      name: `Plot ${state.plots.length + 1}`,
       points,
       results,
       color: PLOT_COLOR_PALETTE[state.plots.length % PLOT_COLOR_PALETTE.length],
@@ -511,7 +506,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
       mode: 'none',
     });
     void incrementMeasuredPlotCount();
-    SuccessToast(`${nextPlot.name} পরিমাপ সম্পন্ন হয়েছে।`);
+    SuccessToast(`${nextPlot.name} measured successfully.`);
     return true;
   },
 
@@ -600,27 +595,27 @@ export const useMapStore = create<MapStore>((set, get) => ({
   savePlotsToLibrary: () => {
     const state = get();
     if (!state.scale) {
-      ErrorToast('সেভ করার আগে দয়া করে স্কেল সেট করে নিন');
+      ErrorToast('Set the scale before saving.');
       return false;
     }
     const targetPlots = state.plots.filter((plot) => !plot.isSaved);
     if (!targetPlots.length) {
-      ErrorToast('সেভ করার আগে দয়া করে অন্তত একটি প্লট আঁকা শেষ করুন');
+      ErrorToast('Finish at least one plot before saving.');
       return false;
     }
     const cleanName = state.plotSaveName.trim();
     if (!cleanName) {
-      ErrorToast('দয়া করে প্লটের নাম লিখুন');
+      ErrorToast('Enter a plot name.');
       return false;
     }
     const now = Date.now();
     const namedPlots: SavedPlotRecord[] = targetPlots.map((plot, index) => ({
       ...plot,
       id: `${now}-${index}`,
-      name: targetPlots.length > 1 ? `${cleanName} - প্লট ${index + 1}` : cleanName,
+      name: targetPlots.length > 1 ? `${cleanName} - Plot ${index + 1}` : cleanName,
       color: plot.color || '#0d9488',
       scale: state.scale!,
-      sourceName: state.mapImage?.name || 'আপলোড করা ম্যাপ',
+      sourceName: state.mapImage?.name || 'Uploaded map',
       createdAt: now,
       expiresAt: now + SAVED_PLOT_TTL_MS,
     }));
@@ -630,7 +625,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
     ];
     set({ savedPlots, plotSaveName: '' });
     void AsyncStorage.setItem(SAVED_PLOTS_KEY, JSON.stringify(savedPlots));
-    SuccessToast('স্ক্র্যাচ লাইব্রেরিতে প্লটটি সফলভাবে সেভ করা হয়েছে');
+    SuccessToast('Plot saved to the scratch library.');
     return true;
   },
 
@@ -638,7 +633,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
     const savedPlots = get().savedPlots.filter((plot) => plot.id !== plotId);
     set({ savedPlots });
     void AsyncStorage.setItem(SAVED_PLOTS_KEY, JSON.stringify(savedPlots));
-    SuccessToast('সেভ করা প্লটটি মুছে ফেলা হয়েছে');
+    SuccessToast('Saved plot deleted.');
   },
 
   updateSavedPlot: (plotId, updates) => {
@@ -739,9 +734,9 @@ export const useMapStore = create<MapStore>((set, get) => ({
     let insertIndex = 1;
     let longestDistance = -1;
     for (let index = 0; index < line.length - 1; index += 1) {
-      const distance = Math.hypot(line[index + 1].x - line[index].x, line[index + 1].y - line[index].y);
-      if (distance > longestDistance) {
-        longestDistance = distance;
+      const pointDistance = Math.hypot(line[index + 1].x - line[index].x, line[index + 1].y - line[index].y);
+      if (pointDistance > longestDistance) {
+        longestDistance = pointDistance;
         insertIndex = index + 1;
       }
     }
@@ -768,13 +763,13 @@ export const useMapStore = create<MapStore>((set, get) => ({
     if (plotIndex < 0 || !state.manualCutLine || !state.scale) return false;
     const split = splitPolygonByPolyline(state.plots[plotIndex].points, state.manualCutLine);
     if (!split) {
-      ErrorToast('লাইনটি জমির দুই সীমানা স্পর্শ করছে না। কাটিং লাইন ঠিক করুন।');
+      ErrorToast('The cut line must touch two plot boundaries. Adjust the line and try again.');
       return false;
     }
     const resultsA = calculatePolygonData(split.poly1, state.scale);
     const resultsB = calculatePolygonData(split.poly2, state.scale);
     if (!resultsA || !resultsB) {
-      ErrorToast('ভাগ করা জমির ক্ষেত্রফল হিসাব করা যায়নি।');
+      ErrorToast('Could not calculate the divided plot areas.');
       return false;
     }
 
@@ -792,7 +787,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
         color: PLOT_COLOR_PALETTE[(plotIndex + 1) % PLOT_COLOR_PALETTE.length],
       },
     );
-    const renamedPlots = nextPlots.map((plot, index) => ({ ...plot, name: `প্লট ${index + 1}` }));
+    const renamedPlots = nextPlots.map((plot, index) => ({ ...plot, name: `Plot ${index + 1}` }));
     set({
       plots: renamedPlots,
       plotsHistory: [...state.plotsHistory, state.plots],
@@ -803,7 +798,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
       manualCutLine: null,
       nudgeTarget: 'all',
     });
-    SuccessToast('জমি সফলভাবে দুই ভাগে বিভক্ত হয়েছে।');
+    SuccessToast('Plot divided successfully.');
     return true;
   },
 }));
