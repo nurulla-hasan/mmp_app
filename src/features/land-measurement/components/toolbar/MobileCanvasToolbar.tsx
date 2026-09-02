@@ -24,18 +24,34 @@ type ActionProps = {
   disabled?: boolean;
   primary?: boolean;
   danger?: boolean;
+  compact?: boolean;
 };
 
-function Action({ label, icon, onPress, active, disabled, primary, danger }: ActionProps) {
+function Action({ label, icon, onPress, active, disabled, primary, danger, compact }: ActionProps) {
   return (
     <TouchableOpacity
       activeOpacity={0.74}
       disabled={disabled}
       onPress={onPress}
-      style={[styles.action, active && styles.active, primary && styles.primary, disabled && styles.disabled]}
+      style={[
+        styles.action,
+        compact && styles.compactAction,
+        active && styles.active,
+        primary && styles.primary,
+        disabled && styles.disabled,
+      ]}
     >
       {icon}
-      <Text style={[styles.actionLabel, (active || primary) && styles.white, danger && styles.danger]}>{label}</Text>
+      <Text
+        style={[
+          styles.actionLabel,
+          compact && styles.compactActionLabel,
+          (active || primary) && styles.white,
+          danger && styles.danger,
+        ]}
+      >
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -44,7 +60,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const store = useMapStore();
   const {
-    mode, mapImage, scale, plotPoints, plotPointsFuture, plots, plotsHistory, plotsFuture,
+    mode, mapImage, scale, plotPoints, plotPointsFuture, plots,
     calibrationLine, calibrationLineFuture, isShowDiagonals, isMagnifierEnabled,
     manualDividePlotId, manualCutLine, nudgeTarget,
   } = store;
@@ -93,20 +109,36 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
 
   if (mode === 'manual_divide_plot') {
     if (!manualDividePlotId || !manualCutLine) {
-      return <View style={styles.wrapper}><Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelManualDivide} /><View style={styles.divideMessage}><Text style={styles.divideText}>ভাগ করার প্লটে ট্যাপ করুন</Text></View></View>;
+      return (
+        <View style={styles.wrapper}>
+          <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelManualDivide} />
+          <View style={styles.divideMessage}><Text style={styles.divideText}>ভাগ করার প্লটে ট্যাপ করুন</Text></View>
+        </View>
+      );
     }
+
     const nextTarget = nudgeTarget === 'all' ? 'start' : nudgeTarget === 'start' ? 'end' : 'all';
     const targetLabel = nudgeTarget === 'all' ? 'পুরো লাইন' : nudgeTarget === 'start' ? 'শুরুর পয়েন্ট' : 'শেষ পয়েন্ট';
+
     return (
       <View style={styles.divideWrapper}>
-        <View style={styles.divideTop}><Text style={styles.divideTopText}>নড়বে: {targetLabel}</Text><TouchableOpacity onPress={() => store.setNudgeTarget(nextTarget)} style={styles.targetButton}><MoveHorizontal size={15} color='#bfdbfe' /><Text style={styles.targetText}>বদলান</Text></TouchableOpacity></View>
+        <View style={styles.divideTop}>
+          <View style={styles.divideTopInfo}>
+            <Text style={styles.divideHeading}>কাটিং লাইন ঠিক করুন</Text>
+            <Text style={styles.divideTopText}>নড়বে: {targetLabel}</Text>
+          </View>
+          <TouchableOpacity onPress={() => store.setNudgeTarget(nextTarget)} style={styles.targetButton}>
+            <MoveHorizontal size={14} color='#bfdbfe' />
+            <Text style={styles.targetText}>টার্গেট বদলান</Text>
+          </TouchableOpacity>
+        </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.divideActions}>
-          <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelManualDivide} />
-          <Action label='বামে' icon={<Undo2 size={18} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(-1)} />
-          <Action label='ডানে' icon={<Redo2 size={18} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(1)} />
-          <Action label='পয়েন্ট +' icon={<Plus size={18} color='#93c5fd' />} onPress={store.addManualCutPoint} />
-          <Action label='পয়েন্ট −' disabled={manualCutLine.length <= 2} icon={<Minus size={18} color='#93c5fd' />} onPress={store.removeManualCutPoint} />
-          <Action label='ভাগ করুন' primary icon={<Scissors size={18} color='#fff' />} onPress={store.executeManualDivide} />
+          <Action compact label='বাতিল' danger icon={<X size={17} color='#ef4444' />} onPress={store.cancelManualDivide} />
+          <Action compact label='বামে' icon={<Undo2 size={17} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(-1)} />
+          <Action compact label='ডানে' icon={<Redo2 size={17} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(1)} />
+          <Action compact label='পয়েন্ট +' icon={<Plus size={17} color='#93c5fd' />} onPress={store.addManualCutPoint} />
+          <Action compact label='পয়েন্ট −' disabled={manualCutLine.length <= 2} icon={<Minus size={17} color='#93c5fd' />} onPress={store.removeManualCutPoint} />
+          <Action compact label='ভাগ করুন' primary icon={<Scissors size={17} color='#fff' />} onPress={store.executeManualDivide} />
         </ScrollView>
       </View>
     );
@@ -135,19 +167,23 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
 const styles = StyleSheet.create({
   wrapper: { position: 'absolute', bottom: 10, left: 8, right: 8, zIndex: 20, minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 4, paddingVertical: 6, borderRadius: 14, borderWidth: 1, borderColor: '#334155', backgroundColor: 'rgba(15,23,42,0.98)', elevation: 12 },
   action: { minWidth: 43, minHeight: 49, alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 5, borderRadius: 9 },
+  compactAction: { minWidth: 51, minHeight: 43, paddingHorizontal: 5, paddingVertical: 4, borderRadius: 8 },
   active: { backgroundColor: '#2563eb' },
   primary: { backgroundColor: '#16a34a', paddingHorizontal: 9 },
   disabled: { opacity: 0.32 },
   actionLabel: { color: '#94a3b8', fontFamily: Fonts.headingSemiBold, fontSize: 8.5 },
+  compactActionLabel: { fontSize: 7.9 },
   white: { color: '#fff' },
   danger: { color: '#ef4444' },
   divideMessage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   divideText: { color: '#e2e8f0', fontFamily: Fonts.headingSemiBold, fontSize: 12 },
-  divideWrapper: { position: 'absolute', bottom: 10, left: 8, right: 8, zIndex: 20, borderRadius: 14, borderWidth: 1, borderColor: '#334155', backgroundColor: 'rgba(15,23,42,0.98)', overflow: 'hidden' },
-  divideTop: { height: 31, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#334155' },
-  divideTopText: { color: '#cbd5e1', fontFamily: Fonts.headingMedium, fontSize: 10 },
-  targetButton: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6, backgroundColor: '#1e3a8a' },
-  targetText: { color: '#bfdbfe', fontFamily: Fonts.headingSemiBold, fontSize: 9 },
-  divideActions: { paddingHorizontal: 4, paddingVertical: 5 },
+  divideWrapper: { position: 'absolute', bottom: 10, left: 8, right: 8, zIndex: 20, borderRadius: 12, borderWidth: 1, borderColor: '#334155', backgroundColor: 'rgba(15,23,42,0.98)', overflow: 'hidden', elevation: 12 },
+  divideTop: { minHeight: 39, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 10, paddingVertical: 5, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#334155', backgroundColor: '#111827' },
+  divideTopInfo: { flex: 1 },
+  divideHeading: { color: '#f8fafc', fontFamily: Fonts.headingSemiBold, fontSize: 10 },
+  divideTopText: { marginTop: -1, color: '#94a3b8', fontFamily: Fonts.headingMedium, fontSize: 8.5 },
+  targetButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 7, backgroundColor: '#1e3a8a' },
+  targetText: { color: '#bfdbfe', fontFamily: Fonts.headingSemiBold, fontSize: 8.5 },
+  divideActions: { alignItems: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 5 },
   morePanel: { position: 'absolute', bottom: 82, right: 8, zIndex: 21, minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 2, padding: 6, borderRadius: 14, borderWidth: 1, borderColor: '#334155', backgroundColor: 'rgba(15,23,42,0.98)', elevation: 14 },
 });
