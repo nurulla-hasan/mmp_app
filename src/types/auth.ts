@@ -1,42 +1,14 @@
-export type LoginPayload = {
-  email: string;
-  password: string;
-};
+import type { TSurveyorProfile } from './surveyor';
 
-export type RegisterPayload = {
-  name: string;
-  email: string;
-  password: string;
-};
-
-export type VerifyEmailPayload = {
-  email: string;
-  otp: string;
-};
-
-export type ResendOtpPayload = {
-  email: string;
-};
-
+export type LoginPayload = { email: string; password: string };
+export type RegisterPayload = { name: string; email: string; password: string };
+export type VerifyEmailPayload = { email: string; otp: string };
+export type ResendOtpPayload = { email: string };
 export type ResetPasswordPayload = {
   email: string;
   otp: string;
   password: string;
   confirmPassword: string;
-};
-
-export type TSurveyorProfile = {
-  id: string;
-  slug: string;
-  name: string;
-  phone: string;
-  bio?: string;
-  experienceYears?: number;
-  district?: string;
-  upazila?: string;
-  rating?: number;
-  totalReviews?: number;
-  isVerified?: boolean;
 };
 
 export type TAuthUser = {
@@ -60,10 +32,7 @@ export type TAuthUser = {
 };
 
 export type UpdateProfilePayload = Partial<
-  Pick<
-    TAuthUser,
-    'name' | 'phone' | 'whatsappNumber' | 'district' | 'upazila' | 'imageUrl'
-  >
+  Pick<TAuthUser, 'name' | 'phone' | 'whatsappNumber' | 'district' | 'upazila' | 'imageUrl'>
 >;
 
 export type ChangePasswordPayload = {
@@ -72,9 +41,13 @@ export type ChangePasswordPayload = {
   confirmPassword: string;
 };
 
-export type AuthTokens = {
-  accessToken: string;
-  refreshToken: string;
+export type AuthTokens = { accessToken: string; refreshToken: string };
+
+export type ApiMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 };
 
 export type ApiSuccess<T> = {
@@ -82,6 +55,7 @@ export type ApiSuccess<T> = {
   statusCode: number;
   message: string;
   data: T;
+  meta?: ApiMeta;
 };
 
 export type ApiFailure = {
@@ -91,3 +65,4 @@ export type ApiFailure = {
 };
 
 export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
+export type { TSurveyorProfile } from './surveyor';
