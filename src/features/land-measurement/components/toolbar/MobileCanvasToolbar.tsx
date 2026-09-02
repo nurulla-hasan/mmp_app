@@ -8,6 +8,7 @@ import {
 import { useMapStore } from '../../store/useMapStore';
 import { Fonts } from '../../../../constants/typography';
 import { toBengaliDigits } from '../../../../lib/utils';
+import { syncCanvasRuntimeTransformToStore } from '../canvas/canvas-runtime';
 
 type Props = {
   onOpenManualScale: () => void;
@@ -82,6 +83,11 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
     ]);
   };
 
+  const addCenterPoint = () => {
+    syncCanvasRuntimeTransformToStore();
+    useMapStore.getState().addCenterPoint();
+  };
+
   if (mode === 'calibrating') {
     const count = calibrationLine.length / 2;
     return (
@@ -90,7 +96,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
         <Action label='আনডু' disabled={count === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={store.undoCalibrationPoint} />
         <Action label='রিডু' disabled={calibrationLineFuture.length === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={store.redoCalibrationPoint} />
         <Action label='ম্যানুয়াল' icon={<Ruler size={18} color='#fbbf24' />} onPress={onOpenManualScale} />
-        <Action label={`পয়েন্ট ${toBengaliDigits(count)}/২`} primary disabled={count >= 2} icon={<Crosshair size={19} color='#fff' />} onPress={store.addCenterPoint} />
+        <Action label={`পয়েন্ট ${toBengaliDigits(count)}/২`} primary disabled={count >= 2} icon={<Crosshair size={19} color='#fff' />} onPress={addCenterPoint} />
       </View>
     );
   }
@@ -101,7 +107,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
         <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelActiveMode} />
         <Action label='আনডু' disabled={plotPoints.length === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={store.undoPlotAction} />
         <Action label='রিডু' disabled={plotPointsFuture.length === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={store.redoPlotAction} />
-        <Action label={`পয়েন্ট ${toBengaliDigits(plotPoints.length)}`} primary icon={<Crosshair size={19} color='#fff' />} onPress={store.addCenterPoint} />
+        <Action label={`পয়েন্ট ${toBengaliDigits(plotPoints.length)}`} primary icon={<Crosshair size={19} color='#fff' />} onPress={addCenterPoint} />
         <Action label='শেষ করুন' disabled={plotPoints.length < 3} icon={<Check size={19} color='#86efac' />} onPress={store.finishPlot} />
       </View>
     );
