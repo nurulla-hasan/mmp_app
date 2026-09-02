@@ -47,6 +47,7 @@ export type NativeEdgeLabel = {
   text: string;
   rotation: number;
   fontPx: number;
+  layoutScale: number;
   color: string;
 };
 
@@ -105,6 +106,7 @@ export function getPlotEdgeLabels(plot: PlotRecord, scale: number | null, stageS
       text,
       rotation: getReadableRotation(Math.atan2(midDy, midDx) * 180 / Math.PI),
       fontPx,
+      layoutScale,
       color: plot.color || '#0F766E',
     });
   });
@@ -157,6 +159,7 @@ export function getActiveSegmentLabels(points: Point[], scale: number | null, st
       text,
       rotation: getReadableRotation(Math.atan2(midDy, midDx) * 180 / Math.PI),
       fontPx,
+      layoutScale: stageScale,
       color: UI_CONFIG.colors.drawPrimary,
     }];
   });
