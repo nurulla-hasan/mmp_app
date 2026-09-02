@@ -19,6 +19,7 @@ import { SuccessToast } from '../../lib/utils';
 import { ProfileHeaderCard } from '../../components/profile/profile-header-card';
 import { PersonalInfoCard } from '../../components/profile/personal-info-card';
 import { ActivityCard } from '../../components/profile/activity-card';
+import { SurveyorAccountCard } from '../../components/profile/surveyor-account-card';
 import { AccountSettingsCard } from '../../components/profile/account-settings-card';
 import { ProfileEditModal } from '../../components/profile/profile-edit-modal';
 import { ChangePasswordModal } from '../../components/profile/change-password-modal';
@@ -54,6 +55,13 @@ export default function ProfileScreen() {
     );
   };
 
+  const handleSurveyorAccountPress = () => {
+    const isApprovedSurveyor =
+      user?.role === 'SURVEYOR' && user.surveyorProfile?.verificationStatus === 'APPROVED';
+
+    router.push(isApprovedSurveyor ? '/surveyor-profile' : '/join-as-surveyor');
+  };
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -73,6 +81,11 @@ export default function ProfileScreen() {
           />
 
           <ActivityCard />
+
+          <SurveyorAccountCard
+            user={user}
+            onPress={handleSurveyorAccountPress}
+          />
 
           <AccountSettingsCard
             onChangePasswordPress={() => setPasswordModalVisible(true)}
@@ -115,7 +128,12 @@ export default function ProfileScreen() {
             },
           ]}
         >
-          <View style={[styles.guestIconCircle, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
+          <View
+            style={[
+              styles.guestIconCircle,
+              { backgroundColor: 'rgba(22, 163, 74, 0.1)' },
+            ]}
+          >
             <UserCheck size={36} color='#16a34a' />
           </View>
           <Text style={[styles.guestTitle, { color: colors.text }]}>
