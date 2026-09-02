@@ -1,6 +1,7 @@
 // Central API contract used by the mobile app.
 // Keep endpoint strings here so services never drift from the backend contract.
-// Mobile intentionally exposes only USER/SURVEYOR-facing subscription endpoints.
+// Mobile intentionally exposes only USER/SURVEYOR-facing subscription and
+// broadcast endpoints; admin management stays on the web.
 
 export const API_ENDPOINTS = {
   auth: {
@@ -26,6 +27,9 @@ export const API_ENDPOINTS = {
     paymentNumbers: '/subscribers/payment-numbers',
     manualCheckout: '/subscribers/manual-checkout',
     mySubscription: '/subscribers/my-subscription',
+  },
+  broadcasts: {
+    active: '/broadcasts/active',
   },
   calculations: {
     root: '/calculations',
