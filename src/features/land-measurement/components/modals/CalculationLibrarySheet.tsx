@@ -1,36 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { BookmarkCheck, Calendar, FolderOpen, Layers, Search, Trash2, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { calculatePolygonData } from '../../utils/calculations';
 import { PLOT_COLOR_PALETTE } from '../../utils/canvas';
 import type { PlotRecord, Point } from '../../types/map';
+import type { TCalculation } from '../../../../types/calculation';
+import { CalculationService } from '../../../../services/calculation-service';
 import { ErrorToast, SuccessToast } from '../../../../lib/utils';
 import { Fonts } from '../../../../constants/typography';
 
-const API_BASE_URL = 'https://mmp-backend-xi.vercel.app/api/v1';
-const ACCESS_TOKEN_KEY = '@mmp_access_token';
 const PAGE_LIMIT = 6;
 
-type ServerPlot = {
-  id?: string;
-  plotNumber?: string;
-  points: Point[] | string;
-  areaShotok?: number;
-  areaKatha?: number;
-};
-
-export type ServerCalculation = {
-  id: string;
-  name: string;
-  mapName?: string | null;
-  scalePxPerUnit?: number | null;
-  imageWidth?: number | null;
-  imageHeight?: number | null;
-  createdAt: string;
-  plots: ServerPlot[];
-};
+export type ServerCalculation = TCalculation;
 
 type Props = {
   visible: boolean;
@@ -39,20 +21,8 @@ type Props = {
   onRequireMap: (calculation: ServerCalculation) => void;
 };
 
-async function apiRequest<T>(path: string, init?: { method?: string; body?: unknown }, unwrap = true): Promise<T> {
-  const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: init?.method ?? 'GET',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: init?.body ? JSON.stringify(init.body) : undefined,
-  });
-  const json = await response.json();
-  if (!response.ok || json.success === false) throw new Error(json.message || 'অনুরোধটি সম্পন্ন করা যায়নি।');
-  return (unwrap ? json.data ?? json : json) as T;
+function getErrorMessage(result: { success: boolean; message: string }, fallback: string) {
+  return result.message || fallback;
 }
 
 export function applyServerCalculation(calculation: ServerCalculation) {
@@ -72,7 +42,7 @@ export function applyServerCalculation(calculation: ServerCalculation) {
     };
     return {
       id: plot.id || `${Date.now()}-${index}`,
-      name: plot.plotNumber || `প্লট ${index + 1}`,
+      name: plot.plotNumber || `Plot ${index + 1}`,
       points,
       results,
       color: PLOT_COLOR_PALETTE[index % PLOT_COLOR_PALETTE.length],
@@ -82,12 +52,17 @@ export function applyServerCalculation(calculation: ServerCalculation) {
   store.setScale(scale);
   store.setPlots(plots);
   store.setCurrentProjectId(calculation.id);
-  SuccessToast(`"${calculation.name}" পরিমাপ সফলভাবে ক্যানভাসে লোড হয়েছে!`);
+  SuccessToast(`“${calculation.name}” loaded on the canvas.`);
 }
 
 export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }: Props) {
-  const { plots, scale, mapImage } = useMapStore();
-  const defaultName = useMemo(() => `পরিমাপ — ${new Date().toLocaleDateString('bn-BD', { day: 'numeric', month: 'long', year: 'numeric' })}`, []);
+  const plots = useMapStore((state) => state.plots);
+  const scale = useMapStore((state) => state.scale);
+  const mapImage = useMapStore((state) => state.mapImage);
+  const defaultName = useMemo(
+    () => `Measurement — ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+    [],
+  );
   const [name, setName] = useState(defaultName);
   const [search, setSearch] = useState('');
   const [items, setItems] = useState<ServerCalculation[]>([]);
@@ -100,14 +75,14 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
     if (!visible || mode !== 'load') return;
     setBusy(true);
     try {
-      const searchQuery = search.trim() ? `&searchTerm=${encodeURIComponent(search.trim())}` : '';
-      const response = await apiRequest<{ data?: ServerCalculation[]; meta?: { totalPages?: number } } | ServerCalculation[]>(`/calculations?page=1&limit=${PAGE_LIMIT}${searchQuery}`, undefined, false);
-      const nextItems = Array.isArray(response) ? response : response.data ?? [];
+      const result = await CalculationService.getCalculations(search, 1, PAGE_LIMIT);
+      if (!result.success) throw new Error(getErrorMessage(result, 'Could not load saved measurements.'));
+      const nextItems = result.data;
       setItems(nextItems);
       setPage(1);
-      setHasMore(Array.isArray(response) ? nextItems.length >= PAGE_LIMIT : 1 < (response.meta?.totalPages ?? 1));
+      setHasMore(result.meta ? 1 < result.meta.totalPages : nextItems.length >= PAGE_LIMIT);
     } catch (error) {
-      ErrorToast(error instanceof Error ? error.message : 'সংরক্ষিত পরিমাপ লোড করা সম্ভব হয়নি।');
+      ErrorToast(error instanceof Error ? error.message : 'Could not load saved measurements.');
     } finally {
       setBusy(false);
     }
@@ -118,15 +93,17 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
     setLoadingMore(true);
     const nextPage = page + 1;
     try {
-      const searchQuery = search.trim() ? `&searchTerm=${encodeURIComponent(search.trim())}` : '';
-      const response = await apiRequest<{ data?: ServerCalculation[]; meta?: { totalPages?: number } } | ServerCalculation[]>(`/calculations?page=${nextPage}&limit=${PAGE_LIMIT}${searchQuery}`, undefined, false);
-      const nextItems = Array.isArray(response) ? response : response.data ?? [];
+      const result = await CalculationService.getCalculations(search, nextPage, PAGE_LIMIT);
+      if (!result.success) throw new Error(getErrorMessage(result, 'Could not load more measurements.'));
+      const nextItems = result.data;
       setItems((current) => [...current, ...nextItems.filter((next) => !current.some((item) => item.id === next.id))]);
       setPage(nextPage);
-      setHasMore(Array.isArray(response) ? nextItems.length >= PAGE_LIMIT : nextPage < (response.meta?.totalPages ?? nextPage));
+      setHasMore(result.meta ? nextPage < result.meta.totalPages : nextItems.length >= PAGE_LIMIT);
     } catch (error) {
-      ErrorToast(error instanceof Error ? error.message : 'পরবর্তী পরিমাপগুলো লোড করা সম্ভব হয়নি।');
-    } finally { setLoadingMore(false); }
+      ErrorToast(error instanceof Error ? error.message : 'Could not load more measurements.');
+    } finally {
+      setLoadingMore(false);
+    }
   }, [busy, hasMore, loadingMore, mode, page, search, visible]);
 
   useEffect(() => {
@@ -135,32 +112,30 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
   }, [loadItems, search]);
 
   const save = async () => {
-    if (!name.trim()) { ErrorToast('দয়া করে পরিমাপের একটি নাম দিন।'); return; }
-    if (!plots.length) { ErrorToast('সেভ করার জন্য অন্তত একটি প্লট আঁকা প্রয়োজন।'); return; }
+    if (!name.trim()) { ErrorToast('Enter a name for this measurement.'); return; }
+    if (!plots.length) { ErrorToast('Draw at least one plot before saving.'); return; }
     setBusy(true);
     try {
-      await apiRequest('/calculations', {
-        method: 'POST',
-        body: {
-          name: name.trim(),
-          mapName: mapImage?.name || 'ম্যাপ ফাইল',
-          scaleType: 'link',
-          scalePxPerUnit: scale || undefined,
-          imageWidth: mapImage?.width,
-          imageHeight: mapImage?.height,
-          plots: plots.map((plot, index) => ({
-            plotNumber: plot.name || `প্লট ${index + 1}`,
-            points: plot.points,
-            areaSqLink: plot.results.sqft ? plot.results.sqft * 2.29568 : 0,
-            areaShotok: plot.results.shotok || 0,
-            areaKatha: plot.results.katha || 0,
-          })),
-        },
+      const result = await CalculationService.saveCalculation({
+        name: name.trim(),
+        mapName: mapImage?.name || 'Map file',
+        scaleType: 'link',
+        scalePxPerUnit: scale || undefined,
+        imageWidth: mapImage?.width,
+        imageHeight: mapImage?.height,
+        plots: plots.map((plot, index) => ({
+          plotNumber: plot.name || `Plot ${index + 1}`,
+          points: plot.points,
+          areaSqLink: plot.results.sqft ? plot.results.sqft * 2.29568 : 0,
+          areaShotok: plot.results.shotok || 0,
+          areaKatha: plot.results.katha || 0,
+        })),
       });
-      SuccessToast(`"${name}" পরিমাপ সফলভাবে সেভ করা হয়েছে!`);
+      if (!result.success) throw new Error(getErrorMessage(result, 'Could not save measurement.'));
+      SuccessToast(`“${name.trim()}” saved successfully.`);
       onClose();
     } catch (error) {
-      ErrorToast(error instanceof Error ? error.message : 'সেভ করতে সমস্যা হয়েছে।');
+      ErrorToast(error instanceof Error ? error.message : 'Could not save measurement.');
     } finally {
       setBusy(false);
     }
@@ -173,15 +148,25 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
   };
 
   const remove = (calculation: ServerCalculation) => Alert.alert(
-    'পরিমাপটি মুছে ফেলবেন?',
-    'এই পরিমাপ এবং এর সব প্লট স্থায়ীভাবে মুছে যাবে।',
-    [{ text: 'বাতিল', style: 'cancel' }, { text: 'মুছে ফেলুন', style: 'destructive', onPress: async () => {
-      try {
-        await apiRequest(`/calculations/${calculation.id}`, { method: 'DELETE' });
-        setItems((current) => current.filter((item) => item.id !== calculation.id));
-        SuccessToast('পরিমাপ সফলভাবে মুছে ফেলা হয়েছে।');
-      } catch (error) { ErrorToast(error instanceof Error ? error.message : 'মুছতে সমস্যা হয়েছে।'); }
-    } }],
+    'Delete measurement?',
+    'This measurement and all of its plots will be permanently deleted.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const result = await CalculationService.deleteCalculation(calculation.id);
+            if (!result.success) throw new Error(getErrorMessage(result, 'Could not delete measurement.'));
+            setItems((current) => current.filter((item) => item.id !== calculation.id));
+            SuccessToast('Measurement deleted.');
+          } catch (error) {
+            ErrorToast(error instanceof Error ? error.message : 'Could not delete measurement.');
+          }
+        },
+      },
+    ],
   );
 
   const totalShotok = plots.reduce((sum, plot) => sum + plot.results.shotok, 0);
@@ -192,15 +177,54 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
       <View style={styles.backdrop}>
         <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheet}>
-          <View style={styles.header}><View><Text style={styles.title}>{mode === 'save' ? 'পরিমাপ সেভ করুন' : 'সংরক্ষিত পরিমাপসমূহ'}</Text><Text style={styles.subtitle}>{mode === 'save' ? 'বর্তমান ম্যাপ ও প্লট আপনার প্রোফাইলে সংরক্ষণ করুন' : 'আগের পরিমাপ ক্যানভাসে পুনরায় লোড করুন'}</Text></View><TouchableOpacity style={styles.close} onPress={onClose}><X size={18} color='#94a3b8' /></TouchableOpacity></View>
+          <View style={styles.header}>
+            <View>
+              <Text style={styles.title}>{mode === 'save' ? 'Save Measurement' : 'Saved Measurements'}</Text>
+              <Text style={styles.subtitle}>{mode === 'save' ? 'Save the current map and plots to your profile' : 'Load a previous measurement back onto the canvas'}</Text>
+            </View>
+            <TouchableOpacity style={styles.close} onPress={onClose}><X size={18} color='#94a3b8' /></TouchableOpacity>
+          </View>
 
           {mode === 'save' ? <>
-            <View style={styles.summary}><Text style={styles.summaryLine}>ম্যাপ: {mapImage?.name || 'ম্যাপ ফাইল'}</Text><Text style={styles.summaryLine}>মোট প্লট: {plots.length}টি</Text><Text style={styles.total}>মোট: {totalShotok.toFixed(2)} শতক ({totalKatha.toFixed(2)} কাঠা)</Text></View>
-            <TextInput value={name} onChangeText={setName} placeholder='পরিমাপের নাম' placeholderTextColor='#64748b' style={styles.input} />
-            <TouchableOpacity disabled={busy || !plots.length} style={[styles.primary, (busy || !plots.length) && styles.disabled]} onPress={save}>{busy ? <ActivityIndicator color='#fff' /> : <BookmarkCheck size={18} color='#fff' />}<Text style={styles.primaryText}>সেভ করুন</Text></TouchableOpacity>
+            <View style={styles.summary}>
+              <Text style={styles.summaryLine}>Map: {mapImage?.name || 'Map file'}</Text>
+              <Text style={styles.summaryLine}>Plots: {plots.length}</Text>
+              <Text style={styles.total}>Total: {totalShotok.toFixed(2)} shotok ({totalKatha.toFixed(2)} katha)</Text>
+            </View>
+            <TextInput value={name} onChangeText={setName} placeholder='Measurement name' placeholderTextColor='#64748b' style={styles.input} />
+            <TouchableOpacity disabled={busy || !plots.length} style={[styles.primary, (busy || !plots.length) && styles.disabled]} onPress={save}>
+              {busy ? <ActivityIndicator color='#fff' /> : <BookmarkCheck size={18} color='#fff' />}
+              <Text style={styles.primaryText}>Save</Text>
+            </TouchableOpacity>
           </> : <>
-            <View style={styles.searchBox}><Search size={17} color='#64748b' /><TextInput value={search} onChangeText={setSearch} placeholder='পরিমাপ বা ম্যাপের নাম দিয়ে খুঁজুন' placeholderTextColor='#64748b' style={styles.searchInput} /></View>
-            {busy ? <ActivityIndicator style={styles.loader} color='#22c55e' /> : <FlatList data={items} keyExtractor={(item) => item.id} style={styles.list} contentContainerStyle={items.length ? styles.listContent : styles.emptyContent} onEndReached={() => void loadMore()} onEndReachedThreshold={0.35} ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.moreLoader} color='#22c55e' /> : null} ListEmptyComponent={<View style={styles.empty}><FolderOpen size={30} color='#475569' /><Text style={styles.emptyText}>{search ? 'কোনো ফলাফল পাওয়া যায়নি' : 'কোনো সংরক্ষিত পরিমাপ নেই'}</Text></View>} renderItem={({ item }) => <TouchableOpacity style={styles.item} onPress={() => select(item)}><View style={styles.itemBody}><Text style={styles.itemTitle}>{item.name}</Text><View style={styles.meta}><Layers size={12} color='#22c55e' /><Text style={styles.metaText}>{item.plots?.length || 0}টি প্লট</Text><Calendar size={12} color='#64748b' /><Text style={styles.metaText}>{new Date(item.createdAt).toLocaleDateString('bn-BD')}</Text></View><Text numberOfLines={1} style={styles.mapName}>🗺️ {item.mapName || 'ম্যাপ ফাইল'}</Text></View><TouchableOpacity style={styles.delete} onPress={(event) => { event.stopPropagation(); remove(item); }}><Trash2 size={17} color='#f87171' /></TouchableOpacity></TouchableOpacity>} />}
+            <View style={styles.searchBox}><Search size={17} color='#64748b' /><TextInput value={search} onChangeText={setSearch} placeholder='Search by measurement or map name' placeholderTextColor='#64748b' style={styles.searchInput} /></View>
+            {busy ? <ActivityIndicator style={styles.loader} color='#22c55e' /> : (
+              <FlatList
+                data={items}
+                keyExtractor={(item) => item.id}
+                style={styles.list}
+                contentContainerStyle={items.length ? styles.listContent : styles.emptyContent}
+                onEndReached={() => void loadMore()}
+                onEndReachedThreshold={0.35}
+                ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.moreLoader} color='#22c55e' /> : null}
+                ListEmptyComponent={<View style={styles.empty}><FolderOpen size={30} color='#475569' /><Text style={styles.emptyText}>{search ? 'No results found' : 'No saved measurements yet'}</Text></View>}
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={styles.item} onPress={() => select(item)}>
+                    <View style={styles.itemBody}>
+                      <Text style={styles.itemTitle}>{item.name}</Text>
+                      <View style={styles.meta}>
+                        <Layers size={12} color='#22c55e' />
+                        <Text style={styles.metaText}>{item.plots?.length || 0} plots</Text>
+                        <Calendar size={12} color='#64748b' />
+                        <Text style={styles.metaText}>{new Date(item.createdAt).toLocaleDateString('en-GB')}</Text>
+                      </View>
+                      <Text numberOfLines={1} style={styles.mapName}>🗺️ {item.mapName || 'Map file'}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.delete} onPress={(event) => { event.stopPropagation(); remove(item); }}><Trash2 size={17} color='#f87171' /></TouchableOpacity>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
           </>}
         </View>
       </View>
