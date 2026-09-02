@@ -1,12 +1,14 @@
 import React from 'react';
 import {
+  Animated,
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -39,6 +41,134 @@ import { toBengaliDigits, SuccessToast } from '../../lib/utils';
 import type { TCalculation, Point } from '../../types/calculation';
 import type { PlotRecord } from '../../features/land-measurement/types/map';
 
+type HomeColors = (typeof Colors)['light'];
+
+function SkeletonBlock({
+  colors,
+  opacity,
+  style,
+}: {
+  colors: HomeColors;
+  opacity: Animated.Value;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Animated.View
+      style={[
+        styles.skeletonBlock,
+        { backgroundColor: colors.skeleton, opacity },
+        style,
+      ]}
+    />
+  );
+}
+
+function ProjectsSkeleton({
+  colors,
+  opacity,
+}: {
+  colors: HomeColors;
+  opacity: Animated.Value;
+}) {
+  return (
+    <View style={styles.savedProjectsList}>
+      {[0, 1, 2].map((item) => (
+        <View
+          key={`project-skeleton-${item}`}
+          style={[
+            styles.skeletonProjectCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}
+        >
+          <View style={styles.skeletonProjectLeft}>
+            <SkeletonBlock
+              colors={colors}
+              opacity={opacity}
+              style={styles.skeletonProjectIcon}
+            />
+            <View style={styles.skeletonProjectText}>
+              <SkeletonBlock
+                colors={colors}
+                opacity={opacity}
+                style={styles.skeletonProjectTitle}
+              />
+              <SkeletonBlock
+                colors={colors}
+                opacity={opacity}
+                style={[styles.skeletonProjectMeta, { backgroundColor: colors.skeletonSoft }]}
+              />
+            </View>
+          </View>
+          <View style={styles.skeletonProjectRight}>
+            <SkeletonBlock
+              colors={colors}
+              opacity={opacity}
+              style={styles.skeletonProjectArea}
+            />
+            <SkeletonBlock
+              colors={colors}
+              opacity={opacity}
+              style={[styles.skeletonProjectBadge, { backgroundColor: colors.skeletonSoft }]}
+            />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function SurveyorsSkeleton({
+  colors,
+  opacity,
+}: {
+  colors: HomeColors;
+  opacity: Animated.Value;
+}) {
+  return (
+    <View style={styles.featuredSurveyorList}>
+      {[0, 1].map((item) => (
+        <View
+          key={`surveyor-skeleton-${item}`}
+          style={[
+            styles.skeletonSurveyorCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}
+        >
+          <View style={styles.skeletonSurveyorTop}>
+            <SkeletonBlock
+              colors={colors}
+              opacity={opacity}
+              style={styles.skeletonAvatar}
+            />
+            <View style={styles.skeletonSurveyorText}>
+              <SkeletonBlock
+                colors={colors}
+                opacity={opacity}
+                style={styles.skeletonSurveyorName}
+              />
+              <SkeletonBlock
+                colors={colors}
+                opacity={opacity}
+                style={[styles.skeletonSurveyorLine, { backgroundColor: colors.skeletonSoft }]}
+              />
+              <SkeletonBlock
+                colors={colors}
+                opacity={opacity}
+                style={[styles.skeletonSurveyorLineShort, { backgroundColor: colors.skeletonSoft }]}
+              />
+            </View>
+          </View>
+          <View style={styles.skeletonSurveyorChips}>
+            <SkeletonBlock colors={colors} opacity={opacity} style={styles.skeletonChip} />
+            <SkeletonBlock colors={colors} opacity={opacity} style={styles.skeletonChipWide} />
+            <SkeletonBlock colors={colors} opacity={opacity} style={styles.skeletonChip} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const { theme } = useThemeStore();
@@ -52,13 +182,36 @@ export default function HomeScreen() {
   } = useCalculations();
   const realCalculations = allCalculations.slice(0, 3);
 
-  // Web home requests verified surveyors from the same public directory.
-  // The backend already restricts the public directory to APPROVED profiles.
-  // Mobile keeps the home preview intentionally compact at two cards.
   const featuredSurveyorsQuery = useSurveyors({ limit: 2 });
   const featuredSurveyors = featuredSurveyorsQuery.data?.surveyors ?? [];
-
   const { isAuthenticated } = useAuthStore();
+
+  const skeletonOpacity = React.useRef(new Animated.Value(0.48)).current;
+
+  React.useEffect(() => {
+    if (!loadingCalculations && !featuredSurveyorsQuery.isLoading) {
+      skeletonOpacity.setValue(0.7);
+      return undefined;
+    }
+
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(skeletonOpacity, {
+          toValue: 0.92,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        Animated.timing(skeletonOpacity, {
+          toValue: 0.48,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+
+    animation.start();
+    return () => animation.stop();
+  }, [featuredSurveyorsQuery.isLoading, loadingCalculations, skeletonOpacity]);
 
   const refreshHome = () => {
     void refetchCalculations();
@@ -111,17 +264,13 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
-          refreshing={
-            loadingCalculations ||
-            refetchingCalculations ||
-            featuredSurveyorsQuery.isRefetching
-          }
+          refreshing={refetchingCalculations || featuredSurveyorsQuery.isRefetching}
           onRefresh={refreshHome}
           tintColor={colors.primary}
+          colors={[colors.primary]}
         />
       }
     >
-      {/* 1. Hero Action Banner */}
       <View
         style={[
           styles.heroCard,
@@ -130,13 +279,13 @@ export default function HomeScreen() {
       >
         <View style={styles.heroHeader}>
           <View style={styles.proTag}>
-            <Sparkles size={12} color='#22c55e' />
-            <Text style={styles.proTagText}>MOUZA MAP PRO</Text>
+            <Sparkles size={12} color={colors.primary} />
+            <Text style={[styles.proTagText, { color: colors.primary }]}>MOUZA MAP PRO</Text>
           </View>
           <Badge label='v2.0 LIVE' variant='pro' />
         </View>
 
-        <Text style={styles.heroTitle}>ডিজিটাল মৌজা ম্যাপ ও জমি পরিমাপ</Text>
+        <Text style={[styles.heroTitle, { color: colors.heroTitle }]}>ডিজিটাল মৌজা ম্যাপ ও জমি পরিমাপ</Text>
         <Text style={[styles.heroSubtitle, { color: colors.heroSubtitle }]}>
           ম্যাপে সরাসরি দাগ এঁকে শতক, কাঠা ও একরে নিখুঁত ক্ষেত্রফল হিসাব ও দাগ বণ্টন করুন।
         </Text>
@@ -154,19 +303,21 @@ export default function HomeScreen() {
             variant='outline'
             size='md'
             onPress={() => router.push('/(tools)/scale-guide')}
-            style={styles.heroBtnOutline}
-            textStyle={{ color: '#ffffff' }}
+            style={[
+              styles.heroBtnOutline,
+              {
+                borderColor: colors.heroSecondaryBorder,
+                backgroundColor: colors.heroSecondaryBg,
+              },
+            ]}
+            textStyle={{ color: colors.heroSecondaryText }}
           />
         </View>
       </View>
 
-      {/* 2. Specialized Tools */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>অন্যান্য টুলস</Text>
-        <TouchableOpacity
-          onPress={() => router.push('/(tabs)/tools')}
-          activeOpacity={0.7}
-        >
+        <TouchableOpacity onPress={() => router.push('/(tabs)/tools')} activeOpacity={0.7}>
           <Text style={[styles.seeAllText, { color: colors.primary }]}>সব টুলস →</Text>
         </TouchableOpacity>
       </View>
@@ -174,15 +325,10 @@ export default function HomeScreen() {
       <View style={styles.grid}>
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[
-            styles.toolCard,
-            { backgroundColor: colors.card, borderColor: colors.cardBorder },
-          ]}
+          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           onPress={() => router.push('/(tools)/land-measurement')}
         >
-          <View
-            style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}
-          >
+          <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
             <Layers size={19} color='#059669' strokeWidth={2} />
           </View>
           <View style={styles.toolTextCol}>
@@ -193,15 +339,10 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[
-            styles.toolCard,
-            { backgroundColor: colors.card, borderColor: colors.cardBorder },
-          ]}
+          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           onPress={() => router.push('/(tools)/land-measurement')}
         >
-          <View
-            style={[styles.iconBox, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}
-          >
+          <View style={[styles.iconBox, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}>
             <Globe size={19} color='#16a34a' strokeWidth={2} />
           </View>
           <View style={styles.toolTextCol}>
@@ -214,15 +355,10 @@ export default function HomeScreen() {
       <View style={styles.grid}>
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[
-            styles.toolCard,
-            { backgroundColor: colors.card, borderColor: colors.cardBorder },
-          ]}
+          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           onPress={() => router.push('/(tools)/pantagraph')}
         >
-          <View
-            style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.12)' }]}
-          >
+          <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.12)' }]}>
             <Scaling size={19} color='#0891b2' strokeWidth={2} />
           </View>
           <View style={styles.toolTextCol}>
@@ -233,15 +369,10 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[
-            styles.toolCard,
-            { backgroundColor: colors.card, borderColor: colors.cardBorder },
-          ]}
+          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           onPress={() => router.push('/(tools)/tracer')}
         >
-          <View
-            style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}
-          >
+          <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
             <PenLine size={19} color='#d97706' strokeWidth={2} />
           </View>
           <View style={styles.toolTextCol}>
@@ -251,7 +382,6 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 3. Saved Calculations */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleRow}>
           <FolderKanban size={16} color={colors.primary} />
@@ -268,24 +398,16 @@ export default function HomeScreen() {
       </View>
 
       {loadingCalculations ? (
-        <View style={styles.homeProjectsLoading}>
-          <ActivityIndicator size='small' color={colors.primary} />
-          <Text style={[styles.metaText, { color: colors.textMuted }]}>প্রজেক্ট লোড হচ্ছে...</Text>
-        </View>
+        <ProjectsSkeleton colors={colors} opacity={skeletonOpacity} />
       ) : !isAuthenticated ? (
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[
-            styles.emptyProjectCard,
-            { backgroundColor: colors.card, borderColor: colors.cardBorder },
-          ]}
+          style={[styles.emptyProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           onPress={() => router.push('/(auth)/login')}
         >
           <FolderKanban size={22} color={colors.textMuted} />
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={[styles.emptyProjectTitle, { color: colors.text }]}>
-              আপনার প্রজেক্ট দেখতে লগইন করুন
-            </Text>
+          <View style={styles.flexText}>
+            <Text style={[styles.emptyProjectTitle, { color: colors.text }]}>আপনার প্রজেক্ট দেখতে লগইন করুন</Text>
             <Text style={[styles.metaText, { color: colors.textMuted }]}>
               ক্লাউডে সংরক্ষিত সমস্ত দাগ ও পরিমাপের হিসাব পেতে সাইন ইন করুন।
             </Text>
@@ -295,17 +417,12 @@ export default function HomeScreen() {
       ) : realCalculations.length === 0 ? (
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[
-            styles.emptyProjectCard,
-            { backgroundColor: colors.card, borderColor: colors.cardBorder },
-          ]}
+          style={[styles.emptyProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
           onPress={() => router.push('/land-measurement')}
         >
           <Calculator size={22} color={colors.primary} />
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text style={[styles.emptyProjectTitle, { color: colors.text }]}>
-              এখনও কোনো প্রজেক্ট সংরক্ষণ করা হয়নি
-            </Text>
+          <View style={styles.flexText}>
+            <Text style={[styles.emptyProjectTitle, { color: colors.text }]}>এখনও কোনো প্রজেক্ট সংরক্ষণ করা হয়নি</Text>
             <Text style={[styles.metaText, { color: colors.textMuted }]}>
               ম্যাপে দাগ এঁকে পরিমাপ সংরক্ষণ করতে এখানে ট্যাপ করুন।
             </Text>
@@ -318,7 +435,7 @@ export default function HomeScreen() {
             const plotCount = project.plots?.length || 0;
             const totalShotok = (project.plots || []).reduce(
               (sum, p) => sum + (Number(p.areaShotok) || 0),
-              0
+              0,
             );
             const scaleDisplay = project.scalePxPerUnit
               ? `১ px ≈ ${(1 / project.scalePxPerUnit).toFixed(1)} ft`
@@ -328,32 +445,19 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={project.id}
                 activeOpacity={0.8}
-                style={[
-                  styles.savedProjectCard,
-                  { backgroundColor: colors.card, borderColor: colors.cardBorder },
-                ]}
+                style={[styles.savedProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
                 onPress={() => handleOpenCalculation(project)}
               >
                 <View style={styles.savedProjectLeft}>
-                  <View
-                    style={[
-                      styles.fileIconBox,
-                      { backgroundColor: 'rgba(22, 163, 74, 0.1)' },
-                    ]}
-                  >
+                  <View style={[styles.fileIconBox, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
                     <FileSpreadsheet size={18} color='#16a34a' />
                   </View>
                   <View style={styles.savedProjectDetails}>
-                    <Text
-                      style={[styles.savedProjectName, { color: colors.text }]}
-                      numberOfLines={1}
-                    >
+                    <Text style={[styles.savedProjectName, { color: colors.text }]} numberOfLines={1}>
                       {project.name}
                     </Text>
                     <View style={styles.savedProjectMeta}>
-                      <Text style={[styles.metaText, { color: colors.textMuted }]}>
-                        {scaleDisplay}
-                      </Text>
+                      <Text style={[styles.metaText, { color: colors.textMuted }]}>{scaleDisplay}</Text>
                       <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text>
                       <Text style={[styles.metaText, { color: colors.textMuted }]}>
                         {toBengaliDigits(plotCount)}টি প্লট
@@ -379,39 +483,27 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* 4. Verified Surveyors: real API preview */}
-      {(featuredSurveyorsQuery.isLoading || featuredSurveyors.length > 0) ? (
+      {featuredSurveyorsQuery.isLoading || featuredSurveyors.length > 0 ? (
         <>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>ভেরিফাইড সার্ভেয়ার</Text>
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/surveyors')}
-              activeOpacity={0.7}
-            >
+            <TouchableOpacity onPress={() => router.push('/(tabs)/surveyors')} activeOpacity={0.7}>
               <Text style={[styles.seeAllText, { color: colors.primary }]}>সকল সার্ভেয়ার →</Text>
             </TouchableOpacity>
           </View>
 
           {featuredSurveyorsQuery.isLoading ? (
-            <View style={styles.homeProjectsLoading}>
-              <ActivityIndicator size='small' color={colors.primary} />
-              <Text style={[styles.metaText, { color: colors.textMuted }]}>সার্ভেয়ার লোড হচ্ছে...</Text>
-            </View>
+            <SurveyorsSkeleton colors={colors} opacity={skeletonOpacity} />
           ) : (
             <View style={styles.featuredSurveyorList}>
               {featuredSurveyors.map((surveyor) => (
-                <SurveyorCard
-                  key={surveyor.id || surveyor.slug}
-                  surveyor={surveyor}
-                  compact
-                />
+                <SurveyorCard key={surveyor.id || surveyor.slug} surveyor={surveyor} compact />
               ))}
             </View>
           )}
         </>
       ) : null}
 
-      {/* 5. Surveyor Career Banner */}
       <View
         style={[
           styles.careerBanner,
@@ -430,7 +522,7 @@ export default function HomeScreen() {
           >
             <Briefcase size={20} color={colors.primary} />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={styles.flexText}>
             <Text
               style={[
                 styles.careerTitle,
@@ -454,7 +546,7 @@ export default function HomeScreen() {
           size='sm'
           variant='primary'
           onPress={() => router.push('/join-as-surveyor')}
-          style={{ alignSelf: 'flex-start', marginTop: 4 }}
+          style={styles.careerButton}
         />
       </View>
     </ScrollView>
@@ -464,6 +556,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 14, gap: 12, paddingBottom: 28 },
+  flexText: { flex: 1, gap: 2 },
   heroCard: {
     borderRadius: 14,
     padding: 16,
@@ -471,9 +564,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.08,
     shadowRadius: 6,
-    elevation: 3,
+    elevation: 2,
   },
   heroHeader: {
     flexDirection: 'row',
@@ -484,7 +577,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -492,13 +585,11 @@ const styles = StyleSheet.create({
   proTagText: {
     fontSize: 10,
     fontFamily: Fonts.headingBold,
-    color: '#22c55e',
     letterSpacing: 0.5,
   },
   heroTitle: {
     fontSize: 17,
     fontFamily: Fonts.headingBold,
-    color: '#ffffff',
     lineHeight: 24,
   },
   heroSubtitle: {
@@ -508,10 +599,7 @@ const styles = StyleSheet.create({
   },
   heroActionRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
   heroBtn: { flex: 1 },
-  heroBtnOutline: {
-    flex: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
+  heroBtnOutline: { flex: 1, borderWidth: 1 },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -548,7 +636,6 @@ const styles = StyleSheet.create({
   toolTextCol: { flex: 1, gap: 3, alignItems: 'flex-start' },
   toolTitle: { fontSize: 12.5, fontFamily: Fonts.headingBold },
   savedProjectsList: { gap: 8 },
-  homeProjectsLoading: { paddingVertical: 18, alignItems: 'center', gap: 6 },
   emptyProjectCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -609,4 +696,38 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sansRegular,
     lineHeight: 15,
   },
+  careerButton: { alignSelf: 'flex-start', marginTop: 4 },
+  skeletonBlock: { borderRadius: 6 },
+  skeletonProjectCard: {
+    minHeight: 66,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  skeletonProjectLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  skeletonProjectIcon: { width: 36, height: 36, borderRadius: 8 },
+  skeletonProjectText: { flex: 1, gap: 7 },
+  skeletonProjectTitle: { width: '58%', height: 12 },
+  skeletonProjectMeta: { width: '76%', height: 9 },
+  skeletonProjectRight: { width: 78, alignItems: 'flex-end', gap: 6 },
+  skeletonProjectArea: { width: 70, height: 12 },
+  skeletonProjectBadge: { width: 44, height: 18, borderRadius: 5 },
+  skeletonSurveyorCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 11,
+  },
+  skeletonSurveyorTop: { flexDirection: 'row', alignItems: 'center', gap: 11 },
+  skeletonAvatar: { width: 46, height: 46, borderRadius: 23 },
+  skeletonSurveyorText: { flex: 1, gap: 7 },
+  skeletonSurveyorName: { width: '52%', height: 13 },
+  skeletonSurveyorLine: { width: '78%', height: 9 },
+  skeletonSurveyorLineShort: { width: '46%', height: 9 },
+  skeletonSurveyorChips: { flexDirection: 'row', gap: 6 },
+  skeletonChip: { width: 58, height: 20, borderRadius: 6 },
+  skeletonChipWide: { width: 82, height: 20, borderRadius: 6 },
 });
