@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { BookmarkCheck, Calendar, FolderOpen, Layers, Search, Trash2, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { calculatePolygonData } from '../../utils/calculations';
@@ -11,8 +12,9 @@ import { ErrorToast, SuccessToast } from '../../../../lib/utils';
 import { Fonts } from '../../../../constants/typography';
 import { useThemeStore } from '../../../../stores/theme-store';
 import { getLandMeasurementToolColors } from '../../utils/tool-theme';
-
-const PAGE_LIMIT = 6;
+import { useSavedCalculations } from '../../../../hooks/queries/use-calculations';
+import { queryKeys } from '../../../../lib/query-keys';
+import { LoadingSkeleton, useSkeletonPulse } from '../../../../components/ui/loading-skeleton';
 
 export type ServerCalculation = TCalculation;
 
@@ -60,6 +62,7 @@ export function applyServerCalculation(calculation: ServerCalculation) {
 export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }: Props) {
   const { theme } = useThemeStore();
   const colors = getLandMeasurementToolColors(theme);
+  const queryClient = useQueryClient();
   const plots = useMapStore((state) => state.plots);
   const scale = useMapStore((state) => state.scale);
   const mapImage = useMapStore((state) => state.mapImage);
@@ -69,56 +72,29 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
   );
   const [name, setName] = useState(defaultName);
   const [search, setSearch] = useState('');
-  const [items, setItems] = useState<ServerCalculation[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-
-  const loadItems = useCallback(async () => {
-    if (!visible || mode !== 'load') return;
-    setBusy(true);
-    try {
-      const result = await CalculationService.getCalculations(search, 1, PAGE_LIMIT);
-      if (!result.success) throw new Error(getErrorMessage(result, 'Could not load saved measurements.'));
-      const nextItems = result.data;
-      setItems(nextItems);
-      setPage(1);
-      setHasMore(result.meta ? 1 < result.meta.totalPages : nextItems.length >= PAGE_LIMIT);
-    } catch (error) {
-      ErrorToast(error instanceof Error ? error.message : 'Could not load saved measurements.');
-    } finally {
-      setBusy(false);
-    }
-  }, [mode, search, visible]);
-
-  const loadMore = useCallback(async () => {
-    if (!visible || mode !== 'load' || busy || loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    const nextPage = page + 1;
-    try {
-      const result = await CalculationService.getCalculations(search, nextPage, PAGE_LIMIT);
-      if (!result.success) throw new Error(getErrorMessage(result, 'Could not load more measurements.'));
-      const nextItems = result.data;
-      setItems((current) => [...current, ...nextItems.filter((next) => !current.some((item) => item.id === next.id))]);
-      setPage(nextPage);
-      setHasMore(result.meta ? nextPage < result.meta.totalPages : nextItems.length >= PAGE_LIMIT);
-    } catch (error) {
-      ErrorToast(error instanceof Error ? error.message : 'Could not load more measurements.');
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [busy, hasMore, loadingMore, mode, page, search, visible]);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => { void loadItems(); }, search ? 300 : 0);
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), search ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [loadItems, search]);
+  }, [search]);
+
+  const libraryQuery = useSavedCalculations(
+    debouncedSearch,
+    visible && mode === 'load',
+  );
+  const items = useMemo(
+    () => libraryQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [libraryQuery.data],
+  );
+  const initialLoading = libraryQuery.isPending && items.length === 0;
+  const skeletonOpacity = useSkeletonPulse(initialLoading || libraryQuery.isFetchingNextPage);
 
   const save = async () => {
     if (!name.trim()) { ErrorToast('Enter a name for this measurement.'); return; }
     if (!plots.length) { ErrorToast('Draw at least one plot before saving.'); return; }
-    setBusy(true);
+    setSaving(true);
     try {
       const result = await CalculationService.saveCalculation({
         name: name.trim(),
@@ -136,12 +112,14 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
         })),
       });
       if (!result.success) throw new Error(getErrorMessage(result, 'Could not save measurement.'));
+      await queryClient.invalidateQueries({ queryKey: queryKeys.calculations.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.profile.stats() });
       SuccessToast(`“${name.trim()}” saved successfully.`);
       onClose();
     } catch (error) {
       ErrorToast(error instanceof Error ? error.message : 'Could not save measurement.');
     } finally {
-      setBusy(false);
+      setSaving(false);
     }
   };
 
@@ -163,7 +141,24 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
           try {
             const result = await CalculationService.deleteCalculation(calculation.id);
             if (!result.success) throw new Error(getErrorMessage(result, 'Could not delete measurement.'));
-            setItems((current) => current.filter((item) => item.id !== calculation.id));
+
+            queryClient.setQueriesData(
+              { queryKey: queryKeys.calculations.libraryLists() },
+              (current: any) => {
+                if (!current?.pages) return current;
+                return {
+                  ...current,
+                  pages: current.pages.map((page: any) => ({
+                    ...page,
+                    items: Array.isArray(page.items)
+                      ? page.items.filter((item: ServerCalculation) => item.id !== calculation.id)
+                      : page.items,
+                  })),
+                };
+              },
+            );
+            await queryClient.invalidateQueries({ queryKey: queryKeys.calculations.lists() });
+            await queryClient.invalidateQueries({ queryKey: queryKeys.profile.stats() });
             SuccessToast('Measurement deleted.');
           } catch (error) {
             ErrorToast(error instanceof Error ? error.message : 'Could not delete measurement.');
@@ -182,7 +177,7 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
         <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: colors.panel, borderColor: colors.panelBorder }]}>
           <View style={styles.header}>
-            <View>
+            <View style={styles.headerText}>
               <Text style={[styles.title, { color: colors.textStrong }]}>{mode === 'save' ? 'Save Measurement' : 'Saved Measurements'}</Text>
               <Text style={[styles.subtitle, { color: colors.textSoft }]}>{mode === 'save' ? 'Save the current map and plots to your profile' : 'Load a previous measurement back onto the canvas'}</Text>
             </View>
@@ -196,21 +191,57 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
               <Text style={[styles.total, { borderTopColor: colors.panelBorder, color: colors.success }]}>Total: {totalShotok.toFixed(2)} shotok ({totalKatha.toFixed(2)} katha)</Text>
             </View>
             <TextInput value={name} onChangeText={setName} placeholder='Measurement name' placeholderTextColor={colors.textSoft} style={[styles.input, { backgroundColor: colors.input, borderColor: colors.panelBorder, color: colors.textStrong }]} />
-            <TouchableOpacity disabled={busy || !plots.length} style={[styles.primary, (busy || !plots.length) && styles.disabled]} onPress={save}>
-              {busy ? <ActivityIndicator color='#fff' /> : <BookmarkCheck size={18} color='#fff' />}
-              <Text style={styles.primaryText}>Save</Text>
+            <TouchableOpacity disabled={saving || !plots.length} style={[styles.primary, (saving || !plots.length) && styles.disabled]} onPress={save}>
+              <BookmarkCheck size={18} color='#fff' />
+              <Text style={styles.primaryText}>{saving ? 'Saving…' : 'Save'}</Text>
             </TouchableOpacity>
           </> : <>
             <View style={[styles.searchBox, { backgroundColor: colors.input, borderColor: colors.panelBorder }]}><Search size={17} color={colors.textSoft} /><TextInput value={search} onChangeText={setSearch} placeholder='Search by measurement or map name' placeholderTextColor={colors.textSoft} style={[styles.searchInput, { color: colors.textStrong }]} /></View>
-            {busy ? <ActivityIndicator style={styles.loader} color={colors.success} /> : (
+
+            {initialLoading ? (
+              <View style={styles.skeletonList}>
+                {[0, 1, 2, 3].map((item) => (
+                  <View key={`saved-skeleton-${item}`} style={[styles.item, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
+                    <View style={styles.itemBody}>
+                      <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonTitle} />
+                      <View style={styles.skeletonMetaRow}>
+                        <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonMeta} />
+                        <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonDate} />
+                      </View>
+                      <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonMap} />
+                    </View>
+                    <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonDelete} />
+                  </View>
+                ))}
+              </View>
+            ) : libraryQuery.isError && items.length === 0 ? (
+              <View style={styles.empty}>
+                <FolderOpen size={30} color={colors.textSoft} />
+                <Text style={[styles.emptyText, { color: colors.textSoft }]}>Could not load saved measurements</Text>
+                <TouchableOpacity style={styles.retry} onPress={() => void libraryQuery.refetch()}>
+                  <Text style={styles.retryText}>Try Again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
               <FlatList
                 data={items}
                 keyExtractor={(item) => item.id}
                 style={styles.list}
                 contentContainerStyle={items.length ? styles.listContent : styles.emptyContent}
-                onEndReached={() => void loadMore()}
+                onEndReached={() => {
+                  if (libraryQuery.hasNextPage && !libraryQuery.isFetchingNextPage) {
+                    void libraryQuery.fetchNextPage();
+                  }
+                }}
                 onEndReachedThreshold={0.35}
-                ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.moreLoader} color={colors.success} /> : null}
+                ListFooterComponent={libraryQuery.isFetchingNextPage ? (
+                  <View style={[styles.item, styles.footerSkeleton, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
+                    <View style={styles.itemBody}>
+                      <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonTitle} />
+                      <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonMap} />
+                    </View>
+                  </View>
+                ) : null}
                 ListEmptyComponent={<View style={styles.empty}><FolderOpen size={30} color={colors.textSoft} /><Text style={[styles.emptyText, { color: colors.textSoft }]}>{search ? 'No results found' : 'No saved measurements yet'}</Text></View>}
                 renderItem={({ item }) => (
                   <TouchableOpacity style={[styles.item, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]} onPress={() => select(item)}>
@@ -239,7 +270,8 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end' },
   sheet: { maxHeight: '82%', padding: 16, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12 },
+  headerText: { flex: 1 },
   title: { fontFamily: Fonts.headingBold, fontSize: 17 },
   subtitle: { fontFamily: Fonts.sansRegular, fontSize: 10 },
   close: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
@@ -252,13 +284,13 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   searchBox: { height: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1 },
   searchInput: { flex: 1, fontFamily: Fonts.headingMedium, fontSize: 11 },
-  loader: { paddingVertical: 48 },
   list: { marginTop: 10 },
   listContent: { gap: 9, paddingBottom: 8 },
   emptyContent: { flexGrow: 1 },
-  moreLoader: { paddingVertical: 14 },
   empty: { alignItems: 'center', gap: 7, paddingVertical: 45 },
   emptyText: { fontFamily: Fonts.headingMedium, fontSize: 11 },
+  retry: { marginTop: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: '#16a34a' },
+  retryText: { color: '#fff', fontFamily: Fonts.headingSemiBold, fontSize: 10.5 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
   itemBody: { flex: 1 },
   itemTitle: { fontFamily: Fonts.headingSemiBold, fontSize: 12 },
@@ -266,4 +298,12 @@ const styles = StyleSheet.create({
   metaText: { marginRight: 7, fontSize: 9 },
   mapName: { marginTop: 3, fontSize: 9 },
   delete: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.08)' },
+  skeletonList: { marginTop: 10, gap: 9 },
+  skeletonTitle: { width: '40%', height: 12 },
+  skeletonMetaRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  skeletonMeta: { width: 66, height: 9 },
+  skeletonDate: { width: 78, height: 9 },
+  skeletonMap: { width: '52%', height: 9, marginTop: 7 },
+  skeletonDelete: { width: 34, height: 34, borderRadius: 8 },
+  footerSkeleton: { marginTop: 9 },
 });
