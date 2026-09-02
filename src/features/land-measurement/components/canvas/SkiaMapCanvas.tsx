@@ -25,7 +25,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useDerivedValue, useSharedValue } from 'react-native-reanimated';
 import { LocateFixed, Minus, Plus } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
-import { calculatePolygonData } from '../../utils/calculations';
+import { calculatePolygonAreaSummary, calculatePolygonData } from '../../utils/calculations';
 import {
   clipLineToPolygon,
   getLogicalCorners,
@@ -50,6 +50,8 @@ import { getPolygonAreaLabelLayout } from '../../utils/polygon-label';
 import { getReadableRotation } from '../../utils/component-helpers';
 import type { PlotRecord, Point } from '../../types/map';
 import { Fonts } from '../../../../constants/typography';
+import { useThemeStore } from '../../../../stores/theme-store';
+import { getLandMeasurementToolColors } from '../../utils/tool-theme';
 import { getActivePlotDots, getActiveSegmentLabels, getPlotEdgeLabels } from './nativeStageGeometry';
 import { SkiaTiledMap } from './SkiaTiledMap';
 import {
@@ -474,6 +476,8 @@ const ManualAnchor = memo(function ManualAnchor({
 });
 
 export function SkiaMapCanvas() {
+  const { theme } = useThemeStore();
+  const colors = getLandMeasurementToolColors(theme);
   const mapImage = useMapStore((state) => state.mapImage);
   const mode = useMapStore((state) => state.mode);
   const scale = useMapStore((state) => state.scale);
@@ -596,8 +600,8 @@ export function SkiaMapCanvas() {
     if (!selectedPlot || !manualCutLine || manualCutLine.length < 2 || !scale) return null;
     const split = splitPolygonByPolyline(selectedPlot.points, manualCutLine);
     if (!split || split.poly1.length < 3 || split.poly2.length < 3) return null;
-    const resultA = calculatePolygonData(split.poly1, scale);
-    const resultB = calculatePolygonData(split.poly2, scale);
+    const resultA = calculatePolygonAreaSummary(split.poly1, scale);
+    const resultB = calculatePolygonAreaSummary(split.poly2, scale);
     if (!resultA || !resultB) return null;
     return {
       poly1: split.poly1,
@@ -751,8 +755,8 @@ export function SkiaMapCanvas() {
   /**
    * Red anchors and the dashed line are UI-thread driven. Split fill/area
    * preview is JS geometry, so coalesce the 120Hz touch stream to one update
-   * per available JS animation frame. This mirrors the web RAF pattern without
-   * the visible 40ms lag from the old timer throttle.
+   * per available JS animation frame. The preview calculation itself is now
+   * area-only, matching the final formula while skipping lengths/diagonals.
    */
   const scheduleManualAnchorMove = useCallback((index: number, x: number, y: number) => {
     pendingManualDragRef.current = { index, x, y };
@@ -1237,12 +1241,12 @@ export function SkiaMapCanvas() {
   }, [isMagnifierEnabled, magnifierTransform, mapImage, mode, viewport.height, viewport.width]);
 
   return (
-    <View style={styles.container} onLayout={onLayout}>
+    <View style={[styles.container, { backgroundColor: colors.workspace }]} onLayout={onLayout}>
       <GestureDetector gesture={gesture}>
         <View style={StyleSheet.absoluteFill}>
           {viewport.width > 0 && viewport.height > 0 && (
             <Canvas style={StyleSheet.absoluteFill}>
-              <Fill color='#090d16' />
+              <Fill color={colors.workspace} />
               <Group transform={contentTransform as any}>
                 {mapImage && (
                   <SkiaTiledMap
@@ -1466,7 +1470,7 @@ export function SkiaMapCanvas() {
 
               {magnifier && mapImage && (
                 <Group>
-                  <Circle cx={magnifier.lens.x} cy={magnifier.lens.y} r={magnifier.radius + 2} color='#f8fafc' />
+                  <Circle cx={magnifier.lens.x} cy={magnifier.lens.y} r={magnifier.radius + 2} color={colors.surface} />
                   <Group clip={magnifier.clip}>
                     <Group transform={[
                       { translateX: magnifier.magnifiedPos.x },
@@ -1489,7 +1493,7 @@ export function SkiaMapCanvas() {
                     cx={magnifier.lens.x}
                     cy={magnifier.lens.y}
                     r={magnifier.radius}
-                    color='rgba(15,23,42,0.72)'
+                    color={theme === 'dark' ? 'rgba(15,23,42,0.72)' : 'rgba(15,23,42,0.42)'}
                     style='stroke'
                     strokeWidth={3}
                   />
@@ -1524,22 +1528,38 @@ export function SkiaMapCanvas() {
 
       {!mapImage && (
         <View pointerEvents='none' style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Add Mouza Map</Text>
-          <Text style={styles.emptyText}>Add a map image to set scale and measure land boundaries</Text>
+          <Text style={[styles.emptyTitle, { color: colors.textStrong }]}>Add Mouza Map</Text>
+          <Text style={[styles.emptyText, { color: colors.textSoft }]}>Add a map image to set scale and measure land boundaries</Text>
         </View>
       )}
       <View pointerEvents='none' style={styles.instructionPill}>
-        <Text style={styles.instructionText}>{instruction}</Text>
+        <Text
+          style={[
+            styles.instructionText,
+            {
+              backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.94)',
+              borderColor: colors.panelBorder,
+              color: colors.textStrong,
+            },
+          ]}
+        >
+          {instruction}
+        </Text>
       </View>
-      <View style={styles.zoomControls}>
-        <TouchableOpacity style={styles.zoomButton} onPress={() => zoomAround(1.25)}>
-          <Plus size={18} color='#e2e8f0' />
+      <View
+        style={[
+          styles.zoomControls,
+          { backgroundColor: colors.overlay, borderColor: colors.panelBorder },
+        ]}
+      >
+        <TouchableOpacity style={[styles.zoomButton, { borderBottomColor: colors.panelBorder }]} onPress={() => zoomAround(1.25)}>
+          <Plus size={18} color={colors.textSoft} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.zoomButton} onPress={() => zoomAround(0.8)}>
-          <Minus size={18} color='#e2e8f0' />
+        <TouchableOpacity style={[styles.zoomButton, { borderBottomColor: colors.panelBorder }]} onPress={() => zoomAround(0.8)}>
+          <Minus size={18} color={colors.textSoft} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.zoomButton} onPress={resetView}>
-          <LocateFixed size={17} color='#22c55e' />
+        <TouchableOpacity style={[styles.zoomButton, { borderBottomColor: colors.panelBorder }]} onPress={resetView}>
+          <LocateFixed size={17} color={colors.success} />
         </TouchableOpacity>
       </View>
     </View>
@@ -1547,18 +1567,17 @@ export function SkiaMapCanvas() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, overflow: 'hidden', backgroundColor: '#090d16' },
+  container: { flex: 1, overflow: 'hidden' },
   emptyState: { position: 'absolute', top: '42%', left: 28, right: 28, alignItems: 'center' },
-  emptyTitle: { color: '#cbd5e1', fontFamily: Fonts.headingBold, fontSize: 16 },
-  emptyText: { marginTop: 3, color: '#64748b', fontFamily: Fonts.sansRegular, fontSize: 11, textAlign: 'center' },
+  emptyTitle: { fontFamily: Fonts.headingBold, fontSize: 16 },
+  emptyText: { marginTop: 3, fontFamily: Fonts.sansRegular, fontSize: 11, textAlign: 'center' },
   instructionPill: { position: 'absolute', top: 10, left: 12, right: 58, alignItems: 'flex-start' },
   instructionText: {
     overflow: 'hidden',
     borderRadius: 8,
+    borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: 'rgba(15,23,42,0.92)',
-    color: '#cbd5e1',
     fontFamily: Fonts.headingMedium,
     fontSize: 11,
   },
@@ -1569,8 +1588,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderRadius: 9,
     borderWidth: 1,
-    borderColor: '#334155',
-    backgroundColor: 'rgba(15,23,42,0.94)',
   },
   zoomButton: {
     width: 38,
@@ -1578,6 +1595,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#334155',
   },
 });
