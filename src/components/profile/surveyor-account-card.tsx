@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { BadgeCheck, Briefcase, ChevronRight, Clock, TriangleAlert } from 'lucide-react-native';
+import { AlertTriangle, BadgeCheck, Briefcase, ChevronRight, Clock } from 'lucide-react-native';
 import { Badge } from '../ui/badge';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
@@ -42,7 +42,7 @@ export const SurveyorAccountCard: React.FC<SurveyorAccountCardProps> = ({ user, 
       : status === 'PENDING'
         ? Clock
         : status === 'REJECTED'
-          ? TriangleAlert
+          ? AlertTriangle
           : Briefcase;
 
   return (
@@ -57,7 +57,13 @@ export const SurveyorAccountCard: React.FC<SurveyorAccountCardProps> = ({ user, 
       <View style={[styles.iconBox, { backgroundColor: `${colors.primary}12` }]}>
         <Icon
           size={18}
-          color={status === 'REJECTED' ? '#ef4444' : status === 'PENDING' ? '#d97706' : colors.primary}
+          color={
+            status === 'REJECTED'
+              ? '#ef4444'
+              : status === 'PENDING'
+                ? '#d97706'
+                : colors.primary
+          }
         />
       </View>
 
