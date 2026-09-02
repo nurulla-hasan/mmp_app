@@ -7,11 +7,11 @@ import { Fonts } from '../../../../constants/typography';
 type Props = { visible: boolean; kind: 'distance' | 'manual'; onClose: () => void };
 
 const PRESETS = [
-  { label: '১০ চেইন', detail: 'প্রস্তাবিত', feet: 660 },
-  { label: '৫ চেইন', detail: '৩৩০ ফুট', feet: 330 },
-  { label: '২০ লিংক', detail: '১৩.২ ফুট', feet: 13.2 },
-  { label: '১০০ লিংক', detail: '৬৬ ফুট', feet: 66 },
-  { label: '১ মাইল', detail: '৫২৮০ ফুট', feet: 5280 },
+  { label: '10 chains', detail: 'Recommended', feet: 660 },
+  { label: '5 chains', detail: '330 ft', feet: 330 },
+  { label: '20 links', detail: '13.2 ft', feet: 13.2 },
+  { label: '100 links', detail: '66 ft', feet: 66 },
+  { label: '1 mile', detail: '5280 ft', feet: 5280 },
 ];
 
 export function ScaleCalibrationModal({ visible, kind, onClose }: Props) {
@@ -37,31 +37,64 @@ export function ScaleCalibrationModal({ visible, kind, onClose }: Props) {
     if (kind === 'manual') onClose();
   };
 
-  const retry = () => {
-    retryCalibration();
-  };
-
   return (
     <Modal visible={visible} transparent animationType='fade' onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}>
         <View style={styles.card}>
           <View style={styles.header}>
-            <View style={styles.titleRow}><View style={styles.iconBox}><Ruler size={20} color='#22c55e' /></View><View><Text style={styles.title}>{kind === 'distance' ? 'পরিচিত দূরত্ব দিন' : 'ম্যানুয়াল স্কেল'}</Text><Text style={styles.subtitle}>{kind === 'distance' ? 'নির্বাচিত রেখাটির বাস্তব দৈর্ঘ্য' : '১ পিক্সেল বাস্তবে কত ফুট'}</Text></View></View>
+            <View style={styles.titleRow}>
+              <View style={styles.iconBox}><Ruler size={20} color='#22c55e' /></View>
+              <View>
+                <Text style={styles.title}>{kind === 'distance' ? 'Enter Known Distance' : 'Manual Scale'}</Text>
+                <Text style={styles.subtitle}>{kind === 'distance' ? 'Real length of the selected line' : 'How many feet equal one pixel'}</Text>
+              </View>
+            </View>
             <TouchableOpacity onPress={onClose} style={styles.close}><X size={18} color='#94a3b8' /></TouchableOpacity>
           </View>
 
-          {kind === 'distance' && <View style={styles.presets}>{PRESETS.map((preset) => <TouchableOpacity key={preset.label} onPress={() => setValue(String(preset.feet))} style={[styles.preset, Number(value) === preset.feet && styles.presetActive]}><Text style={styles.presetLabel}>{preset.label}</Text><Text style={styles.presetDetail}>{preset.detail}</Text></TouchableOpacity>)}</View>}
+          {kind === 'distance' && (
+            <View style={styles.presets}>
+              {PRESETS.map((preset) => (
+                <TouchableOpacity
+                  key={preset.label}
+                  onPress={() => setValue(String(preset.feet))}
+                  style={[styles.preset, Number(value) === preset.feet && styles.presetActive]}
+                >
+                  <Text style={styles.presetLabel}>{preset.label}</Text>
+                  <Text style={styles.presetDetail}>{preset.detail}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
-          <Text style={styles.inputLabel}>{kind === 'distance' ? 'দূরত্ব (ফুট)' : 'ফুট / পিক্সেল'}</Text>
+          <Text style={styles.inputLabel}>{kind === 'distance' ? 'Distance (feet)' : 'Feet per pixel'}</Text>
           <View style={styles.inputRow}>
-            <TextInput value={value} onChangeText={setValue} keyboardType='decimal-pad' placeholder={kind === 'distance' ? 'যেমন: 660' : 'যেমন: 0.125'} placeholderTextColor='#64748b' selectTextOnFocus style={styles.input} />
-            <View style={styles.unit}><Text style={styles.unitText}>{kind === 'distance' ? 'ফুট' : 'ft/px'}</Text></View>
+            <TextInput
+              value={value}
+              onChangeText={setValue}
+              keyboardType='decimal-pad'
+              placeholder={kind === 'distance' ? 'e.g. 660' : 'e.g. 0.125'}
+              placeholderTextColor='#64748b'
+              selectTextOnFocus
+              style={styles.input}
+            />
+            <View style={styles.unit}><Text style={styles.unitText}>{kind === 'distance' ? 'ft' : 'ft/px'}</Text></View>
           </View>
-          <Text style={styles.helper}>{kind === 'distance' ? '১ চেইন = ৬৬ ফুট • ১০০ লিংক = ১ চেইন' : 'উদাহরণ: ০.১২৫ মানে ৮ পিক্সেল = ১ ফুট'}</Text>
+          <Text style={styles.helper}>{kind === 'distance' ? '1 chain = 66 ft • 100 links = 1 chain' : 'Example: 0.125 means 8 pixels = 1 foot'}</Text>
 
           <View style={styles.actions}>
-            {kind === 'distance' ? <TouchableOpacity style={styles.secondary} onPress={retry}><RotateCcw size={16} color='#cbd5e1' /><Text style={styles.secondaryText}>আবার পয়েন্ট দিন</Text></TouchableOpacity> : <TouchableOpacity style={styles.secondary} onPress={onClose}><Text style={styles.secondaryText}>বাতিল</Text></TouchableOpacity>}
-            <TouchableOpacity style={styles.primary} onPress={submit}><Check size={17} color='#fff' /><Text style={styles.primaryText}>স্কেল সেট করুন</Text></TouchableOpacity>
+            {kind === 'distance' ? (
+              <TouchableOpacity style={styles.secondary} onPress={retryCalibration}>
+                <RotateCcw size={16} color='#cbd5e1' />
+                <Text style={styles.secondaryText}>Pick Again</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.secondary} onPress={onClose}><Text style={styles.secondaryText}>Cancel</Text></TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.primary} onPress={submit}>
+              <Check size={17} color='#fff' />
+              <Text style={styles.primaryText}>Set Scale</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
