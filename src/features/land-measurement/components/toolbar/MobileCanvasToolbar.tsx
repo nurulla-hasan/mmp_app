@@ -8,7 +8,6 @@ import {
 } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { Fonts } from '../../../../constants/typography';
-import { toBengaliDigits } from '../../../../lib/utils';
 import { canvasPointActionGesture } from '../canvas/canvas-runtime';
 
 type Props = {
@@ -119,28 +118,28 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   const beginCalibration = () => {
     if (!hasMapImage) { onOpenImagePicker(); return; }
     if (plotCount === 0) { startCalibration(); return; }
-    Alert.alert('স্কেল আবার সেট করবেন?', 'স্কেল বদলালে বর্তমান সব প্লট মুছে যাবে।', [
-      { text: 'বাতিল', style: 'cancel' },
-      { text: 'চালিয়ে যান', style: 'destructive', onPress: startCalibration },
+    Alert.alert('Reset scale?', 'Changing the scale will remove all current plots.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Continue', style: 'destructive', onPress: startCalibration },
     ]);
   };
 
   const resetMap = () => {
     if (!hasMapImage) return;
-    Alert.alert('সব মুছে ফেলবেন?', 'বর্তমান ম্যাপ, স্কেল ছাড়া সব প্লট ও চলমান কাজ মুছে যাবে।', [
-      { text: 'বাতিল', style: 'cancel' },
-      { text: 'মুছে ফেলুন', style: 'destructive', onPress: () => { clearMap(); setIsMoreOpen(false); } },
+    Alert.alert('Clear measurement?', 'This will remove the current map, plots, and active work.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Clear', style: 'destructive', onPress: () => { clearMap(); setIsMoreOpen(false); } },
     ]);
   };
 
   if (mode === 'calibrating') {
     return (
       <View style={styles.wrapper}>
-        <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={cancelCalibration} />
-        <Action label='আনডু' disabled={calibrationPointCount === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={undoCalibrationPoint} />
-        <Action label='রিডু' disabled={calibrationFutureCount === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={redoCalibrationPoint} />
-        <Action label='ম্যানুয়াল' icon={<Ruler size={18} color='#fbbf24' />} onPress={onOpenManualScale} />
-        <PointAction label={`পয়েন্ট ${toBengaliDigits(calibrationPointCount)}/২`} disabled={calibrationPointCount >= 2} icon={<Crosshair size={19} color='#fff' />} />
+        <Action label='Cancel' danger icon={<X size={18} color='#ef4444' />} onPress={cancelCalibration} />
+        <Action label='Undo' disabled={calibrationPointCount === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={undoCalibrationPoint} />
+        <Action label='Redo' disabled={calibrationFutureCount === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={redoCalibrationPoint} />
+        <Action label='Manual' icon={<Ruler size={18} color='#fbbf24' />} onPress={onOpenManualScale} />
+        <PointAction label={`Point ${calibrationPointCount}/2`} disabled={calibrationPointCount >= 2} icon={<Crosshair size={19} color='#fff' />} />
       </View>
     );
   }
@@ -148,11 +147,11 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   if (mode === 'drawing_plot') {
     return (
       <View style={styles.wrapper}>
-        <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={cancelActiveMode} />
-        <Action label='আনডু' disabled={plotPointCount === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={undoPlotAction} />
-        <Action label='রিডু' disabled={plotFutureCount === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={redoPlotAction} />
-        <PointAction label={`পয়েন্ট ${toBengaliDigits(plotPointCount)}`} icon={<Crosshair size={19} color='#fff' />} />
-        <Action label='শেষ করুন' disabled={plotPointCount < 3} icon={<Check size={19} color='#86efac' />} onPress={finishPlot} />
+        <Action label='Cancel' danger icon={<X size={18} color='#ef4444' />} onPress={cancelActiveMode} />
+        <Action label='Undo' disabled={plotPointCount === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={undoPlotAction} />
+        <Action label='Redo' disabled={plotFutureCount === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={redoPlotAction} />
+        <PointAction label={`Point ${plotPointCount}`} icon={<Crosshair size={19} color='#fff' />} />
+        <Action label='Finish' disabled={plotPointCount < 3} icon={<Check size={19} color='#86efac' />} onPress={finishPlot} />
       </View>
     );
   }
@@ -187,7 +186,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
           <Action compact label='Left' icon={<Undo2 size={17} color='#cbd5e1' />} onPress={() => nudgeManualCutLine(-1)} />
           <Action compact label='Right' icon={<Redo2 size={17} color='#cbd5e1' />} onPress={() => nudgeManualCutLine(1)} />
           <Action compact label='Point +' icon={<Plus size={17} color='#93c5fd' />} onPress={addManualCutPoint} />
-          <Action compact label='Point −' disabled={manualCutPointCount <= 2} icon={<Minus size={17} color='#93c5fd' />} onPress={removeManualCutPoint} />
+          <Action compact label='Point -' disabled={manualCutPointCount <= 2} icon={<Minus size={17} color='#93c5fd' />} onPress={removeManualCutPoint} />
           <Action compact label='Divide' primary icon={<Scissors size={17} color='#fff' />} onPress={executeManualDivide} />
         </View>
       </View>
@@ -196,20 +195,20 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
 
   return <>
     {isMoreOpen && <View style={styles.morePanel}>
-      {plotCount > 0 && <Action label='সেভ' active icon={<BookmarkCheck size={18} color='#fff' />} onPress={() => { setIsMoreOpen(false); onOpenSave(); }} />}
-      <Action label='ড্রাইভ' icon={<HardDrive size={18} color='#94a3b8' />} onPress={() => void Linking.openURL('https://drive.google.com/drive/folders/1r0ryb1SyCeYV-41CM1WweokGDKT5t9RB')} />
-      <Action label='কর্ণ' active={isShowDiagonals} icon={isShowDiagonals ? <Eye size={18} color='#fff' /> : <EyeOff size={18} color='#94a3b8' />} onPress={() => setIsShowDiagonals(!isShowDiagonals)} />
-      <Action label='সাহায্য' icon={<HelpCircle size={18} color='#94a3b8' />} onPress={() => Alert.alert('ব্যবহার', 'ম্যাপ নিন → স্কেল সেট করুন → ক্রসহেয়ার কোণায় এনে পয়েন্ট যোগ করুন → শেষ করুন।')} />
-      <Action label='রিসেট' danger disabled={!hasMapImage} icon={<RotateCcw size={18} color='#ef4444' />} onPress={resetMap} />
+      {plotCount > 0 && <Action label='Save' active icon={<BookmarkCheck size={18} color='#fff' />} onPress={() => { setIsMoreOpen(false); onOpenSave(); }} />}
+      <Action label='Drive' icon={<HardDrive size={18} color='#94a3b8' />} onPress={() => void Linking.openURL('https://drive.google.com/drive/folders/1r0ryb1SyCeYV-41CM1WweokGDKT5t9RB')} />
+      <Action label='Diagonals' active={isShowDiagonals} icon={isShowDiagonals ? <Eye size={18} color='#fff' /> : <EyeOff size={18} color='#94a3b8' />} onPress={() => setIsShowDiagonals(!isShowDiagonals)} />
+      <Action label='Help' icon={<HelpCircle size={18} color='#94a3b8' />} onPress={() => Alert.alert('How to use', 'Add map → set scale → move the crosshair to a corner → add points → finish the plot.')} />
+      <Action label='Reset' danger disabled={!hasMapImage} icon={<RotateCcw size={18} color='#ef4444' />} onPress={resetMap} />
     </View>}
     <View style={styles.wrapper}>
-      <Action label='ম্যাপ' icon={<ImageIcon size={18} color='#94a3b8' />} onPress={onOpenImagePicker} />
-      <Action label='সেভড' icon={<FolderOpen size={18} color='#94a3b8' />} onPress={onOpenLoad} />
-      <Action label='স্কেল' icon={<Ruler size={18} color={hasScale ? '#94a3b8' : '#fbbf24'} />} onPress={beginCalibration} />
-      <Action label='আঁকুন' disabled={!hasMapImage || !hasScale} icon={<PenTool size={18} color='#94a3b8' />} onPress={startPlotDrawing} />
-      <Action label='ভাগ' disabled={plotCount === 0} icon={<Scissors size={18} color='#94a3b8' />} onPress={startManualDivide} />
-      <Action label='ম্যাগনিফাই' active={isMagnifierEnabled} icon={isMagnifierEnabled ? <SearchX size={18} color='#fff' /> : <Search size={18} color='#94a3b8' />} onPress={() => setIsMagnifierEnabled(!isMagnifierEnabled)} />
-      <Action label='আরও' active={isMoreOpen} icon={<MoreHorizontal size={18} color={isMoreOpen ? '#fff' : '#94a3b8'} />} onPress={() => setIsMoreOpen((open) => !open)} />
+      <Action label='Map' icon={<ImageIcon size={18} color='#94a3b8' />} onPress={onOpenImagePicker} />
+      <Action label='Saved' icon={<FolderOpen size={18} color='#94a3b8' />} onPress={onOpenLoad} />
+      <Action label='Scale' icon={<Ruler size={18} color={hasScale ? '#94a3b8' : '#fbbf24'} />} onPress={beginCalibration} />
+      <Action label='Draw' disabled={!hasMapImage || !hasScale} icon={<PenTool size={18} color='#94a3b8' />} onPress={startPlotDrawing} />
+      <Action label='Divide' disabled={plotCount === 0} icon={<Scissors size={18} color='#94a3b8' />} onPress={startManualDivide} />
+      <Action label='Magnify' active={isMagnifierEnabled} icon={isMagnifierEnabled ? <SearchX size={18} color='#fff' /> : <Search size={18} color='#94a3b8' />} onPress={() => setIsMagnifierEnabled(!isMagnifierEnabled)} />
+      <Action label='More' active={isMoreOpen} icon={<MoreHorizontal size={18} color={isMoreOpen ? '#fff' : '#94a3b8'} />} onPress={() => setIsMoreOpen((open) => !open)} />
     </View>
   </>;
 }
