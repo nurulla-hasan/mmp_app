@@ -9,12 +9,7 @@ export default function TabLayout() {
       screenOptions={{
         freezeOnBlur: true,
         animation: 'shift',
-        header: ({ options, route }) => (
-          <AppHeader
-            title={options.title}
-            showSearch={route.name === 'index'}
-          />
-        ),
+        header: ({ options }) => <AppHeader title={options.title} />,
       }}
     >
       <Tabs.Screen
