@@ -105,11 +105,6 @@ function ProjectsSkeleton({
               opacity={opacity}
               style={styles.skeletonProjectArea}
             />
-            <SkeletonBlock
-              colors={colors}
-              opacity={opacity}
-              style={[styles.skeletonProjectBadge, { backgroundColor: colors.skeletonSoft }]}
-            />
           </View>
         </View>
       ))}
@@ -253,7 +248,7 @@ export default function HomeScreen() {
     });
 
     useMapStore.getState().setPlots(loadedPlots);
-    SuccessToast(`"${calculation.name}" পরিমাপ লোড হয়েছে!`);
+    SuccessToast(`\"${calculation.name}\" পরিমাপ লোড হয়েছে!`);
     router.push('/land-measurement');
   };
 
@@ -472,10 +467,6 @@ export default function HomeScreen() {
                       {toBengaliDigits(totalShotok.toFixed(2))} শতাংশ
                     </Text>
                   ) : null}
-                  <Badge
-                    label={plotCount > 0 ? 'সম্পন্ন' : 'খসড়া'}
-                    variant={plotCount > 0 ? 'pro' : 'warning'}
-                  />
                 </View>
               </TouchableOpacity>
             );
@@ -712,9 +703,8 @@ const styles = StyleSheet.create({
   skeletonProjectText: { flex: 1, gap: 7 },
   skeletonProjectTitle: { width: '58%', height: 12 },
   skeletonProjectMeta: { width: '76%', height: 9 },
-  skeletonProjectRight: { width: 78, alignItems: 'flex-end', gap: 6 },
+  skeletonProjectRight: { width: 78, alignItems: 'flex-end' },
   skeletonProjectArea: { width: 70, height: 12 },
-  skeletonProjectBadge: { width: 44, height: 18, borderRadius: 5 },
   skeletonSurveyorCard: {
     padding: 12,
     borderRadius: 12,
