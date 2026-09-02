@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Alert, GestureResponderEvent, View, StyleSheet, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, View, StyleSheet, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Ruler } from 'lucide-react-native';
@@ -55,40 +56,48 @@ export default function LandMeasurementScreen() {
   };
 
   /**
-   * Android keeps the original canvas gesture as owner of the whole pointer
-   * stream. When finger #2 lands on the Point action while finger #1 is still
-   * panning, TouchableOpacity may never receive a normal press. Use the newly
-   * added touch (changedTouches), never the first/old drag pointer, as a native
-   * fallback. The canvas gesture layer has the same detection and the runtime
-   * commit has a short dedupe guard, so this is safe even if both paths fire.
+   * Android gives an already-active canvas gesture ownership of finger #1.
+   * A second finger landing on an overlapping toolbar can therefore bypass the
+   * normal React responder chain completely. Observe touches from one native
+   * RNGH Manual gesture attached to the whole workspace. We never activate the
+   * observer, so child pan/pinch/tap gestures remain free to run; it only sees
+   * finger #2 and commits Point immediately when that touch lands in the Point
+   * action zone. The Point button itself has its own native recognizer too, and
+   * canvas-runtime dedupes both paths.
    */
-  const handleWorkspaceTouchStart = (event: GestureResponderEvent) => {
-    const touches = Array.from(event.nativeEvent.touches ?? []);
-    if (touches.length < 2 || pointTouchLatchedRef.current) return;
+  const workspaceTouchObserver = useMemo(() => Gesture.Manual()
+    .runOnJS(true)
+    .shouldCancelWhenOutside(false)
+    .onTouchesDown((event: any) => {
+      const touches = Array.from(event.allTouches ?? []) as any[];
+      if (touches.length < 2 || pointTouchLatchedRef.current) return;
 
-    const current = useMapStore.getState();
-    if (current.mode !== 'drawing_plot' && current.mode !== 'calibrating') return;
+      const current = useMapStore.getState();
+      if (current.mode !== 'drawing_plot' && current.mode !== 'calibrating') return;
 
-    const changedTouches = Array.from(event.nativeEvent.changedTouches ?? []);
-    const candidates = changedTouches.length > 0 ? changedTouches : touches.slice(-1);
-    const pointTouch = candidates.find((touch) => {
-      const xRatio = touch.pageX / Math.max(windowWidth, 1);
-      const isToolbarBand = touch.pageY >= windowHeight - 125;
-      const isPointButton = current.mode === 'drawing_plot'
-        ? xRatio >= 0.54 && xRatio <= 0.84
-        : xRatio >= 0.78;
-      return isToolbarBand && isPointButton;
-    });
+      const changedTouches = Array.from(event.changedTouches ?? []) as any[];
+      const candidates = changedTouches.length > 0 ? changedTouches : touches.slice(-1);
+      const pointTouch = candidates.find((touch) => {
+        const x = Number(touch.absoluteX ?? touch.x ?? 0);
+        const y = Number(touch.absoluteY ?? touch.y ?? 0);
+        const xRatio = x / Math.max(windowWidth, 1);
+        const isToolbarBand = y >= windowHeight - 132;
+        const isPointButton = current.mode === 'drawing_plot'
+          ? xRatio >= 0.54 && xRatio <= 0.84
+          : xRatio >= 0.76;
+        return isToolbarBand && isPointButton;
+      });
 
-    if (!pointTouch) return;
-
-    pointTouchLatchedRef.current = true;
-    commitCenterPointFromRuntime();
-  };
-
-  const handleWorkspaceTouchEnd = (event: GestureResponderEvent) => {
-    if (event.nativeEvent.touches.length <= 1) pointTouchLatchedRef.current = false;
-  };
+      if (!pointTouch) return;
+      pointTouchLatchedRef.current = true;
+      commitCenterPointFromRuntime();
+    })
+    .onTouchesUp((event: any) => {
+      if ((event.allTouches ?? []).length <= 1) pointTouchLatchedRef.current = false;
+    })
+    .onTouchesCancelled(() => {
+      pointTouchLatchedRef.current = false;
+    }), [windowHeight, windowWidth]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -122,23 +131,20 @@ export default function LandMeasurementScreen() {
         </TouchableOpacity>
       </View>
 
-      <View
-        style={styles.canvasContainer}
-        onTouchStart={handleWorkspaceTouchStart}
-        onTouchEnd={handleWorkspaceTouchEnd}
-        onTouchCancel={handleWorkspaceTouchEnd}
-      >
-        <SkiaMapCanvas />
+      <GestureDetector gesture={workspaceTouchObserver}>
+        <View style={styles.canvasContainer}>
+          <SkiaMapCanvas />
 
-        <MobileResultsBar />
+          <MobileResultsBar />
 
-        <MobileCanvasToolbar
-          onOpenManualScale={() => setIsManualScaleOpen(true)}
-          onOpenImagePicker={() => setIsImagePickerOpen(true)}
-          onOpenSave={() => setCalculationSheetMode('save')}
-          onOpenLoad={() => setCalculationSheetMode('load')}
-        />
-      </View>
+          <MobileCanvasToolbar
+            onOpenManualScale={() => setIsManualScaleOpen(true)}
+            onOpenImagePicker={() => setIsImagePickerOpen(true)}
+            onOpenSave={() => setCalculationSheetMode('save')}
+            onOpenLoad={() => setCalculationSheetMode('load')}
+          />
+        </View>
+      </GestureDetector>
 
       <ScaleCalibrationModal
         visible={isDistanceModalOpen}
