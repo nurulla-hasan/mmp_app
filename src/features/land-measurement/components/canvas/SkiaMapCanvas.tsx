@@ -57,6 +57,7 @@ import {
   canvasRuntimeScale,
   canvasRuntimeX,
   canvasRuntimeY,
+  commitCenterPointFromRuntime,
   setCanvasRuntimeTransform,
 } from './canvas-runtime';
 
@@ -147,6 +148,37 @@ const getSnappedPointWorklet = (
   }
 
   return { x: resultX, y: resultY };
+};
+
+const isPointTouchTargetWorklet = (
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  currentMode: string,
+) => {
+  'worklet';
+  if (width <= 0 || height <= 0 || y < height - 125) return false;
+  const xRatio = x / width;
+  if (currentMode === 'drawing_plot') return xRatio >= 0.54 && xRatio <= 0.84;
+  if (currentMode === 'calibrating') return xRatio >= 0.78;
+  return false;
+};
+
+const getTwoTouchGeometryWorklet = (touches: any[]) => {
+  'worklet';
+  if (!touches || touches.length < 2) return null;
+  const first = touches[0];
+  const second = touches[1];
+  const centerX = (first.x + second.x) / 2;
+  const centerY = (first.y + second.y) / 2;
+  const dx = second.x - first.x;
+  const dy = second.y - first.y;
+  return {
+    centerX,
+    centerY,
+    distance: Math.sqrt(dx * dx + dy * dy),
+  };
 };
 
 const getCornerSnapPoint = (point: Point, polygon: Point[], threshold: number): Point | null => {
@@ -476,11 +508,18 @@ export function SkiaMapCanvas() {
   const zoom = useSharedValue(stageScale);
   const panStartX = useSharedValue(stagePos.x);
   const panStartY = useSharedValue(stagePos.y);
+  const panTranslationBaseX = useSharedValue(0);
+  const panTranslationBaseY = useSharedValue(0);
+  const panLastTranslationX = useSharedValue(0);
+  const panLastTranslationY = useSharedValue(0);
   const pinchStartScale = useSharedValue(stageScale);
+  const pinchStartDistance = useSharedValue(0);
   const pinchCanvasX = useSharedValue(0);
   const pinchCanvasY = useSharedValue(0);
-  const pinchHasAnchor = useSharedValue(0);
   const pinchActive = useSharedValue(0);
+  // 0 = single pointer, 1 = real pinch, 2 = second-finger Point action.
+  const multiTouchMode = useSharedValue(0);
+  const pointTouchLatched = useSharedValue(0);
   const draggingAnchor = useSharedValue(-1);
   const dragVisualX = useSharedValue(0);
   const dragVisualY = useSharedValue(0);
@@ -833,12 +872,66 @@ export function SkiaMapCanvas() {
     zoom,
   ]);
 
+  /**
+   * Keep the original first-finger pan alive when finger #2 is used as the
+   * Point action. For a real two-finger pinch, freeze pan immediately before
+   * the pinch starts so pan and zoom never write competing transforms.
+   */
   const panGesture = useMemo(() => Gesture.Pan()
-    .maxPointers(1)
+    .maxPointers(2)
     .minDistance(0)
+    .onTouchesDown((event: any) => {
+      const touches = event.allTouches ?? [];
+      if (touches.length < 2) return;
+      const changed = (event.changedTouches ?? [])[0] ?? touches[touches.length - 1];
+      const isPointTouch = changed
+        ? isPointTouchTargetWorklet(changed.x, changed.y, viewport.width, viewport.height, mode)
+        : false;
+
+      if (isPointTouch) {
+        multiTouchMode.value = 2;
+        if (pointTouchLatched.value === 0) {
+          pointTouchLatched.value = 1;
+          runOnJS(commitCenterPointFromRuntime)();
+        }
+        return;
+      }
+
+      multiTouchMode.value = 1;
+    })
+    .onTouchesUp((event: any) => {
+      const activeCount = (event.allTouches ?? []).length;
+      if (activeCount > 1) return;
+
+      if (multiTouchMode.value === 2) {
+        multiTouchMode.value = 0;
+        pointTouchLatched.value = 0;
+        panStartX.value = translateX.value;
+        panStartY.value = translateY.value;
+        panTranslationBaseX.value = panLastTranslationX.value;
+        panTranslationBaseY.value = panLastTranslationY.value;
+        return;
+      }
+
+      if (multiTouchMode.value === 1) {
+        runOnJS(commitGestureTransform)(zoom.value, translateX.value, translateY.value);
+        multiTouchMode.value = 0;
+        pinchActive.value = 0;
+        pinchStartDistance.value = 0;
+        panStartX.value = translateX.value;
+        panStartY.value = translateY.value;
+        panTranslationBaseX.value = panLastTranslationX.value;
+        panTranslationBaseY.value = panLastTranslationY.value;
+        runOnJS(setPinching)(false);
+      }
+    })
     .onStart((event: any) => {
       panStartX.value = translateX.value;
       panStartY.value = translateY.value;
+      panTranslationBaseX.value = 0;
+      panTranslationBaseY.value = 0;
+      panLastTranslationX.value = 0;
+      panLastTranslationY.value = 0;
       draggingAnchor.value = -1;
 
       if (mode === 'manual_divide_plot' && manualCutLine?.length) {
@@ -864,7 +957,10 @@ export function SkiaMapCanvas() {
       }
     })
     .onUpdate((event: any) => {
-      if (pinchActive.value > 0) return;
+      panLastTranslationX.value = event.translationX;
+      panLastTranslationY.value = event.translationY;
+
+      if (multiTouchMode.value !== 0 || pinchActive.value > 0) return;
 
       if (draggingAnchor.value >= 0) {
         const safeScale = Math.max(zoom.value, 0.001);
@@ -884,8 +980,8 @@ export function SkiaMapCanvas() {
         return;
       }
 
-      const x = panStartX.value + event.translationX;
-      const y = panStartY.value + event.translationY;
+      const x = panStartX.value + (event.translationX - panTranslationBaseX.value);
+      const y = panStartY.value + (event.translationY - panTranslationBaseY.value);
       translateX.value = x;
       translateY.value = y;
       canvasRuntimeScale.value = zoom.value;
@@ -903,14 +999,16 @@ export function SkiaMapCanvas() {
           (event.x - translateX.value) / safeScale,
           (event.y - translateY.value) / safeScale,
         );
-      } else if (pinchActive.value === 0) {
+      } else if (multiTouchMode.value === 0 && pinchActive.value === 0) {
         runOnJS(commitGestureTransform)(zoom.value, translateX.value, translateY.value);
       }
     })
     .onFinalize(() => {
-      if (pinchActive.value === 0 && draggingAnchor.value < 0) {
+      if (multiTouchMode.value === 0 && pinchActive.value === 0 && draggingAnchor.value < 0) {
         panStartX.value = translateX.value;
         panStartY.value = translateY.value;
+        panTranslationBaseX.value = panLastTranslationX.value;
+        panTranslationBaseY.value = panLastTranslationY.value;
       }
     }), [
       commitGestureTransform,
@@ -920,45 +1018,79 @@ export function SkiaMapCanvas() {
       finishManualAnchorMove,
       manualCutLine,
       mode,
+      multiTouchMode,
+      panLastTranslationX,
+      panLastTranslationY,
       panStartX,
       panStartY,
+      panTranslationBaseX,
+      panTranslationBaseY,
       pinchActive,
+      pinchStartDistance,
+      pointTouchLatched,
       scheduleManualAnchorMove,
       selectedPlotPoints,
+      setPinching,
       translateX,
       translateY,
       updateLiveOverlayFromUi,
+      viewport.height,
+      viewport.width,
       zoom,
     ]);
 
+  /**
+   * Web parity: derive zoom from the real distance between the two touches and
+   * keep the image point under their midpoint locked to the moving midpoint.
+   * This avoids Android's focalX/focalY activation jump entirely.
+   */
   const pinchGesture = useMemo(() => Gesture.Pinch()
-    .onStart(() => {
-      pinchActive.value = 1;
-      pinchHasAnchor.value = 0;
-      pinchStartScale.value = zoom.value;
-      runOnJS(setPinching)(true);
-    })
-    .onUpdate((event: any) => {
-      // Android may report an unstable focal point on the activation frame.
-      // Anchor from the first real update frame, then preserve that image point
-      // under the moving focal point exactly like the web touch implementation.
-      if (pinchHasAnchor.value === 0) {
-        const safeZoom = Math.max(zoom.value, 0.001);
-        pinchStartScale.value = zoom.value;
-        pinchCanvasX.value = (event.focalX - translateX.value) / safeZoom;
-        pinchCanvasY.value = (event.focalY - translateY.value) / safeZoom;
-        pinchHasAnchor.value = 1;
+    .onTouchesDown((event: any, stateManager: any) => {
+      const touches = event.allTouches ?? [];
+      if (touches.length < 2) return;
+
+      const changed = (event.changedTouches ?? [])[0] ?? touches[touches.length - 1];
+      const isPointTouch = changed
+        ? isPointTouchTargetWorklet(changed.x, changed.y, viewport.width, viewport.height, mode)
+        : false;
+
+      if (isPointTouch) {
+        multiTouchMode.value = 2;
+        pinchActive.value = 0;
+        pinchStartDistance.value = 0;
+        if (pointTouchLatched.value === 0) {
+          pointTouchLatched.value = 1;
+          runOnJS(commitCenterPointFromRuntime)();
+        }
+        stateManager?.fail?.();
         return;
       }
 
+      const geometry = getTwoTouchGeometryWorklet(touches);
+      if (!geometry || geometry.distance <= 0) return;
+
+      multiTouchMode.value = 1;
+      pinchActive.value = 1;
+      pinchStartScale.value = zoom.value;
+      pinchStartDistance.value = geometry.distance;
+      const safeScale = Math.max(zoom.value, 0.001);
+      pinchCanvasX.value = (geometry.centerX - translateX.value) / safeScale;
+      pinchCanvasY.value = (geometry.centerY - translateY.value) / safeScale;
+      runOnJS(setPinching)(true);
+    })
+    .onTouchesMove((event: any) => {
+      if (multiTouchMode.value !== 1 || pinchStartDistance.value <= 0) return;
+      const geometry = getTwoTouchGeometryWorklet(event.allTouches ?? []);
+      if (!geometry || geometry.distance <= 0) return;
+
       const minimumZoom = Math.min(STAGE_MIN_ZOOM, fitScale || STAGE_MIN_ZOOM);
       const nextScale = clamp(
-        pinchStartScale.value * event.scale,
+        pinchStartScale.value * (geometry.distance / pinchStartDistance.value),
         minimumZoom,
         STAGE_MAX_ZOOM,
       );
-      const x = event.focalX - pinchCanvasX.value * nextScale;
-      const y = event.focalY - pinchCanvasY.value * nextScale;
+      const x = geometry.centerX - pinchCanvasX.value * nextScale;
+      const y = geometry.centerY - pinchCanvasY.value * nextScale;
 
       zoom.value = nextScale;
       translateX.value = x;
@@ -970,40 +1102,67 @@ export function SkiaMapCanvas() {
         runOnJS(updateLiveOverlayFromUi)(nextScale, x, y);
       }
     })
+    // Rendering is driven by raw touches above; RNGH Pinch is only the state owner.
+    .onUpdate(() => {})
     .onEnd(() => {
-      runOnJS(commitGestureTransform)(zoom.value, translateX.value, translateY.value);
+      if (multiTouchMode.value === 1) {
+        runOnJS(commitGestureTransform)(zoom.value, translateX.value, translateY.value);
+      }
     })
     .onFinalize(() => {
-      pinchHasAnchor.value = 0;
-      pinchActive.value = 0;
-      panStartX.value = translateX.value;
-      panStartY.value = translateY.value;
-      runOnJS(setPinching)(false);
+      if (multiTouchMode.value === 1) {
+        multiTouchMode.value = 0;
+        pinchActive.value = 0;
+        pinchStartDistance.value = 0;
+        panStartX.value = translateX.value;
+        panStartY.value = translateY.value;
+        panTranslationBaseX.value = panLastTranslationX.value;
+        panTranslationBaseY.value = panLastTranslationY.value;
+        runOnJS(setPinching)(false);
+      } else if (multiTouchMode.value !== 2) {
+        pinchActive.value = 0;
+        pinchStartDistance.value = 0;
+        runOnJS(setPinching)(false);
+      }
     }), [
       commitGestureTransform,
       fitScale,
       mode,
+      multiTouchMode,
+      panLastTranslationX,
+      panLastTranslationY,
       panStartX,
       panStartY,
+      panTranslationBaseX,
+      panTranslationBaseY,
       pinchActive,
       pinchCanvasX,
       pinchCanvasY,
-      pinchHasAnchor,
+      pinchStartDistance,
       pinchStartScale,
+      pointTouchLatched,
       setPinching,
       translateX,
       translateY,
       updateLiveOverlayFromUi,
+      viewport.height,
+      viewport.width,
       zoom,
     ]);
 
   const tapGesture = useMemo(() => Gesture.Tap()
     .maxDistance(8)
     .onEnd((event: any, success: boolean) => {
-      if (success && pinchActive.value === 0 && mode === 'manual_divide_plot' && !manualDividePlotId) {
+      if (
+        success
+        && multiTouchMode.value === 0
+        && pinchActive.value === 0
+        && mode === 'manual_divide_plot'
+        && !manualDividePlotId
+      ) {
         runOnJS(selectPlotAt)(event.x, event.y);
       }
-    }), [manualDividePlotId, mode, pinchActive, selectPlotAt]);
+    }), [manualDividePlotId, mode, multiTouchMode, pinchActive, selectPlotAt]);
 
   const gesture = useMemo(
     () => Gesture.Simultaneous(panGesture, pinchGesture, tapGesture),
