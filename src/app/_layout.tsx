@@ -17,6 +17,7 @@ import {
   NotoSansBengali_700Bold,
 } from '@expo-google-fonts/noto-sans-bengali';
 import { BroadcastAnnouncementModal } from '../components/broadcasts/broadcast-announcement-modal';
+import { Colors } from '../constants/colors';
 import { useThemeStore } from '../stores/theme-store';
 import { useAuthStore } from '../stores/auth-store';
 import { QueryProvider } from '../providers/QueryProvider';
@@ -25,6 +26,7 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const { theme } = useThemeStore();
+  const colors = Colors[theme];
   const { initializeAuth } = useAuthStore();
   const [fontsLoaded] = useFonts({
     HindSiliguri_400Regular,
@@ -61,6 +63,7 @@ export default function RootLayout() {
             animation: 'slide_from_right',
             gestureEnabled: true,
             freezeOnBlur: true,
+            contentStyle: { backgroundColor: colors.background },
           }}
         >
           <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
@@ -70,11 +73,18 @@ export default function RootLayout() {
           <Stack.Screen
             name='pricing'
             options={{
-              presentation: 'modal',
-              animation: 'slide_from_bottom',
+              presentation: 'card',
+              animation: 'slide_from_right',
               headerShown: true,
               title: 'সাবস্ক্রিপশন প্ল্যানস',
-              headerTitleStyle: { fontFamily: 'HindSiliguri_700Bold', fontSize: 16 },
+              headerStyle: { backgroundColor: colors.surface },
+              headerTintColor: colors.text,
+              headerShadowVisible: false,
+              headerTitleStyle: {
+                fontFamily: 'HindSiliguri_700Bold',
+                fontSize: 16,
+                color: colors.text,
+              },
             }}
           />
         </Stack>
