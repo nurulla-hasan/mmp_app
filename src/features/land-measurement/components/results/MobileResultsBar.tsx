@@ -2,23 +2,47 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { ChevronUp, Printer, Ruler, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { DECIMALS } from '../../utils/calculations';
 import { formatFeetInches } from '../../utils/canvas';
-import { toBengaliDigits } from '../../../../lib/utils';
 import { Fonts } from '../../../../constants/typography';
 import { getPolygonAreaLabelLayout } from '../../utils/polygon-label';
 import { groupPolygonSegments } from '../../utils/geometry';
 
 const PDF_DIRECTORY_KEY = 'mmp_pdf_download_directory';
+const REPORT_IMAGE_MAX_DIMENSION = 1800;
 
 const escapeHtml = (value: unknown) => String(value ?? '')
   .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
 const formatMeasurement = (value: number) => value.toFixed(DECIMALS);
+
+async function prepareReportImageData() {
+  const mapImage = useMapStore.getState().mapImage;
+  if (!mapImage?.uri) return null;
+
+  try {
+    const maxSide = Math.max(mapImage.width, mapImage.height, 1);
+    const ratio = Math.min(1, REPORT_IMAGE_MAX_DIMENSION / maxSide);
+    const context = ImageManipulator.manipulate(mapImage.uri);
+    if (ratio < 1) {
+      context.resize({
+        width: Math.max(1, Math.round(mapImage.width * ratio)),
+        height: Math.max(1, Math.round(mapImage.height * ratio)),
+      });
+    }
+    const rendered = await context.renderAsync();
+    const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.82 });
+    return await FileSystem.readAsStringAsync(saved.uri, { encoding: FileSystem.EncodingType.Base64 });
+  } catch {
+    // PDF generation must still work even if a device cannot prepare the map preview.
+    return null;
+  }
+}
 
 const buildReportHtml = (state: ReturnType<typeof useMapStore.getState>, imageData: string | null) => {
   const { plots, mapImage, reportInfo, isShowDiagonals } = state;
@@ -36,7 +60,7 @@ const buildReportHtml = (state: ReturnType<typeof useMapStore.getState>, imageDa
       return `<text x="${(first.x + last.x) / 2}" y="${(first.y + last.y) / 2}" class="edge" fill="${color}">${escapeHtml(formatFeetInches(value))}</text>`;
     }).join('');
     const center = getPolygonAreaLabelLayout(plot.points).center;
-    const area = `<text x="${center.x}" y="${center.y}" class="area" fill="${color}">${escapeHtml(`${formatMeasurement(plot.results.shotok)} শতক`)}</text>`;
+    const area = `<text x="${center.x}" y="${center.y}" class="area" fill="${color}">${escapeHtml(`${formatMeasurement(plot.results.shotok)} shotok`)}</text>`;
     const diagonals = isShowDiagonals ? (plot.results.diagonals ?? []).map((diagonal) => {
       const start = plot.points[diagonal.p1Index];
       const end = plot.points[diagonal.p2Index];
@@ -44,10 +68,9 @@ const buildReportHtml = (state: ReturnType<typeof useMapStore.getState>, imageDa
     }).join('') : '';
     return `${shape}${diagonals}${edges}${area}`;
   }).join('');
-  const mime = mapImage?.uri.toLowerCase().includes('.png') ? 'image/png' : 'image/jpeg';
-  const map = imageData ? `<img src="data:${mime};base64,${imageData}"/>` : '';
-  const rows = plots.map((plot, index) => `<tr><td>${escapeHtml(plot.name || `প্লট ${index + 1}`)}</td><td>${formatMeasurement(plot.results.shotok)}</td><td>${formatMeasurement(plot.results.katha)}</td><td>${formatMeasurement(plot.results.sqft)}</td><td>${escapeHtml(formatFeetInches(plot.results.perimeter))}</td></tr>`).join('');
-  return `<!doctype html><html lang="bn"><head><meta charset="utf-8"><style>@page{margin:24px}body{font-family:Arial,sans-serif;color:#172033}h1{text-align:center;font-size:22px;margin:0 0 4px}.sub{text-align:center;color:#526175;font-size:11px}.info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:14px 0;font-size:11px}.map{position:relative;width:100%;max-height:510px;overflow:hidden;border:1px solid #ccd5df;background:#f4e3d2}.map img{display:block;width:100%;height:100%;object-fit:contain}.map svg{position:absolute;inset:0;width:100%;height:100%}.edge,.area{font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#fff;stroke-width:${Math.max(width, height) / 350};stroke-linejoin:round}.edge{font-size:${Math.max(width, height) / 75}px}.area{font-size:${Math.max(width, height) / 62}px}table{width:100%;border-collapse:collapse;margin-top:14px;font-size:10px}th,td{border:1px solid #ccd5df;padding:6px;text-align:center}th{background:#e8f1ee}.totals{display:flex;gap:9px;margin-top:10px}.totals b{flex:1;padding:8px;background:#e8f5ee;text-align:center;font-size:11px}</style></head><body><h1>জমি পরিমাপ রিপোর্ট</h1><div class="sub">মৌজা ম্যাপ প্রো</div><div class="info"><span>মৌজা: <b>${escapeHtml(reportInfo.mouza || '—')}</b></span><span>জে. এল. নং: <b>${escapeHtml(reportInfo.jlNo || '—')}</b></span><span>দাগ নং: <b>${escapeHtml(reportInfo.dagNo || '—')}</b></span><span>খতিয়ান নং: <b>${escapeHtml(reportInfo.khatianNo || '—')}</b></span><span>তারিখ: <b>${escapeHtml(reportInfo.date || '—')}</b></span><span>সার্ভেয়ার: <b>${escapeHtml(reportInfo.surveyorName || '—')}</b></span></div>${mapImage ? `<div class="map" style="aspect-ratio:${width}/${height}">${map}<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">${overlay}</svg></div>` : ''}<div class="totals"><b>মোট শতক: ${formatMeasurement(totals.shotok)}</b><b>মোট কাঠা: ${formatMeasurement(totals.katha)}</b><b>বর্গফুট: ${formatMeasurement(totals.sqft)}</b></div><table><thead><tr><th>প্লট</th><th>শতক</th><th>কাঠা</th><th>বর্গফুট</th><th>পরিসীমা</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+  const map = imageData ? `<img src="data:image/jpeg;base64,${imageData}"/>` : '';
+  const rows = plots.map((plot, index) => `<tr><td>${escapeHtml(plot.name || `Plot ${index + 1}`)}</td><td>${formatMeasurement(plot.results.shotok)}</td><td>${formatMeasurement(plot.results.katha)}</td><td>${formatMeasurement(plot.results.sqft)}</td><td>${escapeHtml(formatFeetInches(plot.results.perimeter))}</td></tr>`).join('');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>@page{margin:24px}body{font-family:Arial,sans-serif;color:#172033}h1{text-align:center;font-size:22px;margin:0 0 4px}.sub{text-align:center;color:#526175;font-size:11px}.info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:14px 0;font-size:11px}.map{position:relative;width:100%;max-height:510px;overflow:hidden;border:1px solid #ccd5df;background:#f4e3d2}.map img{display:block;width:100%;height:100%;object-fit:contain}.map svg{position:absolute;inset:0;width:100%;height:100%}.edge,.area{font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#fff;stroke-width:${Math.max(width, height) / 350};stroke-linejoin:round}.edge{font-size:${Math.max(width, height) / 75}px}.area{font-size:${Math.max(width, height) / 62}px}table{width:100%;border-collapse:collapse;margin-top:14px;font-size:10px}th,td{border:1px solid #ccd5df;padding:6px;text-align:center}th{background:#e8f1ee}.totals{display:flex;gap:9px;margin-top:10px}.totals b{flex:1;padding:8px;background:#e8f5ee;text-align:center;font-size:11px}</style></head><body><h1>Land Measurement Report</h1><div class="sub">Mouza Map Pro</div><div class="info"><span>Mouza: <b>${escapeHtml(reportInfo.mouza || '—')}</b></span><span>J.L. No: <b>${escapeHtml(reportInfo.jlNo || '—')}</b></span><span>Dag No: <b>${escapeHtml(reportInfo.dagNo || '—')}</b></span><span>Khatian No: <b>${escapeHtml(reportInfo.khatianNo || '—')}</b></span><span>Date: <b>${escapeHtml(reportInfo.date || '—')}</b></span><span>Surveyor: <b>${escapeHtml(reportInfo.surveyorName || '—')}</b></span></div>${mapImage ? `<div class="map" style="aspect-ratio:${width}/${height}">${map}<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">${overlay}</svg></div>` : ''}<div class="totals"><b>Total shotok: ${formatMeasurement(totals.shotok)}</b><b>Total katha: ${formatMeasurement(totals.katha)}</b><b>Sq ft: ${formatMeasurement(totals.sqft)}</b></div><table><thead><tr><th>Plot</th><th>Shotok</th><th>Katha</th><th>Sq ft</th><th>Perimeter</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
 };
 
 export function MobileResultsBar() {
@@ -64,15 +87,7 @@ export function MobileResultsBar() {
     setExporting(true);
     try {
       const state = useMapStore.getState();
-      let imageData: string | null = null;
-      if (state.mapImage?.uri) {
-        try {
-          imageData = await FileSystem.readAsStringAsync(state.mapImage.uri, { encoding: FileSystem.EncodingType.Base64 });
-        } catch {
-          imageData = null;
-        }
-      }
-
+      const imageData = await prepareReportImageData();
       const result = await Print.printToFileAsync({ html: buildReportHtml(state, imageData) });
       const fileBaseName = `Mouza-Map-Pro-${Date.now()}`;
       const displayFileName = `${fileBaseName}.pdf`;
@@ -83,7 +98,7 @@ export function MobileResultsBar() {
           const initialUri = FileSystem.StorageAccessFramework.getUriForDirectoryInRoot('Download');
           const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(initialUri);
           if (!permission.granted) {
-            Alert.alert('ডাউনলোড বাতিল হয়েছে', 'PDF সেভ করতে Download ফোল্ডারের অনুমতি দিন।');
+            Alert.alert('Download cancelled', 'Allow access to the Download folder to save PDF reports.');
             return;
           }
           directoryUri = permission.directoryUri;
@@ -97,15 +112,15 @@ export function MobileResultsBar() {
         );
         const pdfBase64 = await FileSystem.readAsStringAsync(result.uri, { encoding: FileSystem.EncodingType.Base64 });
         await FileSystem.writeAsStringAsync(targetUri, pdfBase64, { encoding: FileSystem.EncodingType.Base64 });
-        Alert.alert('PDF ডাউনলোড হয়েছে', `${displayFileName}\nDownload ফোল্ডারে সেভ হয়েছে।`);
+        Alert.alert('PDF downloaded', `${displayFileName}\nSaved in your Download folder.`);
       } else if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: 'জমি পরিমাপ রিপোর্ট' });
+        await Sharing.shareAsync(result.uri, { mimeType: 'application/pdf', dialogTitle: 'Land Measurement Report' });
       } else {
-        Alert.alert('রিপোর্ট তৈরি হয়েছে', result.uri);
+        Alert.alert('Report created', result.uri);
       }
     } catch {
       if (Platform.OS === 'android') await AsyncStorage.removeItem(PDF_DIRECTORY_KEY);
-      Alert.alert('রিপোর্ট তৈরি হয়নি', 'PDF রিপোর্ট তৈরি করতে আবার চেষ্টা করুন।');
+      Alert.alert('Report failed', 'Could not create the PDF report. Please try again.');
     } finally {
       setExporting(false);
     }
@@ -115,9 +130,9 @@ export function MobileResultsBar() {
     <>
       <TouchableOpacity activeOpacity={0.82} style={styles.wrapper} onPress={() => setOpen(true)}>
         <View style={styles.icon}><Ruler size={17} color='#22c55e' /></View>
-        <View style={styles.total}><Text style={styles.label}>মোট {toBengaliDigits(plots.length)} প্লট</Text><Text style={styles.value}>{toBengaliDigits(formatMeasurement(totals.shotok))} শতক</Text></View>
-        <View style={styles.unit}><Text style={styles.unitLabel}>কাঠা</Text><Text style={styles.unitValue}>{toBengaliDigits(formatMeasurement(totals.katha))}</Text></View>
-        <View style={styles.unit}><Text style={styles.unitLabel}>বর্গফুট</Text><Text style={styles.unitValue}>{toBengaliDigits(formatMeasurement(totals.sqft))}</Text></View>
+        <View style={styles.total}><Text style={styles.label}>Total • {plots.length} plots</Text><Text style={styles.value}>{formatMeasurement(totals.shotok)} shotok</Text></View>
+        <View style={styles.unit}><Text style={styles.unitLabel}>Katha</Text><Text style={styles.unitValue}>{formatMeasurement(totals.katha)}</Text></View>
+        <View style={styles.unit}><Text style={styles.unitLabel}>Sq ft</Text><Text style={styles.unitValue}>{formatMeasurement(totals.sqft)}</Text></View>
         <ChevronUp size={17} color='#94a3b8' />
       </TouchableOpacity>
 
@@ -126,27 +141,27 @@ export function MobileResultsBar() {
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
-              <View><Text style={styles.sheetTitle}>জমি পরিমাপের ফলাফল</Text><Text style={styles.sheetSub}>সব প্লটের পূর্ণ হিসাব</Text></View>
+              <View><Text style={styles.sheetTitle}>Measurement Results</Text><Text style={styles.sheetSub}>Complete calculation for all plots</Text></View>
               <View style={styles.headerActions}>
                 <TouchableOpacity disabled={exporting} style={[styles.print, exporting && styles.disabled]} onPress={exportPdf}>
                   {exporting ? <ActivityIndicator size='small' color='#86efac' /> : <Printer size={17} color='#86efac' />}
-                  <Text style={styles.printText}>{exporting ? 'তৈরি হচ্ছে' : 'PDF ডাউনলোড'}</Text>
+                  <Text style={styles.printText}>{exporting ? 'Creating…' : 'Download PDF'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.close} onPress={() => setOpen(false)}><X size={18} color='#94a3b8' /></TouchableOpacity>
               </View>
             </View>
             <View style={styles.summary}>
-              <View style={styles.summaryItem}><Text style={styles.summaryLabel}>মোট শতক</Text><Text style={styles.summaryValue}>{toBengaliDigits(formatMeasurement(totals.shotok))}</Text></View>
-              <View style={styles.summaryItem}><Text style={styles.summaryLabel}>মোট কাঠা</Text><Text style={styles.summaryValue}>{toBengaliDigits(formatMeasurement(totals.katha))}</Text></View>
-              <View style={styles.summaryItem}><Text style={styles.summaryLabel}>বর্গফুট</Text><Text style={styles.summaryValue}>{toBengaliDigits(formatMeasurement(totals.sqft))}</Text></View>
+              <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Total shotok</Text><Text style={styles.summaryValue}>{formatMeasurement(totals.shotok)}</Text></View>
+              <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Total katha</Text><Text style={styles.summaryValue}>{formatMeasurement(totals.katha)}</Text></View>
+              <View style={styles.summaryItem}><Text style={styles.summaryLabel}>Sq ft</Text><Text style={styles.summaryValue}>{formatMeasurement(totals.sqft)}</Text></View>
             </View>
             <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
               {plots.map((plot) => <View key={plot.id} style={styles.plotCard}>
-                <View style={styles.plotHeader}><View style={[styles.colorDot, { backgroundColor: plot.color ?? '#0f766e' }]} /><Text style={styles.plotName}>{plot.name}</Text><Text style={styles.plotArea}>{toBengaliDigits(formatMeasurement(plot.results.shotok))} শতক</Text></View>
-                <View style={styles.metrics}><Text style={styles.metric}>কাঠা: {toBengaliDigits(formatMeasurement(plot.results.katha))}</Text><Text style={styles.metric}>বর্গফুট: {toBengaliDigits(formatMeasurement(plot.results.sqft))}</Text><Text style={styles.metric}>পরিসীমা: {formatFeetInches(plot.results.perimeter)}</Text></View>
-                <Text style={styles.sideTitle}>বাহুর দৈর্ঘ্য</Text>
-                <View style={styles.chips}>{plot.results.lengths.map((length, index) => <View key={`${plot.id}-length-${index}`} style={styles.chip}><Text style={styles.chipText}>{toBengaliDigits(index + 1)}. {formatFeetInches(length)}</Text></View>)}</View>
-                {plot.results.diagonals && plot.results.diagonals.length > 0 && <><Text style={styles.sideTitle}>কর্ণ</Text><View style={styles.chips}>{plot.results.diagonals.map((diagonal, index) => <View key={`${plot.id}-diagonal-${index}`} style={[styles.chip, styles.diagonalChip]}><Text style={styles.chipText}>{toBengaliDigits(index + 1)}. {formatFeetInches(diagonal.lengthFt)}</Text></View>)}</View></>}
+                <View style={styles.plotHeader}><View style={[styles.colorDot, { backgroundColor: plot.color ?? '#0f766e' }]} /><Text style={styles.plotName}>{plot.name}</Text><Text style={styles.plotArea}>{formatMeasurement(plot.results.shotok)} shotok</Text></View>
+                <View style={styles.metrics}><Text style={styles.metric}>Katha: {formatMeasurement(plot.results.katha)}</Text><Text style={styles.metric}>Sq ft: {formatMeasurement(plot.results.sqft)}</Text><Text style={styles.metric}>Perimeter: {formatFeetInches(plot.results.perimeter)}</Text></View>
+                <Text style={styles.sideTitle}>Side lengths</Text>
+                <View style={styles.chips}>{plot.results.lengths.map((length, index) => <View key={`${plot.id}-length-${index}`} style={styles.chip}><Text style={styles.chipText}>{index + 1}. {formatFeetInches(length)}</Text></View>)}</View>
+                {plot.results.diagonals && plot.results.diagonals.length > 0 && <><Text style={styles.sideTitle}>Diagonals</Text><View style={styles.chips}>{plot.results.diagonals.map((diagonal, index) => <View key={`${plot.id}-diagonal-${index}`} style={[styles.chip, styles.diagonalChip]}><Text style={styles.chipText}>{index + 1}. {formatFeetInches(diagonal.lengthFt)}</Text></View>)}</View></>}
               </View>)}
             </ScrollView>
           </View>
