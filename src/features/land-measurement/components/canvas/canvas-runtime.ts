@@ -14,6 +14,9 @@ export const canvasRuntimeScale = makeMutable(1);
 export const canvasRuntimeX = makeMutable(0);
 export const canvasRuntimeY = makeMutable(0);
 
+let lastCenterPointCommitAt = 0;
+const CENTER_POINT_DEDUPE_MS = 220;
+
 export function setCanvasRuntimeTransform(scale: number, x: number, y: number) {
   canvasRuntimeScale.value = scale;
   canvasRuntimeX.value = x;
@@ -37,4 +40,17 @@ export function syncCanvasRuntimeTransformToStore() {
     current.setStageTransform(runtimeTransform);
   }
   return runtimeTransform;
+}
+
+export function commitCenterPointFromRuntime() {
+  const now = Date.now();
+  if (now - lastCenterPointCommitAt < CENTER_POINT_DEDUPE_MS) return false;
+
+  const current = useMapStore.getState();
+  if (current.mode !== 'drawing_plot' && current.mode !== 'calibrating') return false;
+
+  lastCenterPointCommitAt = now;
+  syncCanvasRuntimeTransformToStore();
+  useMapStore.getState().addCenterPoint();
+  return true;
 }
