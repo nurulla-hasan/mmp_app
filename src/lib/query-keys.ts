@@ -20,6 +20,8 @@ export const queryKeys = {
     all: [QUERY_KEYS.CALCULATIONS] as const,
     lists: () => [QUERY_KEYS.CALCULATIONS, 'list'] as const,
     list: (searchTerm?: string) => [QUERY_KEYS.CALCULATIONS, 'list', searchTerm ?? ''] as const,
+    libraryLists: () => [QUERY_KEYS.CALCULATIONS, 'library'] as const,
+    library: (searchTerm = '') => [QUERY_KEYS.CALCULATIONS, 'library', searchTerm] as const,
     detail: (id: string) => [QUERY_KEYS.CALCULATIONS, 'detail', id] as const,
   },
   surveyors: {
