@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -8,6 +8,7 @@ import { MobileCanvasToolbar } from '../../features/land-measurement/components/
 import { MobileResultsBar } from '../../features/land-measurement/components/results/MobileResultsBar';
 import { ScaleCalibrationModal } from '../../features/land-measurement/components/modals/ScaleCalibrationModal';
 import { ImagePickerSheet } from '../../features/land-measurement/components/modals/ImagePickerSheet';
+import { CalculationLibrarySheet, applyServerCalculation, type ServerCalculation } from '../../features/land-measurement/components/modals/CalculationLibrarySheet';
 import { useMapStore } from '../../features/land-measurement/store/useMapStore';
 import { Fonts } from '../../constants/typography';
 import { Badge } from '../../components/ui/badge';
@@ -24,6 +25,16 @@ export default function LandMeasurementScreen() {
 
   const [isManualScaleOpen, setIsManualScaleOpen] = useState(false);
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
+  const [calculationSheetMode, setCalculationSheetMode] = useState<'save' | 'load' | null>(null);
+  const [pendingCalculation, setPendingCalculation] = useState<ServerCalculation | null>(null);
+
+  useEffect(() => { void useMapStore.getState().hydratePersistence(); }, []);
+
+  useEffect(() => {
+    if (!mapImage || !pendingCalculation) return;
+    applyServerCalculation(pendingCalculation);
+    setPendingCalculation(null);
+  }, [mapImage, pendingCalculation]);
 
   const beginCalibration = () => {
     if (!mapImage) {
@@ -85,6 +96,8 @@ export default function LandMeasurementScreen() {
         <MobileCanvasToolbar
           onOpenManualScale={() => setIsManualScaleOpen(true)}
           onOpenImagePicker={() => setIsImagePickerOpen(true)}
+          onOpenSave={() => setCalculationSheetMode('save')}
+          onOpenLoad={() => setCalculationSheetMode('load')}
         />
       </View>
 
@@ -102,6 +115,16 @@ export default function LandMeasurementScreen() {
       <ImagePickerSheet
         visible={isImagePickerOpen}
         onClose={() => setIsImagePickerOpen(false)}
+      />
+      <CalculationLibrarySheet
+        visible={calculationSheetMode !== null}
+        mode={calculationSheetMode ?? 'load'}
+        onClose={() => setCalculationSheetMode(null)}
+        onRequireMap={(calculation) => {
+          setPendingCalculation(calculation);
+          Alert.alert('ম্যাপ ইমেজ প্রয়োজন', `“${calculation.mapName || 'ম্যাপ ফাইল'}” নির্বাচন করলে পরিমাপটি স্বয়ংক্রিয়ভাবে লোড হবে।`);
+          setIsImagePickerOpen(true);
+        }}
       />
     </SafeAreaView>
   );

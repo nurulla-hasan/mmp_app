@@ -4,16 +4,18 @@ import Svg, { Circle, ClipPath, Defs, G, Line, Polygon, Polyline, Rect, Text as 
 import { LocateFixed, Minus, Plus } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { calculatePolygonData } from '../../utils/calculations';
-import { clipLineToPolygon, getSnappedPoint, groupPolygonSegments } from '../../utils/geometry';
+import { clipLineToPolygon, getSnappedPoint } from '../../utils/geometry';
 import { getDirectionalContainingPlot } from '../../utils/directionalPlot';
 import { splitPolygonByPolyline } from '../../utils/polygonDivision';
-import { formatFeetInches } from '../../utils/canvas';
+import { formatFeetInches, MIN_DIAGONAL_DRAW_PX, MIN_EDGE_LABEL_FT } from '../../utils/canvas';
+import { STAGE_MAX_ZOOM, STAGE_MIN_ZOOM, UI_CONFIG } from '../../utils/canvas';
 import { getPolygonAreaLabelLayout } from '../../utils/polygon-label';
 import { getReadableRotation } from '../../utils/component-helpers';
 import type { Point } from '../../types/map';
 import { toBengaliDigits } from '../../../../lib/utils';
 import { Fonts } from '../../../../constants/typography';
 import { NativeTiledMap } from './NativeTiledMap';
+import { getActivePlotDots, getActiveSegmentLabels, getPlotEdgeLabels } from './nativeStageGeometry';
 
 type Size = { width: number; height: number };
 
@@ -25,23 +27,22 @@ type Transform = { scale: number; pos: Point };
 type LiveOverlayData = {
   start: Point | null;
   end: Point;
-  lengthText: string | null;
+  label: { point: Point; text: string; rotation: number; fontPx: number } | null;
   color: string;
   snapped: boolean;
 };
 type LiveOverlayHandle = { update: (value: LiveOverlayData) => void };
+type MagnifierHandle = { update: (value: Transform) => void };
 
 const LiveMeasurementOverlay = forwardRef<LiveOverlayHandle, { initial: LiveOverlayData }>(function LiveMeasurementOverlay({ initial }, ref) {
   const [data, setData] = useState(initial);
   useImperativeHandle(ref, () => ({ update: setData }), []);
   if (!data.start) return null;
 
-  const mid = midpoint(data.start, data.end);
-  const angle = Math.atan2(data.end.y - data.start.y, data.end.x - data.start.x) * 180 / Math.PI;
   return (
     <G pointerEvents='none'>
       <Line x1={data.start.x} y1={data.start.y} x2={data.end.x} y2={data.end.y} stroke={data.color} strokeWidth={2.5} strokeDasharray='8,5' />
-      {data.lengthText && <SvgOutlinedText x={mid.x} y={mid.y} text={data.lengthText} stageScale={1} color={data.color} rotation={angle} />}
+      {data.label && <SvgOutlinedText x={data.label.point.x} y={data.label.point.y} text={data.label.text} stageScale={1} color={data.color} rotation={data.label.rotation} fontPx={data.label.fontPx} />}
       {data.snapped && <Circle cx={data.end.x} cy={data.end.y} r={10} fill='none' stroke={data.color} strokeWidth={2} strokeDasharray='5,4' />}
     </G>
   );
@@ -55,6 +56,7 @@ type BadgeProps = {
   color: string;
   rotation?: number;
   compact?: boolean;
+  fontPx?: number;
 };
 
 function SvgBadge({ x, y, text, stageScale, color, rotation = 0, compact = false }: BadgeProps) {
@@ -93,9 +95,9 @@ function SvgBadge({ x, y, text, stageScale, color, rotation = 0, compact = false
   );
 }
 
-function SvgOutlinedText({ x, y, text, stageScale, color, rotation = 0 }: BadgeProps) {
+function SvgOutlinedText({ x, y, text, stageScale, color, rotation = 0, fontPx = UI_CONFIG.fontSize.small }: BadgeProps) {
   const safeScale = Math.max(stageScale, 0.01);
-  const fontSize = 11.5 / safeScale;
+  const fontSize = fontPx / safeScale;
   const common = {
     x: 0,
     y: fontSize * 0.34,
@@ -107,11 +109,70 @@ function SvgOutlinedText({ x, y, text, stageScale, color, rotation = 0 }: BadgeP
 
   return (
     <G transform={`translate(${x} ${y}) rotate(${getReadableRotation(rotation)})`}>
-      <SvgText {...common} fill={color} stroke={color} strokeWidth={3.6 / safeScale} strokeLinejoin='round'>{text}</SvgText>
-      <SvgText {...common} fill='#ffffff'>{text}</SvgText>
+      <SvgText {...common} fill={color} stroke='rgba(255,255,255,0.95)' strokeWidth={2.2 / safeScale} strokeLinejoin='round'>{text}</SvgText>
+      <SvgText {...common} fill={color}>{text}</SvgText>
     </G>
   );
 }
+
+function SvgDiagonalBadge({ x, y, text, stageScale, color }: Omit<BadgeProps, 'rotation'>) {
+  const safeScale = Math.max(stageScale, 0.01);
+  const fontSize = UI_CONFIG.fontSize.small / safeScale;
+  const padding = UI_CONFIG.padding.small / safeScale;
+  const width = text.length * fontSize * 0.6 + padding * 2;
+  const height = fontSize + padding * 2;
+  return (
+    <G transform={`translate(${x} ${y})`} opacity={0.8}>
+      <Rect x={-width / 2} y={-height / 2} width={width} height={height} rx={UI_CONFIG.padding.small / safeScale} fill='#ffffff' stroke={color} strokeWidth={1 / safeScale} />
+      <SvgText x={0} y={fontSize * 0.34} fill={color} fontFamily={Fonts.headingBold} fontWeight='700' fontSize={fontSize} textAnchor='middle'>{text}</SvgText>
+    </G>
+  );
+}
+
+type NativeMagnifierProps = {
+  initial: Transform;
+  image: NonNullable<ReturnType<typeof useMapStore.getState>['mapImage']>;
+  viewport: Size;
+  fitScale: number;
+  mode: ReturnType<typeof useMapStore.getState>['mode'];
+  plots: ReturnType<typeof useMapStore.getState>['plots'];
+  plotPoints: Point[];
+};
+
+const NativeMagnifier = forwardRef<MagnifierHandle, NativeMagnifierProps>(function NativeMagnifier(
+  { initial, image, viewport, fitScale, mode, plots, plotPoints },
+  ref,
+) {
+  const [transform, setTransform] = useState(initial);
+  useImperativeHandle(ref, () => ({ update: setTransform }), []);
+  const radius = 55;
+  const lens = { x: viewport.width - radius - 14, y: radius + 66 };
+  const zoom = 2.5;
+  const centerCanvas = {
+    x: (viewport.width / 2 - transform.pos.x) / Math.max(transform.scale, 0.001),
+    y: (viewport.height / 2 - transform.pos.y) / Math.max(transform.scale, 0.001),
+  };
+  const magnifiedScale = transform.scale * zoom;
+  const magnifiedPos = { x: lens.x - centerCanvas.x * magnifiedScale, y: lens.y - centerCanvas.y * magnifiedScale };
+  const tilePos = { x: radius - centerCanvas.x * magnifiedScale, y: radius - centerCanvas.y * magnifiedScale };
+
+  return (
+    <G pointerEvents='none'>
+      <Defs><ClipPath id='map-magnifier-clip'><Circle cx={lens.x} cy={lens.y} r={radius} /></ClipPath></Defs>
+      <Circle cx={lens.x} cy={lens.y} r={radius + 2} fill='#f8fafc' />
+      <G clipPath='url(#map-magnifier-clip)'>
+        <G transform={`translate(${magnifiedPos.x} ${magnifiedPos.y}) scale(${magnifiedScale})`}>
+          <NativeTiledMap image={image} viewport={{ width: radius * 2, height: radius * 2 }} stageScale={magnifiedScale} stagePos={tilePos} fitScale={fitScale} />
+          {plots.map((plot) => <Polygon key={`mag-${plot.id}`} points={pointString(plot.points)} fill={plot.color ?? '#0f766e'} fillOpacity={0.1} stroke={plot.color ?? '#0f766e'} strokeWidth={2 / magnifiedScale} />)}
+          {mode === 'drawing_plot' && plotPoints.length >= 2 && <Polyline points={pointString(plotPoints)} fill='none' stroke={UI_CONFIG.colors.drawPrimary} strokeWidth={UI_CONFIG.strokeWidth.xxthick / magnifiedScale} />}
+        </G>
+      </G>
+      <Circle cx={lens.x} cy={lens.y} r={radius} fill='none' stroke='rgba(15,23,42,0.72)' strokeWidth={3} />
+      <Line x1={lens.x - 10} y1={lens.y} x2={lens.x + 10} y2={lens.y} stroke='#ef4444' strokeWidth={2} />
+      <Line x1={lens.x} y1={lens.y - 10} x2={lens.x} y2={lens.y + 10} stroke='#ef4444' strokeWidth={2} />
+    </G>
+  );
+});
 
 export function MobileMapCanvas() {
   const state = useMapStore();
@@ -122,6 +183,7 @@ export function MobileMapCanvas() {
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
   const contentGroupRef = useRef<React.ElementRef<typeof G> | null>(null);
   const liveOverlayRef = useRef<LiveOverlayHandle | null>(null);
+  const magnifierRef = useRef<MagnifierHandle | null>(null);
   const liveRafRef = useRef<number | null>(null);
   const pendingLiveTransformRef = useRef<Transform | null>(null);
   const fitScaleRef = useRef(1);
@@ -129,6 +191,8 @@ export function MobileMapCanvas() {
   const panStartRef = useRef<Point>({ x: 0, y: 0 });
   const didPinchRef = useRef(false);
   const draggingAnchorRef = useRef<number | null>(null);
+  const manualDragRafRef = useRef<number | null>(null);
+  const pendingManualDragRef = useRef<{ index: number; point: Point } | null>(null);
   const pinchRef = useRef<null | { distance: number; scale: number; pos: Point; center: Point }>(null);
 
   useEffect(() => { transformRef.current = { scale: stageScale, pos: stagePos }; }, [stagePos, stageScale]);
@@ -172,10 +236,41 @@ export function MobileMapCanvas() {
       y: point.y * transform.scale + transform.pos.y,
     });
     const lengthFt = startCanvas && current.scale ? distance(startCanvas, target) / current.scale : 0;
+    const distPx = startCanvas ? distance(startCanvas, target) : 0;
+    const edgeScreenPx = distPx * transform.scale;
+    let label: LiveOverlayData['label'] = null;
+    if (startCanvas && current.mode === 'drawing_plot' && current.scale && edgeScreenPx >= 34) {
+      const text = formatFeetInches(lengthFt);
+      let fontPx = Math.min(UI_CONFIG.fontSize.small, Math.max(7.5, edgeScreenPx * 0.13));
+      const widthPx = text.length * fontPx * 0.58;
+      const maxWidthPx = edgeScreenPx * 0.74;
+      if (widthPx > maxWidthPx && maxWidthPx > 0) fontPx = Math.max(6.75, fontPx * maxWidthPx / widthPx);
+      const mid = midpoint(startCanvas, target);
+      let point = mid;
+      if (current.plotPoints.length > 1 && distPx >= 1) {
+        const normalA = { x: -(target.y - startCanvas.y) / distPx, y: (target.x - startCanvas.x) / distPx };
+        const plotCenter = current.plotPoints.reduce(
+          (sum, item) => ({ x: sum.x + item.x, y: sum.y + item.y }),
+          { x: 0, y: 0 },
+        );
+        plotCenter.x /= current.plotPoints.length;
+        plotCenter.y /= current.plotPoints.length;
+        const facesCenter = normalA.x * (plotCenter.x - mid.x) + normalA.y * (plotCenter.y - mid.y) >= 0;
+        const normal = facesCenter ? normalA : { x: -normalA.x, y: -normalA.y };
+        const inset = Math.max(7, fontPx * 0.95) / transform.scale;
+        point = { x: mid.x + normal.x * inset, y: mid.y + normal.y * inset };
+      }
+      label = {
+        point: toScreen(point),
+        text,
+        rotation: getReadableRotation(Math.atan2(target.y - startCanvas.y, target.x - startCanvas.x) * 180 / Math.PI),
+        fontPx,
+      };
+    }
     return {
       start: startCanvas ? toScreen(startCanvas) : null,
       end: toScreen(target),
-      lengthText: current.mode === 'drawing_plot' && lengthFt >= 1 ? formatFeetInches(lengthFt) : null,
+      label,
       color: current.mode === 'calibrating' ? '#f59e0b' : '#2563eb',
       snapped: distance(raw, target) * transform.scale > 2,
     };
@@ -187,12 +282,27 @@ export function MobileMapCanvas() {
     liveRafRef.current = requestAnimationFrame(() => {
       liveRafRef.current = null;
       const pending = pendingLiveTransformRef.current;
-      if (pending) liveOverlayRef.current?.update(getLiveOverlay(pending));
+      if (pending) {
+        liveOverlayRef.current?.update(getLiveOverlay(pending));
+        magnifierRef.current?.update(pending);
+      }
     });
   }, [getLiveOverlay]);
 
   useEffect(() => () => {
     if (liveRafRef.current !== null) cancelAnimationFrame(liveRafRef.current);
+    if (manualDragRafRef.current !== null) cancelAnimationFrame(manualDragRafRef.current);
+  }, []);
+
+  const scheduleManualAnchorMove = useCallback((index: number, point: Point) => {
+    pendingManualDragRef.current = { index, point };
+    if (manualDragRafRef.current !== null) return;
+    manualDragRafRef.current = requestAnimationFrame(() => {
+      manualDragRafRef.current = null;
+      const pending = pendingManualDragRef.current;
+      pendingManualDragRef.current = null;
+      if (pending) useMapStore.getState().moveManualCutAnchor(pending.index, pending.point);
+    });
   }, []);
 
   const applyNativeTransform = useCallback((next: { scale: number; pos: Point }) => {
@@ -231,8 +341,7 @@ export function MobileMapCanvas() {
   const zoomAround = useCallback((factor: number, focal?: Point) => {
     const current = transformRef.current;
     const center = focal ?? { x: viewport.width / 2, y: viewport.height / 2 };
-    const min = Math.max(fitScaleRef.current * 0.5, 0.02);
-    const nextScale = Math.max(min, Math.min(fitScaleRef.current * 12, current.scale * factor));
+    const nextScale = Math.max(STAGE_MIN_ZOOM, Math.min(STAGE_MAX_ZOOM, current.scale * factor));
     const ratio = nextScale / current.scale;
     commitTransform({
       scale: nextScale,
@@ -282,21 +391,29 @@ export function MobileMapCanvas() {
           return;
         }
         const initial = pinchRef.current;
-        const min = Math.max(fitScaleRef.current * 0.5, 0.02);
-        const nextScale = Math.max(min, Math.min(fitScaleRef.current * 12, initial.scale * nextDistance / initial.distance));
+        const nextScale = Math.max(STAGE_MIN_ZOOM, Math.min(STAGE_MAX_ZOOM, initial.scale * nextDistance / initial.distance));
         const ratio = nextScale / initial.scale;
         applyNativeTransform({ scale: nextScale, pos: { x: center.x - (initial.center.x - initial.pos.x) * ratio, y: center.y - (initial.center.y - initial.pos.y) * ratio } });
         return;
       }
       if (didPinchRef.current) return;
       if (draggingAnchorRef.current !== null) {
-        useMapStore.getState().moveManualCutAnchor(draggingAnchorRef.current, screenToCanvas({ x: event.nativeEvent.locationX, y: event.nativeEvent.locationY }));
+        scheduleManualAnchorMove(draggingAnchorRef.current, screenToCanvas({ x: event.nativeEvent.locationX, y: event.nativeEvent.locationY }));
         return;
       }
       applyNativeTransform({ scale: transformRef.current.scale, pos: { x: panStartRef.current.x + gesture.dx, y: panStartRef.current.y + gesture.dy } });
     },
     onPanResponderRelease: (event, gesture) => {
       const wasDragging = draggingAnchorRef.current !== null;
+      if (draggingAnchorRef.current !== null) {
+        if (manualDragRafRef.current !== null) cancelAnimationFrame(manualDragRafRef.current);
+        manualDragRafRef.current = null;
+        pendingManualDragRef.current = null;
+        useMapStore.getState().moveManualCutAnchor(
+          draggingAnchorRef.current,
+          screenToCanvas({ x: event.nativeEvent.locationX, y: event.nativeEvent.locationY }),
+        );
+      }
       draggingAnchorRef.current = null;
       pinchRef.current = null;
       if (didPinchRef.current || Math.hypot(gesture.dx, gesture.dy) > 8) {
@@ -314,7 +431,7 @@ export function MobileMapCanvas() {
       pinchRef.current = null;
       commitTransform(transformRef.current);
     },
-  }), [applyNativeTransform, commitTransform, findAnchor, screenToCanvas]);
+  }), [applyNativeTransform, commitTransform, findAnchor, scheduleManualAnchorMove, screenToCanvas]);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -348,43 +465,6 @@ export function MobileMapCanvas() {
         ? selectedPlot ? 'লাল পয়েন্ট টেনে কাটিং লাইন ঠিক করুন' : 'যে প্লট ভাগ করবেন সেটিতে ট্যাপ করুন'
         : mapImage ? 'এক আঙুলে প্যান • দুই আঙুলে জুম' : 'শুরু করতে মৌজা ম্যাপ যোগ করুন';
 
-  const magnifier = useMemo(() => {
-    if (!mapImage || !isMagnifierEnabled || !viewport.width || (mode !== 'drawing_plot' && mode !== 'calibrating')) return null;
-    const radius = 55;
-    const lens = { x: viewport.width - radius - 14, y: radius + 66 };
-    const zoom = 2.5;
-    const centerCanvas = {
-      x: (viewport.width / 2 - stagePos.x) / Math.max(stageScale, 0.001),
-      y: (viewport.height / 2 - stagePos.y) / Math.max(stageScale, 0.001),
-    };
-    const magScale = stageScale * zoom;
-    const magPos = { x: lens.x - centerCanvas.x * magScale, y: lens.y - centerCanvas.y * magScale };
-    const tilePos = { x: radius - centerCanvas.x * magScale, y: radius - centerCanvas.y * magScale };
-
-    return (
-      <G pointerEvents='none'>
-        <Defs><ClipPath id='map-magnifier-clip'><Circle cx={lens.x} cy={lens.y} r={radius} /></ClipPath></Defs>
-        <Circle cx={lens.x} cy={lens.y} r={radius + 2} fill='#f8fafc' />
-        <G clipPath='url(#map-magnifier-clip)'>
-          <G transform={`translate(${magPos.x} ${magPos.y}) scale(${magScale})`}>
-            <NativeTiledMap
-              image={mapImage}
-              viewport={{ width: radius * 2, height: radius * 2 }}
-              stageScale={magScale}
-              stagePos={tilePos}
-              fitScale={fitScaleRef.current}
-            />
-            {plots.map((plot) => <Polygon key={`mag-${plot.id}`} points={pointString(plot.points)} fill={plot.color ?? '#0f766e'} fillOpacity={0.18} stroke={plot.color ?? '#0f766e'} strokeWidth={2 / magScale} />)}
-            {mode === 'drawing_plot' && plotPoints.length >= 2 && <Polyline points={pointString(plotPoints)} fill='none' stroke='#2563eb' strokeWidth={2.5 / magScale} />}
-          </G>
-        </G>
-        <Circle cx={lens.x} cy={lens.y} r={radius} fill='none' stroke='rgba(15,23,42,0.72)' strokeWidth={3} />
-        <Line x1={lens.x - 10} y1={lens.y} x2={lens.x + 10} y2={lens.y} stroke='#ef4444' strokeWidth={2} />
-        <Line x1={lens.x} y1={lens.y - 10} x2={lens.x} y2={lens.y + 10} stroke='#ef4444' strokeWidth={2} />
-      </G>
-    );
-  }, [isMagnifierEnabled, mapImage, mode, plotPoints, plots, stagePos.x, stagePos.y, stageScale, viewport.height, viewport.width]);
-
   return (
     <View style={styles.container} onLayout={onLayout} {...panResponder.panHandlers}>
       {viewport.width > 0 && viewport.height > 0 && (
@@ -404,36 +484,33 @@ export function MobileMapCanvas() {
             {plots.map((plot) => {
               const hiddenForPreview = Boolean(splitPreview && plot.id === selectedPlot?.id);
               const label = getPolygonAreaLabelLayout(plot.points);
+              const edgeLabels = getPlotEdgeLabels(plot, scale, stageScale);
               return (
                 <G key={plot.id} opacity={hiddenForPreview ? 0.2 : 1}>
-                  <Polygon points={pointString(plot.points)} fill={plot.color ?? '#0f766e'} fillOpacity={0.2} stroke={plot.color ?? '#0f766e'} strokeWidth={2.5 / stageScale} />
-                  {groupPolygonSegments(plot.points).map((group, index) => {
-                    const first = group[0].point;
-                    const last = group[group.length - 1].nextPoint;
-                    const mid = midpoint(first, last);
-                    const lengthFt = group.reduce((sum, segment) => sum + segment.distPx / (scale ?? 1), 0);
-                    return <SvgOutlinedText key={`${plot.id}-side-${index}`} x={mid.x} y={mid.y} text={formatFeetInches(lengthFt)} stageScale={stageScale} color={plot.color ?? '#0f766e'} rotation={group[0].angle} />;
-                  })}
+                  <Polygon points={pointString(plot.points)} fill={plot.color ?? '#0f766e'} fillOpacity={manualDividePlotId === plot.id ? 0.18 : 0.1} stroke={plot.color ?? '#0f766e'} strokeWidth={2.5 / stageScale} />
+                  {edgeLabels.map((edge) => <SvgOutlinedText key={edge.id} x={edge.x} y={edge.y} text={edge.text} stageScale={stageScale} color={edge.color} rotation={edge.rotation} fontPx={edge.fontPx} />)}
                   {isShowDiagonals && plot.results.diagonals?.map((diagonal, index) => {
                     const start = plot.points[diagonal.p1Index];
                     const end = plot.points[diagonal.p2Index];
                     if (!start || !end) return null;
+                    if (distance(start, end) <= MIN_DIAGONAL_DRAW_PX / stageScale) return null;
                     const mid = midpoint(start, end);
-                    const angle = Math.atan2(end.y - start.y, end.x - start.x) * 180 / Math.PI;
-                    return <G key={`${plot.id}-diag-${index}`}><Line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke='#8b5cf6' strokeWidth={1.3 / stageScale} strokeDasharray={`${5 / stageScale},${4 / stageScale}`} /><SvgOutlinedText x={mid.x} y={mid.y} text={formatFeetInches(diagonal.lengthFt)} stageScale={stageScale} color='#6d28d9' rotation={angle} /></G>;
+                    const text = diagonal.lengthFt >= MIN_EDGE_LABEL_FT ? formatFeetInches(diagonal.lengthFt) : '';
+                    const color = plot.color ?? '#0f766e';
+                    return <G key={`${plot.id}-diag-${index}`}><Line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke={color} strokeWidth={1 / stageScale} strokeDasharray={`${6 / stageScale},${6 / stageScale}`} opacity={0.4} />{text ? <SvgDiagonalBadge x={mid.x} y={mid.y} text={text} stageScale={stageScale} color={color} /> : null}</G>;
                   })}
-                  <SvgBadge x={label.center.x} y={label.center.y} text={`${toBengaliDigits(plot.results.shotok.toFixed(3))} শতক`} stageScale={stageScale} color={plot.color ?? '#0f766e'} rotation={label.rotation} />
+                  {mode !== 'manual_divide_plot' && <SvgBadge x={label.center.x} y={label.center.y} text={`${toBengaliDigits(plot.results.shotok.toFixed(2))} শতক`} stageScale={stageScale} color={plot.color ?? '#0f766e'} rotation={label.rotation} compact />}
                 </G>
               );
             })}
 
             {splitPreview && selectedPlot && (
               <G>
-                <Polygon points={pointString(splitPreview.poly1)} fill='#16a34a' fillOpacity={0.28} stroke='#22c55e' strokeWidth={2 / stageScale} />
-                <Polygon points={pointString(splitPreview.poly2)} fill='#2563eb' fillOpacity={0.26} stroke='#60a5fa' strokeWidth={2 / stageScale} />
+                <Polygon points={pointString(splitPreview.poly1)} fill={selectedPlot.color ?? '#0F766E'} fillOpacity={0.3} stroke={selectedPlot.color ?? '#0F766E'} strokeWidth={2 / stageScale} />
+                <Polygon points={pointString(splitPreview.poly2)} fill='#0284C7' fillOpacity={0.3} stroke='#0284C7' strokeWidth={2 / stageScale} />
                 {[{ points: splitPreview.poly1, value: splitPreview.resultA?.shotok }, { points: splitPreview.poly2, value: splitPreview.resultB?.shotok }].map((part, index) => {
                   const label = getPolygonAreaLabelLayout(part.points);
-                  return part.value ? <SvgBadge key={`split-label-${index}`} x={label.center.x} y={label.center.y} text={`${toBengaliDigits(part.value.toFixed(3))} শতক`} stageScale={stageScale} color={index === 0 ? '#15803d' : '#1d4ed8'} rotation={label.rotation} /> : null;
+                  return part.value ? <SvgBadge key={`split-label-${index}`} x={label.center.x} y={label.center.y} text={`${part.value.toFixed(2)} শতক`} stageScale={stageScale} color={index === 0 ? selectedPlot.color ?? '#0F766E' : '#0284C7'} rotation={label.rotation} /> : null;
                 })}
               </G>
             )}
@@ -441,14 +518,8 @@ export function MobileMapCanvas() {
             {plotPoints.length > 0 && mode === 'drawing_plot' && (
               <G>
                 {plotPoints.length >= 2 && <Polyline points={pointString(plotPoints)} fill='none' stroke='#2563eb' strokeWidth={3 / stageScale} />}
-                {plotPoints.map((point, index) => <Circle key={`point-${index}`} cx={point.x} cy={point.y} r={(index === 0 ? 7 : 5) / stageScale} fill={index === 0 ? '#f97316' : '#fff'} stroke='#2563eb' strokeWidth={2 / stageScale} />)}
-                {plotPoints.slice(0, -1).map((point, index) => {
-                  const next = plotPoints[index + 1];
-                  const lengthFt = scale ? distance(point, next) / scale : 0;
-                  if (lengthFt < 1) return null;
-                  const angle = Math.atan2(next.y - point.y, next.x - point.x) * 180 / Math.PI;
-                  return <SvgOutlinedText key={`live-side-${index}`} x={(point.x + next.x) / 2} y={(point.y + next.y) / 2} text={formatFeetInches(lengthFt)} stageScale={stageScale} color='#2563eb' rotation={angle} />;
-                })}
+                {getActivePlotDots(plotPoints).map(({ point, index, isCorner }) => isCorner ? <Circle key={`point-${index}`} cx={point.x} cy={point.y} r={5 / stageScale} fill='#3182CE' stroke='#ffffff' strokeWidth={1.5 / stageScale} /> : null)}
+                {getActiveSegmentLabels(plotPoints, scale, stageScale).map((edge) => <SvgOutlinedText key={edge.id} x={edge.x} y={edge.y} text={edge.text} stageScale={stageScale} color={edge.color} rotation={edge.rotation} fontPx={edge.fontPx} />)}
               </G>
             )}
 
@@ -459,11 +530,15 @@ export function MobileMapCanvas() {
               </G>
             )}
 
-            {manualCutLine && <G><Polyline points={pointString(manualCutLine)} fill='none' stroke='#ef4444' strokeWidth={3 / stageScale} strokeDasharray={`${8 / stageScale},${5 / stageScale}`} />{manualCutLine.map((point, index) => <Circle key={`cut-${index}`} cx={point.x} cy={point.y} r={7 / stageScale} fill={index === 0 || index === manualCutLine.length - 1 ? '#ef4444' : '#fff'} stroke='#7f1d1d' strokeWidth={2 / stageScale} />)}</G>}
+            {manualCutLine && selectedPlot && <G>
+              <Defs><ClipPath id='manual-cut-clip'><Polygon points={pointString(selectedPlot.points)} /></ClipPath></Defs>
+              <G clipPath='url(#manual-cut-clip)'><Polyline points={pointString(manualCutLine)} fill='none' stroke='#DC2626' strokeWidth={2 / stageScale} strokeDasharray={`${8 / stageScale},${8 / stageScale}`} /></G>
+              {manualCutLine.map((point, index) => <Circle key={`cut-${index}`} cx={point.x} cy={point.y} r={8 / stageScale} fill='#DC2626' stroke='#FFFFFF' strokeWidth={2 / stageScale} />)}
+            </G>}
           </G>
 
           <LiveMeasurementOverlay ref={liveOverlayRef} initial={getLiveOverlay({ scale: stageScale, pos: stagePos })} />
-          {magnifier}
+          {mapImage && isMagnifierEnabled && viewport.width > 0 && (mode === 'drawing_plot' || mode === 'calibrating') && <NativeMagnifier ref={magnifierRef} initial={{ scale: stageScale, pos: stagePos }} image={mapImage} viewport={viewport} fitScale={fitScaleRef.current} mode={mode} plots={plots} plotPoints={plotPoints} />}
 
           {(mode === 'drawing_plot' || mode === 'calibrating') && (
             <G>

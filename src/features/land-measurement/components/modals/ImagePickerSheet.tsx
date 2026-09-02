@@ -11,6 +11,14 @@ type Props = {
   onClose: () => void;
 };
 
+const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
+
+function validateFileSize(size?: number | null) {
+  if (!size || size <= MAX_UPLOAD_SIZE_BYTES) return true;
+  Alert.alert('ফাইলটি অনেক বড়', '২৫ মেগাবাইটের (25 MB) কম সাইজের ফাইল নির্বাচন করুন।');
+  return false;
+}
+
 export function ImagePickerSheet({ visible, onClose }: Props) {
   const mapImage = useMapStore((state) => state.mapImage);
   const setMapImage = useMapStore((state) => state.setMapImage);
@@ -32,6 +40,7 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
 
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
+    if (!validateFileSize(asset.fileSize)) return;
     setMapImage({
       uri: asset.uri,
       width: Math.max(asset.width, 1),
@@ -51,6 +60,7 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
       if (result.canceled || !result.assets[0]) return;
 
       const asset = result.assets[0];
+      if (!validateFileSize(asset.size)) return;
       setIsImportingPdf(true);
       const { convertPage } = await import('@uzimandias/react-native-pdf-to-image');
       const page = await convertPage(asset.uri, 0, {

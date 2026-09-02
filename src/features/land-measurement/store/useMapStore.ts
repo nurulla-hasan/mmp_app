@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ErrorToast, SuccessToast } from '@/lib/utils';
 import { calculatePolygonData } from '../utils/calculations';
 import {
@@ -12,7 +13,7 @@ import {
 import { getDirectionalContainingPlot } from '../utils/directionalPlot';
 import { splitPolygonByPolyline } from '../utils/polygonDivision';
 import { MANUAL_DIVIDE_CORNER_SNAP_PX, PLOT_COLOR_PALETTE } from '../utils/canvas';
-import type { MapMode, PlotRecord, Point, PolygonResults } from '../types/map';
+import type { MapMode, PlotRecord, Point, PolygonResults, SavedPlotRecord } from '../types/map';
 
 export type MapImage = {
   uri: string;
@@ -23,6 +24,25 @@ export type MapImage = {
 };
 
 export type NudgeTarget = 'all' | 'start' | 'end';
+export type ReportInfo = { mouza: string; jlNo: string; dagNo: string; khatianNo: string; date: string; surveyorName: string };
+
+const SCALE_KEY = 'mapScale';
+const SAVED_PLOTS_KEY = 'mouzaSavedPlots';
+const SAVED_PLOT_TTL_MS = 10 * 24 * 60 * 60 * 1000;
+const API_BASE_URL = 'https://mmp-backend-xi.vercel.app/api/v1';
+const ACCESS_TOKEN_KEY = '@mmp_access_token';
+
+const incrementMeasuredPlotCount = async () => {
+  try {
+    const token = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+    await fetch(`${API_BASE_URL}/calculations/stats/increment-plot`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+  } catch {
+    // Analytics must never interrupt an on-device measurement.
+  }
+};
 
 type MapStore = {
   mapImage: MapImage | null;
@@ -43,12 +63,22 @@ type MapStore = {
   stageSize: { width: number; height: number };
   isShowDiagonals: boolean;
   isMagnifierEnabled: boolean;
+  isPinching: boolean;
+  snapHint: boolean;
+  reportInfo: ReportInfo;
+  reportImage: string | null;
+  currentProjectId: string | null;
+  savedPlots: SavedPlotRecord[];
+  plotSaveName: string;
   manualDividePlotId: string | null;
   manualCutLine: Point[] | null;
   nudgeTarget: NudgeTarget;
 
   setMapImage: (image: MapImage) => void;
+  hydratePersistence: () => Promise<void>;
   clearMap: () => void;
+  setScale: (scale: number | null) => void;
+  setPlots: (plots: PlotRecord[] | ((previous: PlotRecord[]) => PlotRecord[])) => void;
   setMode: (mode: MapMode) => void;
   setStageSize: (size: { width: number; height: number }) => void;
   setStageTransform: (transform: { scale: number; pos: Point }) => void;
@@ -68,13 +98,21 @@ type MapStore = {
   undoPlotAction: () => void;
   redoPlotAction: () => void;
   clearPlots: () => void;
-  setScale: (scale: number | null) => void;
-  setPlots: (plots: PlotRecord[]) => void;
   setIsShowDiagonals: (show: boolean) => void;
   setIsMagnifierEnabled: (enabled: boolean) => void;
+  setIsPinching: (pinching: boolean) => void;
+  setSnapHint: (hint: boolean) => void;
+  setReportInfo: (info: ReportInfo | ((previous: ReportInfo) => ReportInfo)) => void;
+  setReportImage: (image: string | null) => void;
+  setCurrentProjectId: (id: string | null) => void;
+  setPlotSaveName: (name: string) => void;
+  savePlotsToLibrary: () => boolean;
+  deleteSavedPlot: (plotId: string) => void;
+  updateSavedPlot: (plotId: string, updates: Partial<SavedPlotRecord>) => void;
   startManualDivide: () => void;
   cancelManualDivide: () => void;
   selectPlotForDivide: (point: Point) => void;
+  setManualDividePlotId: (id: string | null) => void;
   setManualCutLine: (line: Point[] | null) => void;
   moveManualCutAnchor: (index: number, point: Point) => void;
   setNudgeTarget: (target: NudgeTarget) => void;
@@ -162,11 +200,87 @@ export const useMapStore = create<MapStore>((set, get) => ({
   stageSize: { width: 0, height: 0 },
   isShowDiagonals: false,
   isMagnifierEnabled: false,
+  isPinching: false,
+  snapHint: false,
+  reportInfo: { mouza: '', jlNo: '', dagNo: '', khatianNo: '', date: new Date().toLocaleDateString('en-GB'), surveyorName: '' },
+  reportImage: null,
+  currentProjectId: null,
+  savedPlots: [],
+  plotSaveName: '',
   ...initialMeasurementState,
 
-  setMapImage: (mapImage) => set({ mapImage, ...initialMeasurementState }),
+  setMapImage: (mapImage) => set({
+    mapImage,
+    mode: 'none',
+    calibrationLine: [],
+    calibrationLineFuture: [],
+    plotPoints: [],
+    plotPointsFuture: [],
+    plots: [],
+    plotsHistory: [],
+    plotsFuture: [],
+    results: null,
+    isPlotFinished: false,
+    manualDividePlotId: null,
+    manualCutLine: null,
+    reportImage: null,
+    currentProjectId: null,
+  }),
 
-  clearMap: () => set({ mapImage: null, ...initialMeasurementState }),
+  hydratePersistence: async () => {
+    try {
+      const [scaleRaw, plotsRaw] = await Promise.all([
+        AsyncStorage.getItem(SCALE_KEY),
+        AsyncStorage.getItem(SAVED_PLOTS_KEY),
+      ]);
+      const persistedScale = scaleRaw ? Number(scaleRaw) : null;
+      const now = Date.now();
+      const savedPlots = plotsRaw
+        ? (JSON.parse(plotsRaw) as SavedPlotRecord[]).filter((plot) => plot.expiresAt > now)
+        : [];
+      set({
+        scale: Number.isFinite(persistedScale) && (persistedScale ?? 0) > 0 ? persistedScale : get().scale,
+        savedPlots,
+      });
+      await AsyncStorage.setItem(SAVED_PLOTS_KEY, JSON.stringify(savedPlots));
+    } catch {
+      // Corrupt or unavailable storage should not block the measurement canvas.
+    }
+  },
+
+  clearMap: () => set({
+    mapImage: null,
+    mode: 'none',
+    calibrationLine: [],
+    calibrationLineFuture: [],
+    plotPoints: [],
+    plotPointsFuture: [],
+    plots: [],
+    plotsHistory: [],
+    plotsFuture: [],
+    results: null,
+    isPlotFinished: false,
+    manualDividePlotId: null,
+    manualCutLine: null,
+    reportImage: null,
+    currentProjectId: null,
+  }),
+
+  setScale: (scale) => {
+    set({ scale });
+    if (scale && scale > 0) void AsyncStorage.setItem(SCALE_KEY, String(scale));
+    else void AsyncStorage.removeItem(SCALE_KEY);
+  },
+
+  setPlots: (plots) => set((state) => {
+    const nextPlots = typeof plots === 'function' ? plots(state.plots) : plots;
+    return {
+      plots: nextPlots,
+      plotsHistory: [],
+      plotsFuture: [],
+      results: nextPlots.at(-1)?.results ?? null,
+    };
+  }),
 
   setMode: (mode) => set({ mode }),
 
@@ -245,6 +359,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
       calibrationLineFuture: [],
       isDistanceModalOpen: false,
     });
+    void AsyncStorage.setItem(SCALE_KEY, String(nextScale));
     SuccessToast(`স্কেল সেট হয়েছে: ১ পিক্সেল = ${(1 / nextScale).toFixed(6)} ফুট`);
     return true;
   },
@@ -267,6 +382,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
       plotsFuture: [],
       results: null,
     });
+    void AsyncStorage.setItem(SCALE_KEY, String(1 / feetPerPixel));
     SuccessToast(`স্কেল সেট হয়েছে: ১ পিক্সেল = ${feetPerPixel.toFixed(6)} ফুট`);
     return true;
   },
@@ -394,6 +510,7 @@ export const useMapStore = create<MapStore>((set, get) => ({
       isPlotFinished: true,
       mode: 'none',
     });
+    void incrementMeasuredPlotCount();
     SuccessToast(`${nextPlot.name} পরিমাপ সম্পন্ন হয়েছে।`);
     return true;
   },
@@ -462,16 +579,73 @@ export const useMapStore = create<MapStore>((set, get) => ({
     manualCutLine: null,
   }),
 
-  setScale: (scale) => set({ scale }),
-
-  setPlots: (plots) => set({
-    plots,
-    results: plots.at(-1)?.results ?? null,
-  }),
-
   setIsShowDiagonals: (isShowDiagonals) => set({ isShowDiagonals }),
 
   setIsMagnifierEnabled: (isMagnifierEnabled) => set({ isMagnifierEnabled }),
+
+  setIsPinching: (isPinching) => set({ isPinching }),
+
+  setSnapHint: (snapHint) => set({ snapHint }),
+
+  setReportInfo: (reportInfo) => set((state) => ({
+    reportInfo: typeof reportInfo === 'function' ? reportInfo(state.reportInfo) : reportInfo,
+  })),
+
+  setReportImage: (reportImage) => set({ reportImage }),
+
+  setCurrentProjectId: (currentProjectId) => set({ currentProjectId }),
+
+  setPlotSaveName: (plotSaveName) => set({ plotSaveName }),
+
+  savePlotsToLibrary: () => {
+    const state = get();
+    if (!state.scale) {
+      ErrorToast('সেভ করার আগে দয়া করে স্কেল সেট করে নিন');
+      return false;
+    }
+    const targetPlots = state.plots.filter((plot) => !plot.isSaved);
+    if (!targetPlots.length) {
+      ErrorToast('সেভ করার আগে দয়া করে অন্তত একটি প্লট আঁকা শেষ করুন');
+      return false;
+    }
+    const cleanName = state.plotSaveName.trim();
+    if (!cleanName) {
+      ErrorToast('দয়া করে প্লটের নাম লিখুন');
+      return false;
+    }
+    const now = Date.now();
+    const namedPlots: SavedPlotRecord[] = targetPlots.map((plot, index) => ({
+      ...plot,
+      id: `${now}-${index}`,
+      name: targetPlots.length > 1 ? `${cleanName} - প্লট ${index + 1}` : cleanName,
+      color: plot.color || '#0d9488',
+      scale: state.scale!,
+      sourceName: state.mapImage?.name || 'আপলোড করা ম্যাপ',
+      createdAt: now,
+      expiresAt: now + SAVED_PLOT_TTL_MS,
+    }));
+    const savedPlots = [
+      ...state.savedPlots.filter((plot) => plot.expiresAt > now),
+      ...namedPlots,
+    ];
+    set({ savedPlots, plotSaveName: '' });
+    void AsyncStorage.setItem(SAVED_PLOTS_KEY, JSON.stringify(savedPlots));
+    SuccessToast('স্ক্র্যাচ লাইব্রেরিতে প্লটটি সফলভাবে সেভ করা হয়েছে');
+    return true;
+  },
+
+  deleteSavedPlot: (plotId) => {
+    const savedPlots = get().savedPlots.filter((plot) => plot.id !== plotId);
+    set({ savedPlots });
+    void AsyncStorage.setItem(SAVED_PLOTS_KEY, JSON.stringify(savedPlots));
+    SuccessToast('সেভ করা প্লটটি মুছে ফেলা হয়েছে');
+  },
+
+  updateSavedPlot: (plotId, updates) => {
+    const savedPlots = get().savedPlots.map((plot) => plot.id === plotId ? { ...plot, ...updates } : plot);
+    set({ savedPlots });
+    void AsyncStorage.setItem(SAVED_PLOTS_KEY, JSON.stringify(savedPlots));
+  },
 
   startManualDivide: () => {
     if (get().plots.length === 0) return;
@@ -496,6 +670,8 @@ export const useMapStore = create<MapStore>((set, get) => ({
       nudgeTarget: 'all',
     });
   },
+
+  setManualDividePlotId: (manualDividePlotId) => set({ manualDividePlotId }),
 
   setManualCutLine: (manualCutLine) => set({ manualCutLine }),
 
