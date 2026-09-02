@@ -16,6 +16,7 @@ import {
   NotoSansBengali_600SemiBold,
   NotoSansBengali_700Bold,
 } from '@expo-google-fonts/noto-sans-bengali';
+import { BroadcastAnnouncementModal } from '../components/broadcasts/broadcast-announcement-modal';
 import { useThemeStore } from '../stores/theme-store';
 import { useAuthStore } from '../stores/auth-store';
 import { QueryProvider } from '../providers/QueryProvider';
@@ -69,6 +70,7 @@ export default function RootLayout() {
             }}
           />
         </Stack>
+        <BroadcastAnnouncementModal />
       </SafeAreaProvider>
     </QueryProvider>
   );
