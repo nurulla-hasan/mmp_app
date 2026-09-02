@@ -1,5 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { LayoutChangeEvent, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   Canvas,
   Circle,
@@ -7,11 +7,11 @@ import {
   Fill,
   Group,
   Image as SkiaImage,
+  Paragraph,
   Path,
   RoundedRect,
   Skia,
-  Text as SkiaText,
-  matchFont,
+  TextAlign,
   useImage,
 } from '@shopify/react-native-skia';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -68,26 +68,20 @@ const rgba = (hex: string, alpha: number) => {
   return `rgba(${r},${g},${b},${alpha})`;
 };
 
-const fontCache = new Map<string, ReturnType<typeof matchFont>>();
-const systemFontFamily = Platform.select({
-  android: 'Noto Sans Bengali',
-  ios: 'Bangla Sangam MN',
-  default: 'sans-serif',
-})!;
-
-function getFont(size: number, weight: 'normal' | 'bold' = 'bold') {
-  const rounded = Math.max(6, Math.round(size * 10) / 10);
-  const key = `${rounded}:${weight}`;
-  const cached = fontCache.get(key);
-  if (cached) return cached;
-  let font: ReturnType<typeof matchFont>;
-  try {
-    font = matchFont({ fontFamily: systemFontFamily, fontSize: rounded, fontWeight: weight });
-  } catch {
-    font = matchFont({ fontFamily: 'sans-serif', fontSize: rounded, fontWeight: weight });
-  }
-  fontCache.set(key, font);
-  return font;
+function makeParagraph(text: string, color: string, fontSize: number, width: number, bold = true) {
+  const paragraph = Skia.ParagraphBuilder.Make({ textAlign: TextAlign.Center })
+    .pushStyle({
+      color: Skia.Color(color),
+      fontSize,
+      fontStyle: { weight: bold ? 700 : 500 },
+      locale: 'bn-BD',
+      heightMultiplier: 1.05,
+    })
+    .addText(text)
+    .pop()
+    .build();
+  paragraph.layout(width);
+  return paragraph;
 }
 
 type LabelProps = {
@@ -111,22 +105,24 @@ const SkiaOutlinedText = memo(function SkiaOutlinedText({
 }: LabelProps) {
   const safeScale = Math.max(stageScale, 0.01);
   const fontSize = fontPx / safeScale;
-  const font = getFont(fontSize);
-  const width = text.length * fontSize * 0.58;
-  const baseline = fontSize * 0.34;
+  const width = Math.max(34 / safeScale, text.length * fontSize * 0.72 + 8 / safeScale);
+  const height = Math.max(14 / safeScale, fontSize * 1.25);
+  const paragraph = useMemo(
+    () => makeParagraph(text, color, fontSize, width),
+    [color, fontSize, text, width],
+  );
+
   return (
     <Group transform={[{ translateX: x }, { translateY: y }, { rotate: getReadableRotation(rotation) * Math.PI / 180 }]}>
-      <SkiaText
+      <RoundedRect
         x={-width / 2}
-        y={baseline}
-        text={text}
-        font={font}
-        color='rgba(255,255,255,0.96)'
-        style='stroke'
-        strokeWidth={2.2 / safeScale}
-        strokeJoin='round'
+        y={-height / 2}
+        width={width}
+        height={height}
+        r={3 / safeScale}
+        color='rgba(255,255,255,0.80)'
       />
-      <SkiaText x={-width / 2} y={baseline} text={text} font={font} color={color} />
+      <Paragraph paragraph={paragraph} x={-width / 2} y={-height * 0.53} width={width} />
     </Group>
   );
 });
@@ -143,16 +139,19 @@ const SkiaBadge = memo(function SkiaBadge({
   const safeScale = Math.max(stageScale, 0.01);
   const fontSize = (compact ? 8.5 : 11.5) / safeScale;
   const height = (compact ? 15 : 23) / safeScale;
-  const screenWidth = Math.max(compact ? 34 : 58, text.length * (compact ? 4.9 : 6.6) + (compact ? 10 : 14));
+  const screenWidth = Math.max(compact ? 40 : 64, text.length * (compact ? 5.4 : 7.0) + (compact ? 12 : 16));
   const width = screenWidth / safeScale;
   const radius = (compact ? 3.5 : 5) / safeScale;
-  const font = getFont(fontSize);
-  const textWidth = text.length * fontSize * 0.58;
+  const paragraph = useMemo(
+    () => makeParagraph(text, '#ffffff', fontSize, width),
+    [fontSize, text, width],
+  );
+
   return (
     <Group transform={[{ translateX: x }, { translateY: y }, { rotate: getReadableRotation(rotation) * Math.PI / 180 }]}>
       <RoundedRect x={-width / 2} y={-height / 2} width={width} height={height} r={radius} color={color} opacity={0.94} />
       <RoundedRect x={-width / 2} y={-height / 2} width={width} height={height} r={radius} color='rgba(255,255,255,0.22)' style='stroke' strokeWidth={(compact ? 0.6 : 0.8) / safeScale} />
-      <SkiaText x={-textWidth / 2} y={fontSize * 0.34} text={text} font={font} color='#ffffff' />
+      <Paragraph paragraph={paragraph} x={-width / 2} y={-height * 0.51} width={width} />
     </Group>
   );
 });
@@ -161,15 +160,18 @@ const SkiaDiagonalBadge = memo(function SkiaDiagonalBadge({ x, y, text, stageSca
   const safeScale = Math.max(stageScale, 0.01);
   const fontSize = UI_CONFIG.fontSize.small / safeScale;
   const padding = UI_CONFIG.padding.small / safeScale;
-  const width = text.length * fontSize * 0.6 + padding * 2;
-  const height = fontSize + padding * 2;
-  const font = getFont(fontSize);
-  const textWidth = text.length * fontSize * 0.58;
+  const width = Math.max(34 / safeScale, text.length * fontSize * 0.72 + padding * 2);
+  const height = fontSize * 1.2 + padding * 2;
+  const paragraph = useMemo(
+    () => makeParagraph(text, color, fontSize, width),
+    [color, fontSize, text, width],
+  );
+
   return (
-    <Group transform={[{ translateX: x }, { translateY: y }]} opacity={0.82}>
-      <RoundedRect x={-width / 2} y={-height / 2} width={width} height={height} r={padding} color='#ffffff' />
+    <Group transform={[{ translateX: x }, { translateY: y }]} opacity={0.88}>
+      <RoundedRect x={-width / 2} y={-height / 2} width={width} height={height} r={padding} color='rgba(255,255,255,0.90)' />
       <RoundedRect x={-width / 2} y={-height / 2} width={width} height={height} r={padding} color={color} style='stroke' strokeWidth={1 / safeScale} />
-      <SkiaText x={-textWidth / 2} y={fontSize * 0.34} text={text} font={font} color={color} />
+      <Paragraph paragraph={paragraph} x={-width / 2} y={-height * 0.48} width={width} />
     </Group>
   );
 });
@@ -231,6 +233,7 @@ export function SkiaMapCanvas() {
   const pinchStartScale = useSharedValue(stageScale);
   const pinchCanvasX = useSharedValue(0);
   const pinchCanvasY = useSharedValue(0);
+  const pinchActive = useSharedValue(0);
   const draggingAnchor = useSharedValue(-1);
 
   const contentTransform = useDerivedValue(() => [
@@ -481,6 +484,7 @@ export function SkiaMapCanvas() {
       }
     })
     .onUpdate((event: any) => {
+      if (pinchActive.value > 0) return;
       if (draggingAnchor.value >= 0) {
         const safeScale = Math.max(zoom.value, 0.001);
         runOnJS(moveManualAnchor)(
@@ -497,18 +501,22 @@ export function SkiaMapCanvas() {
       runOnJS(updateRuntimeTransform)(zoom.value, x, y);
     })
     .onEnd(() => {
-      if (draggingAnchor.value < 0) runOnJS(commitGestureTransform)(zoom.value, translateX.value, translateY.value);
+      if (pinchActive.value === 0 && draggingAnchor.value < 0) {
+        runOnJS(commitGestureTransform)(zoom.value, translateX.value, translateY.value);
+      }
       draggingAnchor.value = -1;
     })
     .onFinalize(() => {
       draggingAnchor.value = -1;
-    }), [commitGestureTransform, draggingAnchor, manualCutLine, mode, moveManualAnchor, panStartX, panStartY, translateX, translateY, updateRuntimeTransform, zoom]);
+    }), [commitGestureTransform, draggingAnchor, manualCutLine, mode, moveManualAnchor, panStartX, panStartY, pinchActive, translateX, translateY, updateRuntimeTransform, zoom]);
 
   const pinchGesture = useMemo(() => Gesture.Pinch()
     .onStart((event: any) => {
+      pinchActive.value = 1;
       pinchStartScale.value = zoom.value;
-      pinchCanvasX.value = (event.focalX - translateX.value) / Math.max(zoom.value, 0.001);
-      pinchCanvasY.value = (event.focalY - translateY.value) / Math.max(zoom.value, 0.001);
+      const safeZoom = Math.max(zoom.value, 0.001);
+      pinchCanvasX.value = (event.focalX - translateX.value) / safeZoom;
+      pinchCanvasY.value = (event.focalY - translateY.value) / safeZoom;
       runOnJS(setPinching)(true);
     })
     .onUpdate((event: any) => {
@@ -522,11 +530,11 @@ export function SkiaMapCanvas() {
     })
     .onEnd(() => {
       runOnJS(commitGestureTransform)(zoom.value, translateX.value, translateY.value);
-      runOnJS(setPinching)(false);
     })
     .onFinalize(() => {
+      pinchActive.value = 0;
       runOnJS(setPinching)(false);
-    }), [commitGestureTransform, pinchCanvasX, pinchCanvasY, pinchStartScale, setPinching, translateX, translateY, updateRuntimeTransform, zoom]);
+    }), [commitGestureTransform, pinchActive, pinchCanvasX, pinchCanvasY, pinchStartScale, setPinching, translateX, translateY, updateRuntimeTransform, zoom]);
 
   const tapGesture = useMemo(() => Gesture.Tap()
     .maxDistance(8)
@@ -646,7 +654,7 @@ export function SkiaMapCanvas() {
                           key={`split-label-${index}`}
                           x={label.center.x}
                           y={label.center.y}
-                          text={`${part.value.toFixed(2)} শতক`}
+                          text={`${toBengaliDigits(part.value.toFixed(2))} শতক`}
                           stageScale={stageScale}
                           color={index === 0 ? selectedPlot.color ?? '#0F766E' : '#0284C7'}
                           rotation={label.rotation}
