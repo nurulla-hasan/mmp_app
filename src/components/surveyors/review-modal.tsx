@@ -10,8 +10,8 @@ import {
   View,
 } from 'react-native';
 import {
-  CheckCircle2,
-  Circle,
+  Check,
+  ChevronDown,
   LogIn,
   MessageCircle,
   ShieldAlert,
@@ -43,6 +43,7 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
   const [visible, setVisible] = useState(false);
   const [rating, setRating] = useState(0);
   const [serviceName, setServiceName] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [comment, setComment] = useState('');
   const mutation = useCreateSurveyorReview(surveyorSlug);
 
@@ -61,10 +62,14 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
       setRating(0);
       setServiceName('');
       setComment('');
+      setIsDropdownOpen(false);
     }
   }, [visible]);
 
-  const close = () => setVisible(false);
+  const close = () => {
+    setIsDropdownOpen(false);
+    setVisible(false);
+  };
 
   const goToLogin = () => {
     close();
@@ -190,36 +195,98 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
                   </View>
                 </View>
 
+                {/* Service Dropdown Selection */}
                 <View style={styles.fieldBlock}>
                   <Text style={[styles.label, { color: colors.text }]}>যে সার্ভিসের জন্য রিভিউ দিচ্ছেন</Text>
-                  <View style={styles.serviceList}>
-                    {serviceOptions.map((name) => {
-                      const active = serviceName === name;
-                      return (
-                        <TouchableOpacity
-                          key={name}
-                          activeOpacity={0.75}
-                          onPress={() => setServiceName(name)}
-                          style={[
-                            styles.serviceOption,
-                            {
-                              borderColor: active ? colors.primary : colors.border,
-                              backgroundColor: active ? `${colors.primary}12` : colors.background,
-                            },
-                          ]}
-                        >
-                          {active ? (
-                            <CheckCircle2 size={17} color={colors.primary} />
-                          ) : (
-                            <Circle size={17} color={colors.textMuted} />
-                          )}
-                          <Text style={[styles.serviceText, { color: active ? colors.primary : colors.text }]}>
-                            {name}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                  
+                  {/* Dropdown Trigger */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setIsDropdownOpen((prev) => !prev)}
+                    style={[
+                      styles.dropdownTrigger,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: isDropdownOpen ? colors.primary : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.dropdownTriggerText,
+                        { color: serviceName ? colors.text : colors.textMuted },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {serviceName || 'সার্ভিস নির্বাচন করুন'}
+                    </Text>
+                    <ChevronDown
+                      size={17}
+                      color={colors.textMuted}
+                      style={{ transform: [{ rotate: isDropdownOpen ? '180deg' : '0deg' }] }}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Dropdown Menu */}
+                  {isDropdownOpen && (
+                    <View
+                      style={[
+                        styles.dropdownMenu,
+                        {
+                          backgroundColor: colors.background,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <ScrollView
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={true}
+                        style={styles.dropdownScroll}
+                      >
+                        {serviceOptions.length > 0 ? (
+                          serviceOptions.map((name) => {
+                            const isSelected = serviceName === name;
+                            return (
+                              <TouchableOpacity
+                                key={name}
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                  setServiceName(name);
+                                  setIsDropdownOpen(false);
+                                }}
+                                style={[
+                                  styles.dropdownItem,
+                                  { borderBottomColor: colors.border },
+                                  isSelected && { backgroundColor: `${colors.primary}14` },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.dropdownItemText,
+                                    {
+                                      color: isSelected ? colors.primary : colors.text,
+                                      fontFamily: isSelected ? Fonts.sansSemiBold : Fonts.sansRegular,
+                                    },
+                                  ]}
+                                  numberOfLines={1}
+                                >
+                                  {name}
+                                </Text>
+                                {isSelected && <Check size={16} color={colors.primary} />}
+                              </TouchableOpacity>
+                            );
+                          })
+                        ) : (
+                          <View style={styles.emptyDropdownItem}>
+                            <Text style={[styles.emptyDropdownText, { color: colors.textMuted }]}>
+                              কোনো সার্ভিস পাওয়া যায়নি
+                            </Text>
+                          </View>
+                        )}
+                      </ScrollView>
+                    </View>
+                  )}
+
                   {!serviceName ? (
                     <Text style={styles.errorText}>সার্ভিস নির্বাচন করুন</Text>
                   ) : null}
@@ -347,18 +414,53 @@ const styles = StyleSheet.create({
   userHint: { marginTop: 1, fontSize: 9.5, fontFamily: Fonts.sansRegular },
   fieldBlock: { gap: 7 },
   label: { fontSize: 11.5, fontFamily: Fonts.sansMedium },
-  serviceList: { gap: 6 },
-  serviceOption: {
+  dropdownTrigger: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dropdownTriggerText: {
+    flex: 1,
+    fontSize: 11.5,
+    fontFamily: Fonts.sansMedium,
+    marginRight: 8,
+  },
+  dropdownMenu: {
+    borderWidth: 1,
+    borderRadius: 9,
+    overflow: 'hidden',
+    marginTop: -2,
+  },
+  dropdownScroll: {
+    maxHeight: 160,
+  },
+  dropdownItem: {
     minHeight: 40,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    borderWidth: 1,
-    borderRadius: 9,
-    paddingHorizontal: 11,
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  serviceText: { flex: 1, fontSize: 10.5, fontFamily: Fonts.sansMedium },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: 11,
+    marginRight: 8,
+  },
+  emptyDropdownItem: {
+    padding: 14,
+    alignItems: 'center',
+  },
+  emptyDropdownText: {
+    fontSize: 11,
+    fontFamily: Fonts.sansRegular,
+  },
   stars: { flexDirection: 'row', gap: 7 },
   starButton: { padding: 1 },
   commentInput: {
