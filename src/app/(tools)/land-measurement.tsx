@@ -55,26 +55,32 @@ export default function LandMeasurementScreen() {
   };
 
   /**
-   * Android keeps the original canvas gesture as the owner of a multi-touch
-   * stream. A second finger can therefore land on the visible Point button
-   * without TouchableOpacity receiving a normal press while the first finger
-   * is still panning. The common workspace sees the raw touch bubble and can
-   * commit the current Skia crosshair immediately.
+   * Android keeps the original canvas gesture as owner of the whole pointer
+   * stream. When finger #2 lands on the Point action while finger #1 is still
+   * panning, TouchableOpacity may never receive a normal press. Use the newly
+   * added touch (changedTouches), never the first/old drag pointer, as a native
+   * fallback. The canvas gesture layer has the same detection and the runtime
+   * commit has a short dedupe guard, so this is safe even if both paths fire.
    */
   const handleWorkspaceTouchStart = (event: GestureResponderEvent) => {
-    if (event.nativeEvent.touches.length < 2 || pointTouchLatchedRef.current) return;
+    const touches = Array.from(event.nativeEvent.touches ?? []);
+    if (touches.length < 2 || pointTouchLatchedRef.current) return;
 
     const current = useMapStore.getState();
     if (current.mode !== 'drawing_plot' && current.mode !== 'calibrating') return;
 
-    const { pageX, pageY } = event.nativeEvent;
-    const xRatio = pageX / Math.max(windowWidth, 1);
-    const isToolbarBand = pageY >= windowHeight - 125;
-    const isPointButton = current.mode === 'drawing_plot'
-      ? xRatio >= 0.54 && xRatio <= 0.84
-      : xRatio >= 0.78;
+    const changedTouches = Array.from(event.nativeEvent.changedTouches ?? []);
+    const candidates = changedTouches.length > 0 ? changedTouches : touches.slice(-1);
+    const pointTouch = candidates.find((touch) => {
+      const xRatio = touch.pageX / Math.max(windowWidth, 1);
+      const isToolbarBand = touch.pageY >= windowHeight - 125;
+      const isPointButton = current.mode === 'drawing_plot'
+        ? xRatio >= 0.54 && xRatio <= 0.84
+        : xRatio >= 0.78;
+      return isToolbarBand && isPointButton;
+    });
 
-    if (!isToolbarBand || !isPointButton) return;
+    if (!pointTouch) return;
 
     pointTouchLatchedRef.current = true;
     commitCenterPointFromRuntime();
