@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, GestureResponderEvent, View, StyleSheet, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Ruler } from 'lucide-react-native';
 import { SkiaMapCanvas } from '../../features/land-measurement/components/canvas/SkiaMapCanvas';
+import { commitCenterPointFromRuntime } from '../../features/land-measurement/components/canvas/canvas-runtime';
 import { MobileCanvasToolbar } from '../../features/land-measurement/components/toolbar/MobileCanvasToolbar';
 import { MobileResultsBar } from '../../features/land-measurement/components/results/MobileResultsBar';
 import { ScaleCalibrationModal } from '../../features/land-measurement/components/modals/ScaleCalibrationModal';
@@ -16,6 +17,8 @@ import { toBengaliDigits } from '../../lib/utils';
 
 export default function LandMeasurementScreen() {
   const router = useRouter();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const pointTouchLatchedRef = useRef(false);
   const scale = useMapStore((state) => state.scale);
   const mapImage = useMapStore((state) => state.mapImage);
   const plots = useMapStore((state) => state.plots);
@@ -51,6 +54,36 @@ export default function LandMeasurementScreen() {
     ]);
   };
 
+  /**
+   * Android keeps the original canvas gesture as the owner of a multi-touch
+   * stream. A second finger can therefore land on the visible Point button
+   * without TouchableOpacity receiving a normal press while the first finger
+   * is still panning. The common workspace sees the raw touch bubble and can
+   * commit the current Skia crosshair immediately.
+   */
+  const handleWorkspaceTouchStart = (event: GestureResponderEvent) => {
+    if (event.nativeEvent.touches.length < 2 || pointTouchLatchedRef.current) return;
+
+    const current = useMapStore.getState();
+    if (current.mode !== 'drawing_plot' && current.mode !== 'calibrating') return;
+
+    const { pageX, pageY } = event.nativeEvent;
+    const xRatio = pageX / Math.max(windowWidth, 1);
+    const isToolbarBand = pageY >= windowHeight - 125;
+    const isPointButton = current.mode === 'drawing_plot'
+      ? xRatio >= 0.54 && xRatio <= 0.84
+      : xRatio >= 0.78;
+
+    if (!isToolbarBand || !isPointButton) return;
+
+    pointTouchLatchedRef.current = true;
+    commitCenterPointFromRuntime();
+  };
+
+  const handleWorkspaceTouchEnd = (event: GestureResponderEvent) => {
+    if (event.nativeEvent.touches.length <= 1) pointTouchLatchedRef.current = false;
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
@@ -83,7 +116,12 @@ export default function LandMeasurementScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.canvasContainer}>
+      <View
+        style={styles.canvasContainer}
+        onTouchStart={handleWorkspaceTouchStart}
+        onTouchEnd={handleWorkspaceTouchEnd}
+        onTouchCancel={handleWorkspaceTouchEnd}
+      >
         <SkiaMapCanvas />
 
         <MobileResultsBar />
