@@ -234,6 +234,7 @@ export function MobileMapCanvas() {
   const transformRef = useRef({ scale: stageScale, pos: stagePos });
   const panStartRef = useRef<Point>({ x: 0, y: 0 });
   const didPinchRef = useRef(false);
+  const pointGestureLatchRef = useRef(false);
   const draggingAnchorRef = useRef<number | null>(null);
   const manualDragRafRef = useRef<number | null>(null);
   const pendingManualDragRef = useRef<{ index: number; point: Point } | null>(null);
@@ -320,10 +321,24 @@ export function MobileMapCanvas() {
     };
   }, [viewport.height, viewport.width]);
 
+  const clearLiveOverlay = useCallback(() => {
+    pendingLiveTransformRef.current = null;
+    liveOverlayRef.current?.update({
+      start: null,
+      end: { x: 0, y: 0 },
+      label: null,
+      color: UI_CONFIG.colors.drawPrimary,
+      snapped: false,
+    });
+  }, []);
+
   const scheduleLiveOverlay = useCallback((transform: Transform) => {
     const snapshot = useMapStore.getState();
     const measurementActive = snapshot.mode === 'drawing_plot' || snapshot.mode === 'calibrating';
-    if (!measurementActive) return;
+    if (!measurementActive) {
+      clearLiveOverlay();
+      return;
+    }
 
     pendingLiveTransformRef.current = transform;
     if (liveRafRef.current !== null) return;
@@ -334,11 +349,14 @@ export function MobileMapCanvas() {
 
       const current = useMapStore.getState();
       const active = current.mode === 'drawing_plot' || current.mode === 'calibrating';
-      if (!active) return;
+      if (!active) {
+        clearLiveOverlay();
+        return;
+      }
       liveOverlayRef.current?.update(getLiveOverlay(pending));
       if (current.isMagnifierEnabled) magnifierRef.current?.update(pending);
     });
-  }, [getLiveOverlay]);
+  }, [clearLiveOverlay, getLiveOverlay]);
 
   useEffect(() => () => {
     if (liveRafRef.current !== null) cancelAnimationFrame(liveRafRef.current);
@@ -417,6 +435,32 @@ export function MobileMapCanvas() {
     return found;
   }, [screenToCanvas]);
 
+  const tryAddPointFromToolbarTouch = useCallback((touches: readonly { locationX: number; locationY: number }[]) => {
+    if (touches.length < 2 || viewport.width <= 0 || viewport.height <= 0) {
+      pointGestureLatchRef.current = false;
+      return false;
+    }
+
+    const current = useMapStore.getState();
+    if (current.mode !== 'drawing_plot' && current.mode !== 'calibrating') return false;
+
+    const toolbarTouch = touches.find((touch) => {
+      if (touch.locationY < viewport.height - 96) return false;
+      const xRatio = touch.locationX / viewport.width;
+      return current.mode === 'drawing_plot'
+        ? xRatio >= 0.55 && xRatio <= 0.84
+        : xRatio >= 0.74;
+    });
+    if (!toolbarTouch) return false;
+
+    if (!pointGestureLatchRef.current) {
+      pointGestureLatchRef.current = true;
+      current.addPointAt(screenToCanvas({ x: viewport.width / 2, y: viewport.height / 2 }));
+      scheduleLiveOverlay(transformRef.current);
+    }
+    return true;
+  }, [scheduleLiveOverlay, screenToCanvas, viewport.height, viewport.width]);
+
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
@@ -426,10 +470,14 @@ export function MobileMapCanvas() {
       panStartRef.current = { ...transformRef.current.pos };
       draggingAnchorRef.current = findAnchor(point);
       didPinchRef.current = false;
+      pointGestureLatchRef.current = false;
       pinchRef.current = null;
     },
     onPanResponderMove: (event, gesture) => {
       const touches = event.nativeEvent.touches;
+      if (touches.length < 2) pointGestureLatchRef.current = false;
+      if (tryAddPointFromToolbarTouch(touches)) return;
+
       if (touches.length >= 2) {
         draggingAnchorRef.current = null;
         const first = touches[0];
@@ -455,6 +503,7 @@ export function MobileMapCanvas() {
       applyNativeTransform({ scale: transformRef.current.scale, pos: { x: panStartRef.current.x + gesture.dx, y: panStartRef.current.y + gesture.dy } });
     },
     onPanResponderRelease: (event, gesture) => {
+      pointGestureLatchRef.current = false;
       const wasDragging = draggingAnchorRef.current !== null;
       if (draggingAnchorRef.current !== null) {
         if (manualDragRafRef.current !== null) cancelAnimationFrame(manualDragRafRef.current);
@@ -478,12 +527,13 @@ export function MobileMapCanvas() {
       }
     },
     onPanResponderTerminate: () => {
+      pointGestureLatchRef.current = false;
       draggingAnchorRef.current = null;
       pinchRef.current = null;
       commitTransform(transformRef.current);
     },
     onShouldBlockNativeResponder: () => false,
-  }), [applyNativeTransform, commitTransform, findAnchor, scheduleManualAnchorMove, screenToCanvas]);
+  }), [applyNativeTransform, commitTransform, findAnchor, scheduleManualAnchorMove, screenToCanvas, tryAddPointFromToolbarTouch]);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -562,7 +612,7 @@ export function MobileMapCanvas() {
                 <Polygon points={pointString(splitPreview.poly2)} fill='#0284C7' fillOpacity={0.3} stroke='#0284C7' strokeWidth={2 / stageScale} />
                 {[{ points: splitPreview.poly1, value: splitPreview.resultA?.shotok }, { points: splitPreview.poly2, value: splitPreview.resultB?.shotok }].map((part, index) => {
                   const label = getPolygonAreaLabelLayout(part.points);
-                  return part.value ? <SvgBadge key={`split-label-${index}`} x={label.center.x} y={label.center.y} text={`${part.value.toFixed(2)} শতক`} stageScale={stageScale} color={index === 0 ? selectedPlot.color ?? '#0F766E' : '#0284C7'} rotation={label.rotation} /> : null;
+                  return part.value ? <SvgBadge key={`split-label-${index}`} x={label.center.x} y={label.center.y} text={`${part.value.toFixed(2)} শতক`} stageScale={stageScale} color={index === 0 ? selectedPlot.color ?? '#0F766E' : '#0284C7'} rotation={label.rotation} compact /> : null;
                 })}
               </G>
             )}
