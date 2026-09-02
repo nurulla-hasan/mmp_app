@@ -8,6 +8,7 @@ import { Colors } from '../../constants/colors';
 import { useThemeStore } from '../../stores/theme-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { Button } from '../ui/button';
+import { ProAvatarRing } from '../ui/pro-avatar-ring';
 
 interface AppHeaderProps {
   title?: string;
@@ -70,22 +71,27 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           {isAuthenticated && user ? (
             <TouchableOpacity
               activeOpacity={0.8}
-              style={[
-                styles.headerAvatarBtn,
-                user.isSubscribed && { borderColor: '#f59e0b', borderWidth: 1.5 },
-              ]}
               onPress={() => router.push('/(tabs)/profile')}
             >
-              {user.imageUrl ? (
-                <Image
-                  source={{ uri: user.imageUrl }}
-                  style={styles.headerAvatarImg}
-                />
-              ) : (
-                <Text style={styles.headerAvatarText}>
-                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                </Text>
-              )}
+              <ProAvatarRing size={32} strokeWidth={1.75} isPro={user.isSubscribed}>
+                <View
+                  style={[
+                    styles.headerAvatarBtn,
+                    user.isSubscribed && { borderWidth: 0, width: 28, height: 28 },
+                  ]}
+                >
+                  {user.imageUrl ? (
+                    <Image
+                      source={{ uri: user.imageUrl }}
+                      style={styles.headerAvatarImg}
+                    />
+                  ) : (
+                    <Text style={styles.headerAvatarText}>
+                      {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                    </Text>
+                  )}
+                </View>
+              </ProAvatarRing>
             </TouchableOpacity>
           ) : (
             <Button

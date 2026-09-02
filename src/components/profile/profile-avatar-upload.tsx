@@ -6,15 +6,12 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { Camera } from 'lucide-react-native';
-import { AuthService } from '../../services/auth-service';
-import { useAuthStore } from '../../stores/auth-store';
+import { ProAvatarRing } from '../ui/pro-avatar-ring';
+import { useUploadAvatar } from '../../hooks/mutations/use-profile-mutations';
 import { useThemeStore } from '../../stores/theme-store';
 import { Fonts } from '../../constants/typography';
-import { SuccessToast, ErrorToast } from '../../lib/utils';
 
 interface ProfileAvatarUploadProps {
   src?: string | null;
@@ -33,63 +30,23 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
 }) => {
   const { theme } = useThemeStore();
   const isDark = theme === 'dark';
-  const { refreshUser } = useAuthStore();
-  const [uploading, setUploading] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
 
-  const handlePickAndCropImage = async () => {
+  const { mutate: uploadAvatar, isPending: uploading } = useUploadAvatar();
+
+  const handlePickAndCropImage = () => {
     if (!editable || uploading) return;
 
-    try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permissionResult.granted) {
-        Alert.alert(
-          'অনুমতি প্রয়োজন',
-          'গ্যালারি থেকে ছবি আপলোড করতে ফটো লাইব্রেরির অনুমতি দিন।'
-        );
-        return;
-      }
-
-      const pickerResult = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true, // Native square cropper!
-        aspect: [1, 1],      // 1:1 Aspect ratio
-        quality: 0.8,
-      });
-
-      if (pickerResult.canceled || !pickerResult.assets || pickerResult.assets.length === 0) {
-        return;
-      }
-
-      const asset = pickerResult.assets[0];
-      setPreviewUri(asset.uri);
-      setUploading(true);
-
-      const filename = asset.fileName || `avatar_${Date.now()}.jpg`;
-      const mimeType = asset.mimeType || 'image/jpeg';
-
-      const formData = new FormData();
-      formData.append('image', {
-        uri: asset.uri,
-        name: filename,
-        type: mimeType,
-      } as any);
-
-      const res = await AuthService.uploadProfileImage(formData);
-
-      if (res.success) {
-        await refreshUser();
-        SuccessToast('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
-      } else {
+    uploadAvatar(undefined, {
+      onSuccess: (res: any) => {
+        if (res?.success && res?.data?.imageUrl) {
+          setPreviewUri(res.data.imageUrl);
+        }
+      },
+      onError: () => {
         setPreviewUri(null);
-        ErrorToast(res.message || 'ছবি আপলোড করা যায়নি। আবার চেষ্টা করুন।');
-      }
-    } catch (err: any) {
-      setPreviewUri(null);
-      ErrorToast(err?.message || 'সমস্যা হয়েছে। আবার চেষ্টা করুন।');
-    } finally {
-      setUploading(false);
-    }
+      },
+    });
   };
 
   const getDimensions = () => {
@@ -109,41 +66,44 @@ export const ProfileAvatarUpload: React.FC<ProfileAvatarUploadProps> = ({
 
   return (
     <View style={[styles.container, { width: dim.boxSize, height: dim.boxSize }]}>
-      <View
-        style={[
-          styles.avatarBorder,
-          {
-            width: dim.boxSize,
-            height: dim.boxSize,
-            borderRadius: dim.radius,
-            borderColor: isPro ? '#f59e0b' : isDark ? '#334155' : '#cbd5e1',
-          },
-        ]}
-      >
-        {currentImage ? (
-          <Image
-            source={{ uri: currentImage }}
-            style={[styles.avatarImg, { borderRadius: dim.radius - 2 }]}
-          />
-        ) : (
-          <View
-            style={[
-              styles.avatarFallback,
-              { borderRadius: dim.radius - 2, backgroundColor: '#16a34a' },
-            ]}
-          >
-            <Text style={[styles.avatarInitial, { fontSize: dim.initialSize }]}>
-              {name ? name.charAt(0).toUpperCase() : 'U'}
-            </Text>
-          </View>
-        )}
+      <ProAvatarRing size={dim.boxSize} isPro={isPro}>
+        <View
+          style={[
+            styles.avatarBorder,
+            {
+              width: isPro ? dim.boxSize - 8 : dim.boxSize,
+              height: isPro ? dim.boxSize - 8 : dim.boxSize,
+              borderRadius: dim.radius,
+              borderColor: isDark ? '#334155' : '#cbd5e1',
+              borderWidth: isPro ? 0 : 1.5,
+            },
+          ]}
+        >
+          {currentImage ? (
+            <Image
+              source={{ uri: currentImage }}
+              style={[styles.avatarImg, { borderRadius: dim.radius }]}
+            />
+          ) : (
+            <View
+              style={[
+                styles.avatarFallback,
+                { borderRadius: dim.radius, backgroundColor: '#16a34a' },
+              ]}
+            >
+              <Text style={[styles.avatarInitial, { fontSize: dim.initialSize }]}>
+                {name ? name.charAt(0).toUpperCase() : 'U'}
+              </Text>
+            </View>
+          )}
 
-        {uploading && (
-          <View style={[styles.uploadingOverlay, { borderRadius: dim.radius - 2 }]}>
-            <ActivityIndicator size='small' color='#ffffff' />
-          </View>
-        )}
-      </View>
+          {uploading && (
+            <View style={[styles.uploadingOverlay, { borderRadius: dim.radius }]}>
+              <ActivityIndicator size='small' color='#ffffff' />
+            </View>
+          )}
+        </View>
+      </ProAvatarRing>
 
       {editable && (
         <TouchableOpacity
@@ -174,15 +134,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarBorder: {
-    borderWidth: 2,
-    padding: 2,
+    borderWidth: 1.5,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    position: 'relative',
   },
   avatarImg: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   avatarFallback: {
     width: '100%',
@@ -196,18 +157,24 @@ const styles = StyleSheet.create({
   },
   uploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   cameraBtn: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
+    bottom: -1,
+    right: -1,
     backgroundColor: '#16a34a',
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    zIndex: 20,
   },
 });
-

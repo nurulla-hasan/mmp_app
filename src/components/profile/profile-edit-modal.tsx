@@ -21,6 +21,7 @@ import {
   Check,
 } from 'lucide-react-native';
 import { Input } from '../ui/input';
+import { ProAvatarRing } from '../ui/pro-avatar-ring';
 import { useThemeStore } from '../../stores/theme-store';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
@@ -167,17 +168,24 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                 onPress={handlePickAndCropImage}
                 disabled={loading}
               >
-                <View style={[styles.avatarPreviewImgBorder, user.isSubscribed && { borderColor: '#f59e0b' }]}>
-                  {imageUrl ? (
-                    <Image source={{ uri: imageUrl }} style={styles.avatarImg} />
-                  ) : (
-                    <View style={[styles.avatarFallback, { backgroundColor: '#16a34a' }]}>
-                      <Text style={styles.avatarFallbackText}>
-                        {name ? name.charAt(0).toUpperCase() : 'U'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
+                <ProAvatarRing size={52} isPro={user.isSubscribed}>
+                  <View
+                    style={[
+                      styles.avatarPreviewImgBorder,
+                      user.isSubscribed && { borderWidth: 0, width: 44, height: 44, borderRadius: 22 },
+                    ]}
+                  >
+                    {imageUrl ? (
+                      <Image source={{ uri: imageUrl }} style={styles.avatarImg} />
+                    ) : (
+                      <View style={[styles.avatarFallback, { backgroundColor: '#16a34a' }]}>
+                        <Text style={styles.avatarFallbackText}>
+                          {name ? name.charAt(0).toUpperCase() : 'U'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </ProAvatarRing>
                 <View style={styles.avatarCameraBadge}>
                   <Camera size={10} color='#ffffff' strokeWidth={2.5} />
                 </View>
