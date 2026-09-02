@@ -103,6 +103,13 @@ export default function LandMeasurementScreen() {
       <View style={[styles.canvasContainer, { backgroundColor: colors.workspace }]}>
         <SkiaMapCanvas />
 
+        {theme === 'light' && !mapImage && (
+          <View pointerEvents='none' style={[styles.lightEmptyCanvas, { backgroundColor: colors.workspace }]}>
+            <Text style={[styles.lightEmptyTitle, { color: colors.text }]}>Add Mouza Map</Text>
+            <Text style={[styles.lightEmptyText, { color: colors.textMuted }]}>Use Map below to add an image or PDF and start measuring.</Text>
+          </View>
+        )}
+
         <MobileResultsBar />
 
         <MobileCanvasToolbar
@@ -202,5 +209,22 @@ const styles = StyleSheet.create({
   canvasContainer: {
     flex: 1,
     position: 'relative',
+  },
+  lightEmptyCanvas: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  lightEmptyTitle: {
+    fontFamily: Fonts.headingBold,
+    fontSize: 16,
+  },
+  lightEmptyText: {
+    marginTop: 4,
+    fontFamily: Fonts.sansRegular,
+    fontSize: 11,
+    textAlign: 'center',
   },
 });
