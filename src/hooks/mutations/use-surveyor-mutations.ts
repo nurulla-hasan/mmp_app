@@ -14,18 +14,24 @@ export function useApplyAsSurveyor() {
   const queryClient = useQueryClient();
   const { refreshUser } = useAuthStore();
   return useMutation({
-    mutationFn: (payload: SurveyorApplicationPayload) => SurveyorService.applyAsSurveyor(payload),
-    onSuccess: async (result) => {
+    mutationFn: async (payload: SurveyorApplicationPayload) => {
+      const result = await SurveyorService.applyAsSurveyor(payload);
       if (!result.success) {
-        ErrorToast(result.message || 'আবেদন জমা দিতে সমস্যা হয়েছে।');
-        return;
+        // Rollback: delete uploaded certificate from Cloudinary so no orphaned files exist
+        if (payload.certificatePublicId) {
+          await SurveyorService.deleteCertificate(payload.certificatePublicId).catch(() => {});
+        }
+        throw new Error(result.message || 'আবেদন জমা দিতে সমস্যা হয়েছে।');
       }
+      return result;
+    },
+    onSuccess: async () => {
       await refreshUser();
       void queryClient.invalidateQueries({ queryKey: queryKeys.profile.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.surveyors.all });
       SuccessToast('আপনার আবেদন সফলভাবে জমা হয়েছে! অ্যাডমিন যাচাইয়ের পর প্রোফাইল সচল হবে।');
     },
-    onError: () => ErrorToast('আবেদন জমা দিতে সমস্যা হয়েছে।'),
+    onError: (err: any) => ErrorToast(err?.message || 'আবেদন জমা দিতে সমস্যা হয়েছে।'),
   });
 }
 

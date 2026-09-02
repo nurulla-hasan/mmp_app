@@ -1,12 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Check, CheckCircle2, MapPin, Square, Wrench } from 'lucide-react-native';
+import {
+  Check,
+  CheckCircle2,
+  FileText,
+  Image as ImageIcon,
+  MapPin,
+  Square,
+  Trash2,
+  UploadCloud,
+  Wrench,
+} from 'lucide-react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
 import { ErrorToast } from '../../lib/utils';
+import { SurveyorService } from '../../services/surveyor-service';
 import type {
   DistrictOption,
   SurveyorApplicationPayload,
@@ -80,9 +92,50 @@ export function SurveyorProfileForm({
   const [experienceYears, setExperienceYears] = useState(mode === 'apply' ? '1' : '0');
   const [bio, setBio] = useState('');
   const [certificateUrl, setCertificateUrl] = useState('');
+  const [certificateFile, setCertificateFile] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+    size?: number;
+  } | null>(null);
+  const [isUploadingCertificate, setIsUploadingCertificate] = useState(false);
   const [selectedServices, setSelectedServices] = useState<DraftService[]>([]);
   const [serviceAreas, setServiceAreas] = useState<DraftArea[]>([]);
   const [terms, setTerms] = useState(mode === 'edit');
+
+  const pickCertificate = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      if (asset.size && asset.size > 10 * 1024 * 1024) {
+        ErrorToast('ফাইলের আকার সর্বোচ্চ ১০MB হতে পারবে।');
+        return;
+      }
+
+      setCertificateFile({
+        uri: asset.uri,
+        name: asset.name,
+        type:
+          asset.mimeType ||
+          (asset.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+        size: asset.size,
+      });
+    } catch {
+      ErrorToast('ফাইল নির্বাচন করতে সমস্যা হয়েছে।');
+    }
+  };
+
+  const removeCertificate = () => {
+    setCertificateFile(null);
+    setCertificateUrl('');
+  };
 
   useEffect(() => {
     if (!initialProfile) return;
@@ -182,7 +235,7 @@ export function SurveyorProfileForm({
     );
   };
 
-  const submit = () => {
+  const submit = async () => {
     const cleanHeadline = headline.trim();
     const years = Number(experienceYears);
 
@@ -225,11 +278,43 @@ export function SurveyorProfileForm({
       return;
     }
 
+    let finalCertificateUrl = certificateUrl.trim() || undefined;
+    let uploadedPublicId: string | undefined = undefined;
+
+    if (certificateFile) {
+      setIsUploadingCertificate(true);
+      try {
+        const formData = new FormData();
+        formData.append('certificate', {
+          uri: certificateFile.uri,
+          name: certificateFile.name || 'certificate.pdf',
+          type: certificateFile.type || 'application/pdf',
+        } as any);
+
+        const uploadRes = await SurveyorService.uploadCertificate(formData);
+        if (!uploadRes.success || !uploadRes.data) {
+          setIsUploadingCertificate(false);
+          ErrorToast(uploadRes.message || 'সার্টিফিকেট আপলোড করতে ব্যর্থ হয়েছে।');
+          return;
+        }
+
+        finalCertificateUrl = uploadRes.data.url;
+        uploadedPublicId = uploadRes.data.publicId;
+      } catch {
+        setIsUploadingCertificate(false);
+        ErrorToast('সার্টিফিকেট আপলোড করতে সমস্যা হয়েছে।');
+        return;
+      } finally {
+        setIsUploadingCertificate(false);
+      }
+    }
+
     onSubmit({
       headline: cleanHeadline,
       bio: bio.trim() || undefined,
       experienceYears: years,
-      certificateUrl: certificateUrl.trim() || undefined,
+      certificateUrl: finalCertificateUrl,
+      certificatePublicId: uploadedPublicId,
       serviceAreas,
       services: normalizedServices,
     });
@@ -271,13 +356,111 @@ export function SurveyorProfileForm({
             },
           ]}
         />
-        <Input
-          label='সার্টিফিকেট URL (ঐচ্ছিক)'
-          value={certificateUrl}
-          onChangeText={setCertificateUrl}
-          autoCapitalize='none'
-          placeholder='https://...'
-        />
+        {/* Certificate Upload */}
+        <View style={styles.certificateBlock}>
+          <Text style={[styles.label, { color: colors.text }]}>
+            সার্টিফিকেট বা সনদপত্র (ঐচ্ছিক)
+          </Text>
+
+          {certificateFile ? (
+            <View
+              style={[
+                styles.certificateCard,
+                { backgroundColor: colors.background, borderColor: colors.primary },
+              ]}
+            >
+              <View style={styles.certificateCardLeft}>
+                <View
+                  style={[
+                    styles.certificateIconBox,
+                    {
+                      backgroundColor:
+                        certificateFile.type === 'application/pdf'
+                          ? 'rgba(239, 68, 68, 0.12)'
+                          : `${colors.primary}15`,
+                    },
+                  ]}
+                >
+                  {certificateFile.type === 'application/pdf' ? (
+                    <FileText size={18} color='#ef4444' />
+                  ) : (
+                    <ImageIcon size={18} color={colors.primary} />
+                  )}
+                </View>
+                <View style={styles.certificateInfo}>
+                  <Text
+                    style={[styles.certificateFileName, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {certificateFile.name}
+                  </Text>
+                  <Text style={[styles.certificateFileSize, { color: colors.textMuted }]}>
+                    {certificateFile.type === 'application/pdf' ? 'PDF Document' : 'Image File'}
+                    {certificateFile.size
+                      ? ` • ${(certificateFile.size / (1024 * 1024)).toFixed(2)} MB`
+                      : ''}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={removeCertificate}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.certificateRemoveBtn}
+              >
+                <Trash2 size={16} color='#ef4444' />
+              </TouchableOpacity>
+            </View>
+          ) : certificateUrl ? (
+            <View
+              style={[
+                styles.certificateCard,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.certificateCardLeft}>
+                <View style={[styles.certificateIconBox, { backgroundColor: `${colors.primary}15` }]}>
+                  <FileText size={18} color={colors.primary} />
+                </View>
+                <View style={styles.certificateInfo}>
+                  <Text style={[styles.certificateFileName, { color: colors.text }]}>
+                    সংযুক্ত সনদপত্র বিদ্যমান
+                  </Text>
+                  <Text style={[styles.certificateFileSize, { color: colors.textMuted }]}>
+                    নতুন ফাইল বাছতে চাপ দিন
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={pickCertificate}
+                style={[styles.changeBtn, { borderColor: colors.border }]}
+              >
+                <Text style={[styles.changeBtnText, { color: colors.primary }]}>পরিবর্তন</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={pickCertificate}
+              style={[
+                styles.uploadButton,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <UploadCloud size={20} color={colors.primary} />
+              <View style={styles.uploadButtonTextWrap}>
+                <Text style={[styles.uploadButtonTitle, { color: colors.text }]}>
+                  সনদপত্র আপলোড করুন (PDF বা ছবি)
+                </Text>
+                <Text style={[styles.uploadButtonSub, { color: colors.textMuted }]}>
+                  PDF, JPG, PNG ফাইল • সর্বোচ্চ ১০MB
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -400,9 +583,15 @@ export function SurveyorProfileForm({
       ) : null}
 
       <Button
-        title={mode === 'apply' ? 'আবেদন জমা দিন' : 'পরিবর্তন সংরক্ষণ করুন'}
+        title={
+          isUploadingCertificate
+            ? 'সার্টিফিকেট আপলোড হচ্ছে...'
+            : mode === 'apply'
+              ? 'আবেদন জমা দিন'
+              : 'পরিবর্তন সংরক্ষণ করুন'
+        }
         size='lg'
-        loading={pending}
+        loading={pending || isUploadingCertificate}
         onPress={submit}
       />
     </View>
@@ -424,6 +613,42 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: Fonts.sansRegular,
   },
+  certificateBlock: { gap: 6, marginTop: 4 },
+  uploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 14,
+  },
+  uploadButtonTextWrap: { flex: 1 },
+  uploadButtonTitle: { fontSize: 12, fontFamily: Fonts.sansMedium },
+  uploadButtonSub: { fontSize: 10, fontFamily: Fonts.sansRegular, marginTop: 2 },
+  certificateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+  },
+  certificateCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  certificateIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  certificateInfo: { flex: 1 },
+  certificateFileName: { fontSize: 12, fontFamily: Fonts.sansMedium },
+  certificateFileSize: { fontSize: 10, fontFamily: Fonts.sansRegular, marginTop: 2 },
+  certificateRemoveBtn: { padding: 6 },
+  changeBtn: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 },
+  changeBtnText: { fontSize: 11, fontFamily: Fonts.sansMedium },
   help: { fontSize: 9.5, lineHeight: 14, fontFamily: Fonts.sansRegular },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: {

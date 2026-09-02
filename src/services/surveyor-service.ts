@@ -41,4 +41,23 @@ export const SurveyorService = {
       body: payload,
       auth: true,
     }),
+
+  uploadCertificate: (
+    formData: FormData
+  ): Promise<ApiResult<{ url: string; publicId: string; format: string }>> =>
+    apiFetch<{ url: string; publicId: string; format: string }>(
+      API_ENDPOINTS.surveyors.uploadCertificate,
+      {
+        method: 'POST',
+        body: formData,
+        auth: true,
+      }
+    ),
+
+  deleteCertificate: (publicId: string): Promise<ApiResult<null>> =>
+    apiFetch<null>(API_ENDPOINTS.surveyors.deleteCertificate, {
+      method: 'DELETE',
+      body: { publicId },
+      auth: true,
+    }),
 };

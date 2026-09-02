@@ -107,6 +107,7 @@ export type SurveyorApplicationPayload = {
   bio?: string;
   experienceYears: number;
   certificateUrl?: string;
+  certificatePublicId?: string;
   serviceAreas: Array<{ district: string; upazilas: string[] }>;
   services: SurveyorServiceInput[];
 };

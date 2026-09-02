@@ -17,6 +17,8 @@ export const API_ENDPOINTS = {
     root: '/surveyor',
     bySlug: (slug: string) => `/surveyor/${encodeURIComponent(slug)}`,
     profile: '/surveyor/profile',
+    uploadCertificate: '/surveyor/certificate/upload',
+    deleteCertificate: '/surveyor/certificate/delete',
   },
   reviews: { root: '/reviews', testimonials: '/reviews/testimonials' },
   plans: {
