@@ -54,6 +54,7 @@ import { Fonts } from '../../../../constants/typography';
 import { getActivePlotDots, getActiveSegmentLabels, getPlotEdgeLabels } from './nativeStageGeometry';
 import { SkiaTiledMap } from './SkiaTiledMap';
 import {
+  canvasPointActionGesture,
   canvasRuntimeScale,
   canvasRuntimeX,
   canvasRuntimeY,
@@ -926,6 +927,7 @@ export function SkiaMapCanvas() {
    * the pinch starts so pan and zoom never write competing transforms.
    */
   const panGesture = useMemo(() => Gesture.Pan()
+    .simultaneousWithExternalGesture(canvasPointActionGesture)
     .maxPointers(2)
     .minDistance(0)
     .onTouchesDown((event: any) => {
