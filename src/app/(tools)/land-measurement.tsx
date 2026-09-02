@@ -1,11 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, View, StyleSheet, TouchableOpacity, Text, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import React, { useEffect, useState } from 'react';
+import { Alert, View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Ruler } from 'lucide-react-native';
 import { SkiaMapCanvas } from '../../features/land-measurement/components/canvas/SkiaMapCanvas';
-import { commitCenterPointFromRuntime } from '../../features/land-measurement/components/canvas/canvas-runtime';
 import { MobileCanvasToolbar } from '../../features/land-measurement/components/toolbar/MobileCanvasToolbar';
 import { MobileResultsBar } from '../../features/land-measurement/components/results/MobileResultsBar';
 import { ScaleCalibrationModal } from '../../features/land-measurement/components/modals/ScaleCalibrationModal';
@@ -18,8 +16,6 @@ import { toBengaliDigits } from '../../lib/utils';
 
 export default function LandMeasurementScreen() {
   const router = useRouter();
-  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const pointTouchLatchedRef = useRef(false);
   const scale = useMapStore((state) => state.scale);
   const mapImage = useMapStore((state) => state.mapImage);
   const plots = useMapStore((state) => state.plots);
@@ -55,50 +51,6 @@ export default function LandMeasurementScreen() {
     ]);
   };
 
-  /**
-   * Android gives an already-active canvas gesture ownership of finger #1.
-   * A second finger landing on an overlapping toolbar can therefore bypass the
-   * normal React responder chain completely. Observe touches from one native
-   * RNGH Manual gesture attached to the whole workspace. We never activate the
-   * observer, so child pan/pinch/tap gestures remain free to run; it only sees
-   * finger #2 and commits Point immediately when that touch lands in the Point
-   * action zone. The Point button itself has its own native recognizer too, and
-   * canvas-runtime dedupes both paths.
-   */
-  const workspaceTouchObserver = useMemo(() => Gesture.Manual()
-    .runOnJS(true)
-    .shouldCancelWhenOutside(false)
-    .onTouchesDown((event: any) => {
-      const touches = Array.from(event.allTouches ?? []) as any[];
-      if (touches.length < 2 || pointTouchLatchedRef.current) return;
-
-      const current = useMapStore.getState();
-      if (current.mode !== 'drawing_plot' && current.mode !== 'calibrating') return;
-
-      const changedTouches = Array.from(event.changedTouches ?? []) as any[];
-      const candidates = changedTouches.length > 0 ? changedTouches : touches.slice(-1);
-      const pointTouch = candidates.find((touch) => {
-        const x = Number(touch.absoluteX ?? touch.x ?? 0);
-        const y = Number(touch.absoluteY ?? touch.y ?? 0);
-        const xRatio = x / Math.max(windowWidth, 1);
-        const isToolbarBand = y >= windowHeight - 132;
-        const isPointButton = current.mode === 'drawing_plot'
-          ? xRatio >= 0.54 && xRatio <= 0.84
-          : xRatio >= 0.76;
-        return isToolbarBand && isPointButton;
-      });
-
-      if (!pointTouch) return;
-      pointTouchLatchedRef.current = true;
-      commitCenterPointFromRuntime();
-    })
-    .onTouchesUp((event: any) => {
-      if ((event.allTouches ?? []).length <= 1) pointTouchLatchedRef.current = false;
-    })
-    .onTouchesCancelled(() => {
-      pointTouchLatchedRef.current = false;
-    }), [windowHeight, windowWidth]);
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.header}>
@@ -131,20 +83,18 @@ export default function LandMeasurementScreen() {
         </TouchableOpacity>
       </View>
 
-      <GestureDetector gesture={workspaceTouchObserver}>
-        <View style={styles.canvasContainer}>
-          <SkiaMapCanvas />
+      <View style={styles.canvasContainer}>
+        <SkiaMapCanvas />
 
-          <MobileResultsBar />
+        <MobileResultsBar />
 
-          <MobileCanvasToolbar
-            onOpenManualScale={() => setIsManualScaleOpen(true)}
-            onOpenImagePicker={() => setIsImagePickerOpen(true)}
-            onOpenSave={() => setCalculationSheetMode('save')}
-            onOpenLoad={() => setCalculationSheetMode('load')}
-          />
-        </View>
-      </GestureDetector>
+        <MobileCanvasToolbar
+          onOpenManualScale={() => setIsManualScaleOpen(true)}
+          onOpenImagePicker={() => setIsImagePickerOpen(true)}
+          onOpenSave={() => setCalculationSheetMode('save')}
+          onOpenLoad={() => setCalculationSheetMode('load')}
+        />
+      </View>
 
       <ScaleCalibrationModal
         visible={isDistanceModalOpen}
