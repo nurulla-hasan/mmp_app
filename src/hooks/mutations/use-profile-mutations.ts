@@ -1,29 +1,24 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// use-profile-mutations.ts  (Mutation Hooks)
-//
-// Profile mutation hooks for updating info, avatar image, and password.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import { AuthService } from '../../services/auth-service';
+import { UserService } from '../../services/user-service';
 import { queryKeys } from '../../lib/query-keys';
 import { useAuthStore } from '../../stores/auth-store';
 import { SuccessToast, ErrorToast } from '../../lib/utils';
 
-// ── Update Profile: PATCH /users/me ──────────────────────────────────────────
+// Update Profile: PATCH /auth/me
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
-  const { refreshUser } = useAuthStore();
+  const { setUser } = useAuthStore();
 
   return useMutation({
     mutationFn: (payload: Parameters<typeof AuthService.updateMe>[0]) =>
       AuthService.updateMe(payload),
     onSuccess: async (res) => {
-      if (res.success) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.profile.all });
-        await refreshUser();
+      if (res.success && res.data?.user) {
+        queryClient.setQueryData(queryKeys.profile.me(), res.data.user);
+        await setUser(res.data.user);
         SuccessToast('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
       } else {
         ErrorToast(res.message || 'প্রোফাইল আপডেট করা যায়নি।');
@@ -35,10 +30,10 @@ export function useUpdateProfile() {
   });
 }
 
-// ── Upload Avatar: PATCH /users/profile-image ────────────────────────────────
+// Upload Avatar: PATCH /users/profile-image
 export function useUploadAvatar() {
   const queryClient = useQueryClient();
-  const { refreshUser } = useAuthStore();
+  const { setUser } = useAuthStore();
 
   return useMutation({
     mutationFn: async () => {
@@ -70,12 +65,12 @@ export function useUploadAvatar() {
         type: asset.mimeType || 'image/jpeg',
       } as any);
 
-      return AuthService.uploadProfileImage(formData);
+      return UserService.uploadProfileImage(formData);
     },
     onSuccess: async (res) => {
-      if (res.success) {
-        await queryClient.invalidateQueries({ queryKey: queryKeys.profile.all });
-        await refreshUser();
+      if (res.success && res.data) {
+        queryClient.setQueryData(queryKeys.profile.me(), res.data);
+        await setUser(res.data);
         SuccessToast('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
       } else {
         ErrorToast(res.message || 'ছবি আপলোড করা যায়নি।');
@@ -88,7 +83,7 @@ export function useUploadAvatar() {
   });
 }
 
-// ── Change Password: PATCH /auth/change-password ─────────────────────────────
+// Change Password: POST /auth/change-password
 export function useChangePassword() {
   return useMutation({
     mutationFn: (payload: { oldPassword?: string; newPassword: string }) =>

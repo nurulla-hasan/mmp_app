@@ -1,7 +1,11 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthService } from '../services/auth-service';
-import { STORAGE_KEYS } from '../services/api-client';
+import { SessionStorage } from '../services/session-storage';
+import {
+  subscribeSessionExpired,
+  subscribeTokensRefreshed,
+} from '../services/auth-events';
+import { clearQueryCache } from '../lib/query-client';
 import type { TAuthUser, AuthTokens } from '../types/auth';
 
 interface AuthState {
@@ -14,128 +18,127 @@ interface AuthState {
   initializeAuth: () => Promise<void>;
   setSession: (tokens: AuthTokens, user?: TAuthUser) => Promise<void>;
   setUser: (user: TAuthUser) => Promise<void>;
-  fetchCurrentUser: () => Promise<void>;
+  fetchCurrentUser: () => Promise<TAuthUser | null>;
   refreshUser: () => Promise<void>;
+  clearLocalSession: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+const emptySessionState = {
   user: null,
   accessToken: null,
   refreshToken: null,
   isAuthenticated: false,
+} as const;
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  ...emptySessionState,
   isLoading: true,
 
   initializeAuth: async () => {
+    set({ isLoading: true });
+
     try {
-      set({ isLoading: true });
-      const [accessToken, refreshToken, cachedUserStr] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN),
-        AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
-        AsyncStorage.getItem(STORAGE_KEYS.USER),
+      const [tokens, cachedUser] = await Promise.all([
+        SessionStorage.getTokens(),
+        SessionStorage.getCachedUser(),
       ]);
 
-      if (!accessToken) {
-        set({
-          user: null,
-          accessToken: null,
-          refreshToken: null,
-          isAuthenticated: false,
-          isLoading: false,
-        });
+      const hasStoredSession = Boolean(tokens.accessToken || tokens.refreshToken);
+
+      if (!hasStoredSession) {
+        await SessionStorage.setCachedUser(null);
+        set({ ...emptySessionState, isLoading: false });
         return;
       }
 
-      let cachedUser: TAuthUser | null = null;
-      if (cachedUserStr) {
-        try {
-          cachedUser = JSON.parse(cachedUserStr);
-        } catch {
-          // Ignore parse error
-        }
-      }
-
+      // Hydrate immediately for a fast startup, then validate against /auth/me.
       set({
-        accessToken,
-        refreshToken,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
         user: cachedUser,
         isAuthenticated: true,
-        isLoading: false,
       });
 
-      // Background fetch fresh user data
-      get().fetchCurrentUser();
+      await get().fetchCurrentUser();
     } catch {
+      // Storage/network failures should not crash app startup.
+    } finally {
       set({ isLoading: false });
     }
   },
 
   setSession: async (tokens: AuthTokens, user?: TAuthUser) => {
-    try {
-      await Promise.all([
-        AsyncStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken),
-        AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken),
-        user ? AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user)) : Promise.resolve(),
-      ]);
+    await SessionStorage.setTokens(tokens);
 
-      set({
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        user: user || null,
-        isAuthenticated: true,
-      });
+    if (user) {
+      await SessionStorage.setCachedUser(user);
+    } else {
+      // Never show a previous account while the new session is resolving.
+      await SessionStorage.setCachedUser(null);
+    }
 
-      if (!user) {
-        await get().fetchCurrentUser();
-      }
-    } catch {
-      // Storage error
+    set({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: user ?? null,
+      isAuthenticated: true,
+    });
+
+    if (!user) {
+      await get().fetchCurrentUser();
     }
   },
 
   setUser: async (user: TAuthUser) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
-      set({ user });
-    } catch {
-      // Storage error
-    }
+    await SessionStorage.setCachedUser(user);
+    set({ user, isAuthenticated: true });
   },
 
   fetchCurrentUser: async () => {
-    try {
-      const res = await AuthService.getMe();
-      if (res.success && res.data?.user) {
-        await get().setUser(res.data.user);
-      }
-    } catch {
-      // Failed to refresh profile
+    const res = await AuthService.getMe();
+
+    if (res.success && res.data?.user) {
+      await get().setUser(res.data.user);
+      return res.data.user;
     }
+
+    if (res.statusCode === 401) {
+      await get().clearLocalSession();
+    }
+
+    return null;
   },
 
   refreshUser: async () => {
     await get().fetchCurrentUser();
   },
 
-  logout: async () => {
-    try {
-      // Best-effort backend logout
-      AuthService.logout().catch(() => {});
-      await Promise.all([
-        AsyncStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN),
-        AsyncStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN),
-        AsyncStorage.removeItem(STORAGE_KEYS.USER),
-      ]);
+  clearLocalSession: async () => {
+    await Promise.all([SessionStorage.clear(), clearQueryCache()]);
+    set({ ...emptySessionState, isLoading: false });
+  },
 
-      set({
-        user: null,
-        accessToken: null,
-        refreshToken: null,
-        isAuthenticated: false,
-      });
-    } catch {
-      // Storage error
+  logout: async () => {
+    // Backend logout is best-effort; local session removal must always succeed.
+    try {
+      await AuthService.logout();
+    } finally {
+      await get().clearLocalSession();
     }
   },
 }));
 
+// Keep Zustand's in-memory session synchronized with token rotation performed
+// inside the HTTP client, without introducing an api-client <-> store cycle.
+subscribeTokensRefreshed((tokens) => {
+  useAuthStore.setState({
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    isAuthenticated: true,
+  });
+});
+
+subscribeSessionExpired(() => {
+  void useAuthStore.getState().clearLocalSession();
+});

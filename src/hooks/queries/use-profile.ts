@@ -1,35 +1,31 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// use-profile.ts  (Query Hooks)
-//
-// Profile and location reference query hooks.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useQuery } from '@tanstack/react-query';
 import { AuthService } from '../../services/auth-service';
 import { queryKeys, STALE_TIME } from '../../lib/query-keys';
+import { unwrapApiResult } from '../../lib/api-result';
 import { useAuthStore } from '../../stores/auth-store';
 
-// ── Profile: GET /users/me ────────────────────────────────────────────────────
+// Profile: GET /auth/me
 export function useProfile() {
   const { isAuthenticated, user } = useAuthStore();
 
   return useQuery({
     queryKey: queryKeys.profile.me(),
-    queryFn: () => AuthService.getMe(),
+    queryFn: async () => {
+      const result = unwrapApiResult(await AuthService.getMe());
+      return result.user;
+    },
     enabled: isAuthenticated,
     staleTime: STALE_TIME.FIVE_MINUTES,
-    select: (res) => (res.success && res.data ? res.data.user : null),
-    placeholderData: user ? { success: true as const, statusCode: 200, message: '', data: { user } } : undefined,
+    placeholderData: user ?? undefined,
   });
 }
 
-// ── Districts: GET /districts ────────────────────────────────────────────────
+// District catalog: GET /districts
 export function useDistricts() {
   return useQuery({
     queryKey: queryKeys.districts.list(),
-    queryFn: () => AuthService.getDistricts(),
+    queryFn: async () => unwrapApiResult(await AuthService.getDistricts()),
     staleTime: STALE_TIME.DAY,
     gcTime: STALE_TIME.DAY * 2,
-    select: (res) => (res.success && res.data ? res.data : []),
   });
 }
