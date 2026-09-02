@@ -19,6 +19,7 @@ import { SuccessToast } from '../../lib/utils';
 import { ProfileHeaderCard } from '../../components/profile/profile-header-card';
 import { PersonalInfoCard } from '../../components/profile/personal-info-card';
 import { ActivityCard } from '../../components/profile/activity-card';
+import { SubscriptionCard } from '../../components/profile/subscription-card';
 import { SurveyorAccountCard } from '../../components/profile/surveyor-account-card';
 import { AccountSettingsCard } from '../../components/profile/account-settings-card';
 import { ProfileEditModal } from '../../components/profile/profile-edit-modal';
@@ -81,6 +82,8 @@ export default function ProfileScreen() {
           />
 
           <ActivityCard />
+
+          <SubscriptionCard onPress={() => router.push('/pricing')} />
 
           <SurveyorAccountCard
             user={user}
@@ -168,61 +171,13 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    padding: 14,
-    gap: 12,
-    paddingBottom: 32,
-  },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  logoutBtnText: {
-    color: '#ef4444',
-    fontSize: 13,
-    fontFamily: Fonts.sansMedium,
-  },
-  guestCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    padding: 24,
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 20,
-  },
-  guestIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  guestTitle: {
-    fontSize: 18,
-    fontFamily: Fonts.headingBold,
-    textAlign: 'center',
-  },
-  guestSubtitle: {
-    fontSize: 12,
-    fontFamily: Fonts.sansRegular,
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  guestActionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    width: '100%',
-  },
+  container: { flex: 1 },
+  content: { padding: 14, gap: 12, paddingBottom: 32 },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 40, borderRadius: 8, borderWidth: 1, marginTop: 4 },
+  logoutBtnText: { color: '#ef4444', fontSize: 13, fontFamily: Fonts.sansMedium },
+  guestCard: { borderRadius: 14, borderWidth: 1, padding: 24, alignItems: 'center', gap: 10, marginTop: 20 },
+  guestIconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  guestTitle: { fontSize: 18, fontFamily: Fonts.headingBold, textAlign: 'center' },
+  guestSubtitle: { fontSize: 12, fontFamily: Fonts.sansRegular, textAlign: 'center', lineHeight: 18, paddingHorizontal: 16, marginBottom: 8 },
+  guestActionsRow: { flexDirection: 'row', gap: 10, width: '100%' },
 });
