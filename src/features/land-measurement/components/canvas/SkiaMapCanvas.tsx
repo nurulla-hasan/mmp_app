@@ -81,6 +81,7 @@ const midpoint = (a: Point, b: Point): Point => ({
 });
 
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+const MANUAL_DIVIDE_PREVIEW_INTERVAL_MS = 40;
 
 const clamp = (value: number, min: number, max: number) => {
   'worklet';
@@ -501,7 +502,8 @@ export function SkiaMapCanvas() {
   const deferredManualCutLine = useDeferredValue(manualCutLine);
   const liveRafRef = useRef<number | null>(null);
   const pendingLiveTransformRef = useRef<Transform | null>(null);
-  const manualDragRafRef = useRef<number | null>(null);
+  const manualPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const manualPreviewLastAtRef = useRef(0);
   const pendingManualDragRef = useRef<ManualDrag | null>(null);
 
   const translateX = useSharedValue(stagePos.x);
@@ -749,11 +751,17 @@ export function SkiaMapCanvas() {
     useMapStore.getState().setIsPinching(value);
   }, []);
 
+  /**
+   * The red anchors and dashed line are already driven by shared values on the
+   * UI thread. Only the expensive split preview needs JS/store updates. Limit
+   * that preview to ~25Hz so a 120Hz touch stream cannot flood Zustand/React.
+   * The final released point is always committed synchronously below.
+   */
   const scheduleManualAnchorMove = useCallback((index: number, x: number, y: number) => {
     pendingManualDragRef.current = { index, x, y };
-    if (manualDragRafRef.current !== null) return;
-    manualDragRafRef.current = requestAnimationFrame(() => {
-      manualDragRafRef.current = null;
+
+    const flushPreview = () => {
+      manualPreviewTimerRef.current = null;
       const pending = pendingManualDragRef.current;
       pendingManualDragRef.current = null;
       if (!pending) return;
@@ -762,14 +770,27 @@ export function SkiaMapCanvas() {
       if (!currentLine || pending.index < 0 || pending.index >= currentLine.length) return;
       const nextLine = [...currentLine];
       nextLine[pending.index] = { x: pending.x, y: pending.y };
+      manualPreviewLastAtRef.current = Date.now();
       state.setManualCutLine(nextLine);
-    });
+    };
+
+    const elapsed = Date.now() - manualPreviewLastAtRef.current;
+    if (elapsed >= MANUAL_DIVIDE_PREVIEW_INTERVAL_MS && manualPreviewTimerRef.current === null) {
+      flushPreview();
+      return;
+    }
+
+    if (manualPreviewTimerRef.current !== null) return;
+    manualPreviewTimerRef.current = setTimeout(
+      flushPreview,
+      Math.max(1, MANUAL_DIVIDE_PREVIEW_INTERVAL_MS - elapsed),
+    );
   }, []);
 
   const finishManualAnchorMove = useCallback((index: number, x: number, y: number) => {
-    if (manualDragRafRef.current !== null) {
-      cancelAnimationFrame(manualDragRafRef.current);
-      manualDragRafRef.current = null;
+    if (manualPreviewTimerRef.current !== null) {
+      clearTimeout(manualPreviewTimerRef.current);
+      manualPreviewTimerRef.current = null;
     }
     pendingManualDragRef.current = null;
 
@@ -798,6 +819,7 @@ export function SkiaMapCanvas() {
     const nextLine = [...currentLine];
     nextLine[index] = finalPoint;
     state.setManualCutLine(nextLine);
+    manualPreviewLastAtRef.current = Date.now();
     dragVisualX.value = finalPoint.x;
     dragVisualY.value = finalPoint.y;
     requestAnimationFrame(() => {
@@ -836,7 +858,7 @@ export function SkiaMapCanvas() {
 
   useEffect(() => () => {
     if (liveRafRef.current !== null) cancelAnimationFrame(liveRafRef.current);
-    if (manualDragRafRef.current !== null) cancelAnimationFrame(manualDragRafRef.current);
+    if (manualPreviewTimerRef.current !== null) clearTimeout(manualPreviewTimerRef.current);
   }, []);
 
   const resetView = useCallback(() => {
