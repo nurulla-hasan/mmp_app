@@ -207,7 +207,7 @@ export async function apiFetch<T>(
   const { auth = true } = options;
   const { accessToken } = auth
     ? await SessionStorage.getTokens()
-    : { accessToken: null, refreshToken: null };
+    : { accessToken: null };
 
   const firstResult = await requestOnce<T>(endpoint, options, accessToken);
 

@@ -64,27 +64,56 @@ export default function RootLayout() {
             gestureEnabled: true,
             freezeOnBlur: true,
             contentStyle: { backgroundColor: colors.background },
+            headerStyle: { backgroundColor: colors.surface },
+            headerTintColor: colors.text,
+            headerShadowVisible: false,
+            headerTitleStyle: {
+              fontFamily: 'HindSiliguri_700Bold',
+              fontSize: 16,
+              color: colors.text,
+            },
           }}
         >
+          {/* Main Tab Group (Has AppHeader navbar centrally configured in (tabs)/_layout.tsx) */}
           <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
+          {/* Tools Group (Has Stack header centrally configured in (tools)/_layout.tsx) */}
           <Stack.Screen name='(tools)' options={{ headerShown: false }} />
+          {/* Auth Group (Has Stack header centrally configured in (auth)/_layout.tsx) */}
           <Stack.Screen name='(auth)' options={{ headerShown: false }} />
-          <Stack.Screen name='calculations' options={{ headerShown: false }} />
+
+          {/* Standalone Screens with Centralized Header */}
+          <Stack.Screen
+            name='calculations'
+            options={{
+              headerShown: false, // calculations screen has its own integrated search navbar
+            }}
+          />
           <Stack.Screen
             name='pricing'
             options={{
-              presentation: 'card',
-              animation: 'slide_from_right',
               headerShown: true,
               title: 'সাবস্ক্রিপশন প্ল্যানস',
-              headerStyle: { backgroundColor: colors.surface },
-              headerTintColor: colors.text,
-              headerShadowVisible: false,
-              headerTitleStyle: {
-                fontFamily: 'HindSiliguri_700Bold',
-                fontSize: 16,
-                color: colors.text,
-              },
+            }}
+          />
+          <Stack.Screen
+            name='join-as-surveyor'
+            options={{
+              headerShown: true,
+              title: 'সার্ভেয়ার হিসেবে যোগ দিন',
+            }}
+          />
+          <Stack.Screen
+            name='surveyor-profile'
+            options={{
+              headerShown: true,
+              title: 'সার্ভেয়ার প্রোফাইল',
+            }}
+          />
+          <Stack.Screen
+            name='surveyors/[slug]'
+            options={{
+              headerShown: true,
+              title: 'সার্ভেয়ার প্রোফাইল',
             }}
           />
         </Stack>

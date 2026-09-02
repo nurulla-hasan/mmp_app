@@ -173,17 +173,6 @@ export default function SurveyorDetailScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={[
-          styles.backButton,
-          { backgroundColor: colors.card, borderColor: colors.border },
-        ]}
-      >
-        <ArrowLeft size={17} color={colors.text} />
-        <Text style={[styles.backText, { color: colors.text }]}>সার্ভেয়ার তালিকা</Text>
-      </TouchableOpacity>
-
       <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
         <View style={styles.heroTop}>
           {imageUrl ? (

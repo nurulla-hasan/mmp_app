@@ -39,7 +39,7 @@ export default function JoinAsSurveyorScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.content, { paddingTop: 14 + insets.top }]}
+      contentContainerStyle={[styles.content, { paddingTop: 14 }]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps='handled'
     >
