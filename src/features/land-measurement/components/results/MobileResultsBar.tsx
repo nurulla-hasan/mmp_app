@@ -2,75 +2,184 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { ChevronUp, Printer, Ruler, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { DECIMALS } from '../../utils/calculations';
-import { formatFeetInches } from '../../utils/canvas';
+import {
+  AREA_LABEL_FONT_SCALE,
+  MIN_EDGE_LABEL_FT,
+  formatFeetInches,
+} from '../../utils/canvas';
 import { Fonts } from '../../../../constants/typography';
-import { getPolygonAreaLabelLayout } from '../../utils/polygon-label';
-import { groupPolygonSegments } from '../../utils/geometry';
+import { computePrintLabels } from '../print/PrintLabelEngine';
 
 const PDF_DIRECTORY_KEY = 'mmp_pdf_download_directory';
-const REPORT_IMAGE_MAX_DIMENSION = 1800;
 
 const escapeHtml = (value: unknown) => String(value ?? '')
-  .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;');
 
 const formatMeasurement = (value: number) => value.toFixed(DECIMALS);
 
-async function prepareReportImageData() {
-  const mapImage = useMapStore.getState().mapImage;
-  if (!mapImage?.uri) return null;
+const toBengaliNumber = (value: unknown) => {
+  const digits: Record<string, string> = {
+    '0': '০', '1': '১', '2': '২', '3': '৩', '4': '৪',
+    '5': '৫', '6': '৬', '7': '৭', '8': '৮', '9': '৯',
+  };
+  return String(value ?? '').replace(/[0-9]/g, (digit) => digits[digit]);
+};
 
-  try {
-    const maxSide = Math.max(mapImage.width, mapImage.height, 1);
-    const ratio = Math.min(1, REPORT_IMAGE_MAX_DIMENSION / maxSide);
-    const context = ImageManipulator.manipulate(mapImage.uri);
-    if (ratio < 1) {
-      context.resize({
-        width: Math.max(1, Math.round(mapImage.width * ratio)),
-        height: Math.max(1, Math.round(mapImage.height * ratio)),
-      });
+const buildWebPrintHtml = (state: ReturnType<typeof useMapStore.getState>) => {
+  const { plots, results, isShowDiagonals, reportInfo } = state;
+  if (plots.length === 0) return '';
+
+  const totalShotok = plots.length > 0
+    ? plots.reduce((sum, plot) => sum + plot.results.shotok, 0).toFixed(3)
+    : results?.shotok.toFixed(3) ?? '';
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const plot of plots) {
+    for (const point of plot.points) {
+      if (point.x < minX) minX = point.x;
+      if (point.y < minY) minY = point.y;
+      if (point.x > maxX) maxX = point.x;
+      if (point.y > maxY) maxY = point.y;
     }
-    const rendered = await context.renderAsync();
-    const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.82 });
-    return await FileSystem.readAsStringAsync(saved.uri, { encoding: FileSystem.EncodingType.Base64 });
-  } catch {
-    // PDF generation must still work even if a device cannot prepare the map preview.
-    return null;
   }
-}
 
-const buildReportHtml = (state: ReturnType<typeof useMapStore.getState>, imageData: string | null) => {
-  const { plots, mapImage, reportInfo, isShowDiagonals } = state;
-  const totals = plots.reduce((sum, plot) => ({ sqft: sum.sqft + plot.results.sqft, shotok: sum.shotok + plot.results.shotok, katha: sum.katha + plot.results.katha }), { sqft: 0, shotok: 0, katha: 0 });
-  const width = mapImage?.width ?? 1200;
-  const height = mapImage?.height ?? 900;
-  const overlay = plots.map((plot) => {
-    const color = plot.color ?? '#0F766E';
-    const shape = `<polygon points="${plot.points.map((point) => `${point.x},${point.y}`).join(' ')}" fill="${color}" fill-opacity=".10" stroke="${color}" stroke-width="${Math.max(width, height) / 500}"/>`;
-    const edges = groupPolygonSegments(plot.points).map((group) => {
-      const first = group[0]?.point;
-      const last = group.at(-1)?.nextPoint;
-      if (!first || !last) return '';
-      const value = group.reduce((sum, segment) => sum + (plot.results.lengths[segment.i] ?? 0), 0);
-      return `<text x="${(first.x + last.x) / 2}" y="${(first.y + last.y) / 2}" class="edge" fill="${color}">${escapeHtml(formatFeetInches(value))}</text>`;
-    }).join('');
-    const center = getPolygonAreaLabelLayout(plot.points).center;
-    const area = `<text x="${center.x}" y="${center.y}" class="area" fill="${color}">${escapeHtml(`${formatMeasurement(plot.results.shotok)} shotok`)}</text>`;
-    const diagonals = isShowDiagonals ? (plot.results.diagonals ?? []).map((diagonal) => {
-      const start = plot.points[diagonal.p1Index];
-      const end = plot.points[diagonal.p2Index];
-      return start && end ? `<line x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" stroke="${color}" stroke-width="${Math.max(width, height) / 900}" stroke-dasharray="10 8" opacity=".55"/>` : '';
-    }).join('') : '';
-    return `${shape}${diagonals}${edges}${area}`;
+  if (!Number.isFinite(minX)) return '';
+
+  const boundsWidth = Math.max(1, maxX - minX);
+  const boundsHeight = Math.max(1, maxY - minY);
+  const maxDim = Math.max(boundsWidth, boundsHeight);
+  const paddingX = maxDim * 0.1;
+  const paddingY = maxDim * 0.1;
+  const viewBoxMinX = minX - paddingX;
+  const viewBoxMinY = minY - paddingY;
+  const viewBoxWidth = boundsWidth + paddingX * 2;
+  const viewBoxHeight = boundsHeight + paddingY * 2;
+  const baseScale = Math.max(viewBoxWidth, viewBoxHeight);
+  const strokeW = baseScale * 0.005;
+  const fontSize = baseScale * 0.018;
+  const labelPad = baseScale * 0.005;
+  const labelOffset = baseScale * 0.02;
+  const areaFontSize = fontSize * Math.max(0.78, AREA_LABEL_FONT_SCALE * 0.85);
+  const reportLabelFontSize = areaFontSize * 1.1;
+
+  const { allLabels, plotPolygons } = computePrintLabels(plots, {
+    baseScale,
+    fontSize: reportLabelFontSize,
+    labelPad,
+    labelOffset,
+  });
+
+  const polygonsSvg = plotPolygons.map(({ plot, pointsStr }) => {
+    const color = plot.color || '#0F766E';
+    return `<polygon points="${pointsStr}" fill="${color}" fill-opacity="0.1" stroke="${color}" stroke-width="${strokeW}" stroke-linejoin="round" />`;
   }).join('');
-  const map = imageData ? `<img src="data:image/jpeg;base64,${imageData}"/>` : '';
-  const rows = plots.map((plot, index) => `<tr><td>${escapeHtml(plot.name || `Plot ${index + 1}`)}</td><td>${formatMeasurement(plot.results.shotok)}</td><td>${formatMeasurement(plot.results.katha)}</td><td>${formatMeasurement(plot.results.sqft)}</td><td>${escapeHtml(formatFeetInches(plot.results.perimeter))}</td></tr>`).join('');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>@page{margin:24px}body{font-family:Arial,sans-serif;color:#172033}h1{text-align:center;font-size:22px;margin:0 0 4px}.sub{text-align:center;color:#526175;font-size:11px}.info{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin:14px 0;font-size:11px}.map{position:relative;width:100%;max-height:510px;overflow:hidden;border:1px solid #ccd5df;background:#f4e3d2}.map img{display:block;width:100%;height:100%;object-fit:contain}.map svg{position:absolute;inset:0;width:100%;height:100%}.edge,.area{font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#fff;stroke-width:${Math.max(width, height) / 350};stroke-linejoin:round}.edge{font-size:${Math.max(width, height) / 75}px}.area{font-size:${Math.max(width, height) / 62}px}table{width:100%;border-collapse:collapse;margin-top:14px;font-size:10px}th,td{border:1px solid #ccd5df;padding:6px;text-align:center}th{background:#e8f1ee}.totals{display:flex;gap:9px;margin-top:10px}.totals b{flex:1;padding:8px;background:#e8f5ee;text-align:center;font-size:11px}</style></head><body><h1>Land Measurement Report</h1><div class="sub">Mouza Map Pro</div><div class="info"><span>Mouza: <b>${escapeHtml(reportInfo.mouza || '—')}</b></span><span>J.L. No: <b>${escapeHtml(reportInfo.jlNo || '—')}</b></span><span>Dag No: <b>${escapeHtml(reportInfo.dagNo || '—')}</b></span><span>Khatian No: <b>${escapeHtml(reportInfo.khatianNo || '—')}</b></span><span>Date: <b>${escapeHtml(reportInfo.date || '—')}</b></span><span>Surveyor: <b>${escapeHtml(reportInfo.surveyorName || '—')}</b></span></div>${mapImage ? `<div class="map" style="aspect-ratio:${width}/${height}">${map}<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet">${overlay}</svg></div>` : ''}<div class="totals"><b>Total shotok: ${formatMeasurement(totals.shotok)}</b><b>Total katha: ${formatMeasurement(totals.katha)}</b><b>Sq ft: ${formatMeasurement(totals.sqft)}</b></div><table><thead><tr><th>Plot</th><th>Shotok</th><th>Katha</th><th>Sq ft</th><th>Perimeter</th></tr></thead><tbody>${rows}</tbody></table></body></html>`;
+
+  const diagonalsSvg = isShowDiagonals
+    ? plots.flatMap((plot) => (plot.results.diagonals ?? []).map((diagonal, index) => {
+        const p1 = plot.points[diagonal.p1Index];
+        const p2 = plot.points[diagonal.p2Index];
+        if (!p1 || !p2) return '';
+        const distPx = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        if (distPx < baseScale * 0.05) return '';
+        const color = plot.color || '#0F766E';
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        const labelText = diagonal.lengthFt >= MIN_EDGE_LABEL_FT
+          ? formatFeetInches(diagonal.lengthFt)
+          : '';
+        const label = labelText
+          ? `<text x="${midX}" y="${midY}" font-size="${reportLabelFontSize * 0.85}" font-weight="700" fill="#0F766E" text-anchor="middle" dominant-baseline="central">${escapeHtml(labelText)}</text>`
+          : '';
+        return `<g data-diagonal="${plot.id}-${index}"><line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${color}" stroke-width="${strokeW * 0.4}" stroke-dasharray="${baseScale * 0.005}, ${baseScale * 0.005}" opacity="0.5" />${label}</g>`;
+      })).join('')
+    : '';
+
+  const edgeLabelsSvg = allLabels.map((label) => (
+    `<g transform="translate(${label.lx}, ${label.ly}) rotate(${label.rotation})"><text x="0" y="0" font-size="${label.fontSize}" font-weight="700" fill="#0F766E" stroke="rgba(255,255,255,0.96)" stroke-width="${baseScale * 0.0022}" stroke-linejoin="round" paint-order="stroke" text-anchor="middle" dominant-baseline="central">${escapeHtml(label.labelText)}</text></g>`
+  )).join('');
+
+  const areaLabelsSvg = plotPolygons.map(({ plot, areaLabelLayout }) => {
+    if (!plot.results) return '';
+    const color = plot.color || '#0F766E';
+    const areaText = `${plot.results.shotok.toFixed(2)} শতক`;
+    return `<g transform="translate(${areaLabelLayout.center.x}, ${areaLabelLayout.center.y}) rotate(${areaLabelLayout.rotation})"><text x="0" y="0" font-size="${reportLabelFontSize}" font-weight="700" fill="${color}" stroke="rgba(255,255,255,0.96)" stroke-width="${baseScale * 0.003}" stroke-linejoin="round" paint-order="stroke" text-anchor="middle" dominant-baseline="central">${escapeHtml(areaText)}</text></g>`;
+  }).join('');
+
+  const value = (text?: string | null) => text ? toBengaliNumber(text) : '';
+
+  return `<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  @page { size: A4 portrait; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; width: 210mm; height: 297mm; background: #fff; }
+  body { font-family: Arial, "Noto Sans Bengali", sans-serif; color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; height: 297mm; padding: 7mm 8mm 3mm; display: flex; flex-direction: column; overflow: hidden; background: #fff; }
+  .header { display: flex; flex-direction: column; align-items: center; margin-bottom: 2mm; }
+  .title { margin: 0 0 4mm; padding: 0 8mm 2mm; border-bottom: 3px solid #0d9488; color: #115e59; font-size: 30px; line-height: 1.15; font-weight: 900; letter-spacing: -0.4px; }
+  .info-grid { width: 100%; padding: 0 4mm; display: grid; grid-template-columns: 1fr 1fr; column-gap: 16mm; row-gap: 3mm; font-size: 17.6px; }
+  .field { display: flex; align-items: flex-end; min-width: 0; }
+  .field-label { flex: 0 0 30mm; color: #374151; font-weight: 700; white-space: nowrap; }
+  .field-label.wide { flex-basis: 34mm; }
+  .field-value { min-width: 0; flex: 1; min-height: 7mm; padding: 0 1mm 0.5mm; border-bottom: 1.5px dashed #9ca3af; text-align: center; color: #111827; font-weight: 700; overflow: hidden; white-space: nowrap; }
+  .field-value.total { color: #0f766e; font-size: 20px; }
+  .plot-area { position: relative; flex: 1; min-height: 0; width: 100%; margin-top: 4mm; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .plot-area svg { width: 100%; height: 100%; display: block; }
+  .footer { margin-top: 2mm; padding: 2mm 8mm 0; display: flex; justify-content: space-between; align-items: flex-end; font-size: 18px; color: #000; }
+  .signature { width: 56mm; text-align: center; }
+  .signature.surveyor { width: 64mm; }
+  .signature-line { height: 7mm; margin-bottom: 2mm; padding-bottom: 0.5mm; border-bottom: 1.5px dashed #4b5563; color: #111827; font-weight: 700; }
+  .signature-label { color: #374151; font-weight: 700; }
+  .generated { margin-top: 1mm; text-align: center; color: #166534; font-size: 12px; font-weight: 500; }
+  .generated span { color: #2563eb; text-decoration: underline; }
+</style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <h1 class="title">ভূমি পরিমাপ প্রতিবেদন</h1>
+      <div class="info-grid">
+        <div class="field"><span class="field-label">মৌজা:</span><span class="field-value">${escapeHtml(value(reportInfo?.mouza))}</span></div>
+        <div class="field"><span class="field-label wide">খতিয়ান নং:</span><span class="field-value">${escapeHtml(value(reportInfo?.khatianNo))}</span></div>
+        <div class="field"><span class="field-label">জে. এল. নং:</span><span class="field-value">${escapeHtml(value(reportInfo?.jlNo))}</span></div>
+        <div class="field"><span class="field-label wide">দাগ নং:</span><span class="field-value">${escapeHtml(value(reportInfo?.dagNo))}</span></div>
+        <div class="field"><span class="field-label">মোট পরিমাণ:</span><span class="field-value total">${totalShotok ? `${toBengaliNumber(totalShotok)} শতক` : ''}</span></div>
+        <div class="field"><span class="field-label wide">তারিখ:</span><span class="field-value">${escapeHtml(value(reportInfo?.date))}</span></div>
+      </div>
+    </header>
+
+    <section class="plot-area">
+      <svg preserveAspectRatio="xMidYMid meet" viewBox="${viewBoxMinX} ${viewBoxMinY} ${viewBoxWidth} ${viewBoxHeight}">
+        ${polygonsSvg}
+        ${diagonalsSvg}
+        ${edgeLabelsSvg}
+        ${areaLabelsSvg}
+      </svg>
+    </section>
+
+    <footer class="footer">
+      <div class="signature"><div class="signature-line">&nbsp;</div><div class="signature-label">উপস্থিত সাক্ষীদের স্বাক্ষর</div></div>
+      <div class="signature surveyor"><div class="signature-line">${escapeHtml(reportInfo?.surveyorName || '')}</div><div class="signature-label">সার্ভেয়ারের স্বাক্ষর</div></div>
+    </footer>
+    <div class="generated">Generated by <span>Mouza Map Pro</span></div>
+  </main>
+</body>
+</html>`;
 };
 
 export function MobileResultsBar() {
@@ -86,9 +195,9 @@ export function MobileResultsBar() {
     if (exporting) return;
     setExporting(true);
     try {
-      const state = useMapStore.getState();
-      const imageData = await prepareReportImageData();
-      const result = await Print.printToFileAsync({ html: buildReportHtml(state, imageData) });
+      const html = buildWebPrintHtml(useMapStore.getState());
+      if (!html) throw new Error('No plots to print');
+      const result = await Print.printToFileAsync({ html });
       const fileBaseName = `Mouza-Map-Pro-${Date.now()}`;
       const displayFileName = `${fileBaseName}.pdf`;
 
@@ -145,7 +254,7 @@ export function MobileResultsBar() {
               <View style={styles.headerActions}>
                 <TouchableOpacity disabled={exporting} style={[styles.print, exporting && styles.disabled]} onPress={exportPdf}>
                   {exporting ? <ActivityIndicator size='small' color='#86efac' /> : <Printer size={17} color='#86efac' />}
-                  <Text style={styles.printText}>{exporting ? 'Creating…' : 'Download PDF'}</Text>
+                  <Text style={styles.printText}>{exporting ? 'Creating…' : 'Download A4 PDF'}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.close} onPress={() => setOpen(false)}><X size={18} color='#94a3b8' /></TouchableOpacity>
               </View>
@@ -174,8 +283,12 @@ export function MobileResultsBar() {
 const styles = StyleSheet.create({
   wrapper: { position: 'absolute', bottom: 82, left: 10, right: 10, zIndex: 19, minHeight: 57, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 13, borderWidth: 1, borderColor: '#334155', backgroundColor: 'rgba(15,23,42,0.97)' },
   icon: { width: 34, height: 34, marginRight: 9, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: 'rgba(34,197,94,0.12)' },
-  total: { flex: 1 }, label: { color: '#94a3b8', fontFamily: Fonts.headingMedium, fontSize: 9.5 }, value: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 14 },
-  unit: { minWidth: 57, marginRight: 8 }, unitLabel: { color: '#64748b', fontFamily: Fonts.headingMedium, fontSize: 8.5 }, unitValue: { color: '#cbd5e1', fontFamily: Fonts.headingSemiBold, fontSize: 10.5 },
+  total: { flex: 1 },
+  label: { color: '#94a3b8', fontFamily: Fonts.headingMedium, fontSize: 9.5 },
+  value: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 14 },
+  unit: { minWidth: 57, marginRight: 8 },
+  unitLabel: { color: '#64748b', fontFamily: Fonts.headingMedium, fontSize: 8.5 },
+  unitValue: { color: '#cbd5e1', fontFamily: Fonts.headingSemiBold, fontSize: 10.5 },
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2,6,23,0.68)' },
   sheet: { maxHeight: '82%', paddingTop: 16, paddingHorizontal: 15, paddingBottom: 22, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: '#334155', backgroundColor: '#0f172a' },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
