@@ -11,11 +11,16 @@ export type ResetPasswordPayload = {
   confirmPassword: string;
 };
 
+// Backend roles are shared with the web/admin panel.
+// The mobile app itself only allows USER and SURVEYOR sessions.
+export type BackendRole = 'USER' | 'SURVEYOR' | 'ADMIN' | 'SUPER_ADMIN';
+export type MobileRole = 'USER' | 'SURVEYOR';
+
 export type TAuthUser = {
   id: string;
   name: string;
   email: string;
-  role: 'USER' | 'SURVEYOR' | 'ADMIN' | 'SUPER_ADMIN';
+  role: BackendRole;
   status: 'ACTIVE' | 'BLOCKED';
   emailVerified: boolean;
   isSubscribed: boolean;
