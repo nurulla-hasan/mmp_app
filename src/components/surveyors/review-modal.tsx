@@ -35,8 +35,6 @@ type Props = {
   services: TSurveyorServiceWithPrice[];
 };
 
-const OTHER_SERVICE = 'অন্যান্য সেবা';
-
 export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props) {
   const router = useRouter();
   const { theme } = useThemeStore();
@@ -52,7 +50,7 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
     const names = services
       .map((item) => item.service?.name?.trim())
       .filter((name): name is string => Boolean(name));
-    return [...Array.from(new Set(names)), OTHER_SERVICE];
+    return Array.from(new Set(names));
   }, [services]);
 
   const trimmedComment = comment.trim();
@@ -216,7 +214,7 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
                             <Circle size={17} color={colors.textMuted} />
                           )}
                           <Text style={[styles.serviceText, { color: active ? colors.primary : colors.text }]}>
-                            {name === OTHER_SERVICE ? 'অন্যান্য সেবা / General Survey' : name}
+                            {name}
                           </Text>
                         </TouchableOpacity>
                       );
