@@ -1,5 +1,6 @@
 import { apiFetch } from './api-client';
 import { API_ENDPOINTS } from './api-endpoints';
+import { CatalogService } from './catalog-service';
 import { UserService } from './user-service';
 import type {
   LoginPayload,
@@ -70,8 +71,6 @@ export const AuthService = {
       auth: true,
     }),
 
-  // Backend returns a safe user projection here. Merge it with the current
-  // /auth/me user instead of treating it as a complete auth identity.
   updateMe: (
     payload: UpdateProfilePayload
   ): Promise<ApiResult<{ user: Partial<TAuthUser> }>> =>
@@ -88,18 +87,10 @@ export const AuthService = {
       auth: true,
     }),
 
-  getDistricts: (): Promise<
-    ApiResult<{ value: string; label: string; upazilas: string[] }[]>
-  > =>
-    apiFetch<{ value: string; label: string; upazilas: string[] }[]>(
-      API_ENDPOINTS.catalog.districts,
-      {
-        method: 'GET',
-        auth: false,
-      }
-    ),
+  // Backward-compatible catalog alias for existing profile code.
+  getDistricts: CatalogService.getDistricts,
 
-  // Backward-compatible alias. New profile code should use UserService directly.
+  // Backward-compatible user-service alias.
   uploadProfileImage: UserService.uploadProfileImage,
 
   logout: (): Promise<ApiResult<null>> =>

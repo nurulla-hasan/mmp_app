@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { CatalogService } from '../../services/catalog-service';
 import { SurveyorService } from '../../services/surveyor-service';
 import { ApiRequestError, unwrapApiResult } from '../../lib/api-result';
 import { queryKeys, STALE_TIME } from '../../lib/query-keys';
@@ -47,7 +48,7 @@ export function useSurveyorBySlug(slug: string) {
 export function useSurveyorServices() {
   return useQuery({
     queryKey: queryKeys.services.list(),
-    queryFn: async () => unwrapApiResult(await SurveyorService.getServices()),
+    queryFn: async () => unwrapApiResult(await CatalogService.getServices()),
     staleTime: STALE_TIME.DAY,
     gcTime: STALE_TIME.DAY * 2,
   });
@@ -56,7 +57,7 @@ export function useSurveyorServices() {
 export function useSurveyorDistricts() {
   return useQuery({
     queryKey: queryKeys.districts.list(),
-    queryFn: async () => unwrapApiResult(await SurveyorService.getDistricts()),
+    queryFn: async () => unwrapApiResult(await CatalogService.getDistricts()),
     staleTime: STALE_TIME.DAY,
     gcTime: STALE_TIME.DAY * 2,
   });
