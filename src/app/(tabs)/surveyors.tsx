@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Briefcase, Search, SlidersHorizontal, Users } from 'lucide-react-native';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { SurveyorCard } from '../../components/surveyors/surveyor-card';
 import { SurveyorFilterModal } from '../../components/surveyors/surveyor-filter-modal';
+import { SurveyorListSkeleton } from '../../components/common/page-loading-skeletons';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -102,14 +103,14 @@ export default function SurveyorsScreen() {
         keyboardShouldPersistTaps='handled'
         refreshControl={
           <RefreshControl
-            refreshing={surveyorQuery.isRefetching && !surveyorQuery.isFetchingNextPage}
+            refreshing={surveyorQuery.isRefetching && !surveyorQuery.isFetchingNextPage && surveyors.length > 0}
             onRefresh={() => surveyorQuery.refetch()}
             tintColor={colors.primary}
           />
         }
         ListEmptyComponent={
           surveyorQuery.isLoading ? (
-            <View style={styles.centerState}><ActivityIndicator color={colors.primary} /><Text style={[styles.stateText, { color: colors.textMuted }]}>সার্ভেয়ার লোড হচ্ছে...</Text></View>
+            <SurveyorListSkeleton />
           ) : surveyorQuery.isError ? (
             <View style={[styles.emptyCard, { borderColor: colors.border, backgroundColor: colors.card }]}>
               <Users size={28} color='#ef4444' />
@@ -168,7 +169,6 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   filterButton: { width: 40, height: 38, borderWidth: 1, borderRadius: 7, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   filterCount: { position: 'absolute', top: 1, right: 4, fontSize: 8, fontFamily: Fonts.headingBold },
-  centerState: { paddingVertical: 70, alignItems: 'center', gap: 8 },
   stateText: { fontSize: 11, fontFamily: Fonts.sansRegular, textAlign: 'center' },
   emptyCard: { marginTop: 30, borderWidth: 1, borderStyle: 'dashed', borderRadius: 14, padding: 28, alignItems: 'center', gap: 8 },
   emptyTitle: { fontSize: 13.5, fontFamily: Fonts.headingBold },

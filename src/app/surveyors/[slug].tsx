@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
   ScrollView,
@@ -25,6 +24,7 @@ import {
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { ReviewModal } from '../../components/surveyors/review-modal';
+import { SurveyorDetailSkeleton } from '../../components/common/page-loading-skeletons';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -107,14 +107,7 @@ export default function SurveyorDetailScreen() {
   const query = useSurveyorBySlug(slug);
 
   if (query.isLoading) {
-    return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator color={colors.primary} />
-        <Text style={[styles.stateText, { color: colors.textMuted }]}>
-          সার্ভেয়ার প্রোফাইল লোড হচ্ছে...
-        </Text>
-      </View>
-    );
+    return <SurveyorDetailSkeleton />;
   }
 
   if (query.isError || !query.data) {
@@ -359,9 +352,7 @@ export default function SurveyorDetailScreen() {
         >
           <CheckCircle2 size={20} color={colors.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.verifiedTitle, { color: colors.primary }]}>
-              Mouza Map Pro ভেরিফাইড সার্ভেয়ার
-            </Text>
+            <Text style={[styles.verifiedTitle, { color: colors.primary }]}>Mouza Map Pro ভেরিফাইড সার্ভেয়ার</Text>
             <Text style={[styles.verifiedText, { color: colors.textMuted }]}>
               পেশাদার তথ্য অ্যাডমিন যাচাই করে অনুমোদন করেছে।
               {surveyor.verifiedAt ? ` ভেরিফাইড: ${formatDate(surveyor.verifiedAt)}` : ''}
@@ -391,9 +382,7 @@ export default function SurveyorDetailScreen() {
         </View>
 
         {approvedReviews.length === 0 && pendingReviews.length === 0 ? (
-          <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            এখনও কোনো রিভিউ নেই।
-          </Text>
+          <Text style={[styles.emptyText, { color: colors.textMuted }]}>এখনও কোনো রিভিউ নেই।</Text>
         ) : null}
         {approvedReviews.map((review) => (
           <ReviewCard key={review.id} review={review} />
@@ -402,9 +391,7 @@ export default function SurveyorDetailScreen() {
           <ReviewCard key={review.id} review={review} pending />
         ))}
         {!isAuthenticated && !ownProfile ? (
-          <Text style={[styles.loginHint, { color: colors.textMuted }]}>
-            রিভিউ দিতে লগইন করতে হবে।
-          </Text>
+          <Text style={[styles.loginHint, { color: colors.textMuted }]}>রিভিউ দিতে লগইন করতে হবে।</Text>
         ) : null}
       </View>
     </ScrollView>

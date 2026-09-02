@@ -1,8 +1,9 @@
 import React from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../components/ui/button';
 import { SurveyorProfileForm } from '../components/surveyors/surveyor-profile-form';
+import { SurveyorProfileSkeleton } from '../components/common/page-loading-skeletons';
 import { Colors } from '../constants/colors';
 import { Fonts } from '../constants/typography';
 import { useThemeStore } from '../stores/theme-store';
@@ -31,7 +32,7 @@ export default function SurveyorProfileScreen() {
   }
 
   if (profileQuery.isLoading) {
-    return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator color={colors.primary} /><Text style={[styles.text, { color: colors.textMuted }]}>প্রোফাইল লোড হচ্ছে...</Text></View>;
+    return <SurveyorProfileSkeleton />;
   }
 
   if (!profileQuery.data) {

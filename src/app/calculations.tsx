@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react-native';
 import { CalculationCard } from '../components/calculations/calculation-card';
 import { CalculationEmptyState } from '../components/calculations/calculation-empty-state';
+import { CalculationListSkeleton } from '../components/common/page-loading-skeletons';
 import { useCalculations } from '../hooks/queries/use-calculations';
 import { Fonts } from '../constants/typography';
 import { Colors } from '../constants/colors';
@@ -119,14 +119,9 @@ export default function CalculationsScreen() {
           ) : null}
         </View>
 
-        {/* Loading Spinner */}
+        {/* Loading Skeleton */}
         {isLoading && calculations.length === 0 ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size='large' color='#16a34a' />
-            <Text style={[styles.loadingText, { color: colors.textMuted }]}>
-              ক্যালকুলেশন লোড হচ্ছে...
-            </Text>
-          </View>
+          <CalculationListSkeleton />
         ) : calculations.length === 0 ? (
           <CalculationEmptyState searchTerm={searchTerm} />
         ) : (
@@ -254,4 +249,3 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sansRegular,
   },
 });
-
