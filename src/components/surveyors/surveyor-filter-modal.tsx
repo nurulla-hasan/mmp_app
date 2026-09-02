@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   label: { fontSize: 12, fontFamily: Fonts.headingSemiBold },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  chip: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6 },
+  chip: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6 },
   chipText: { fontSize: 10.5, fontFamily: Fonts.sansMedium },
   footer: { borderTopWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   smallText: { fontSize: 10.5, fontFamily: Fonts.sansRegular },
