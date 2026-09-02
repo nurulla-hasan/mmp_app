@@ -3,7 +3,7 @@ import { Alert, View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Ruler } from 'lucide-react-native';
-import { MobileMapCanvas } from '../../features/land-measurement/components/canvas/MobileMapCanvas';
+import { SkiaMapCanvas } from '../../features/land-measurement/components/canvas/SkiaMapCanvas';
 import { MobileCanvasToolbar } from '../../features/land-measurement/components/toolbar/MobileCanvasToolbar';
 import { MobileResultsBar } from '../../features/land-measurement/components/results/MobileResultsBar';
 import { ScaleCalibrationModal } from '../../features/land-measurement/components/modals/ScaleCalibrationModal';
@@ -53,7 +53,6 @@ export default function LandMeasurementScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* ─── 1. Top Navbar Header ─── */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <TouchableOpacity
@@ -72,7 +71,6 @@ export default function LandMeasurementScreen() {
           </View>
         </View>
 
-        {/* Quick Scale Chip */}
         <TouchableOpacity
           activeOpacity={0.75}
           style={styles.scaleChip}
@@ -85,14 +83,11 @@ export default function LandMeasurementScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ─── 2. Interactive Drawing Canvas Layer ─── */}
       <View style={styles.canvasContainer}>
-        <MobileMapCanvas />
+        <SkiaMapCanvas />
 
-        {/* ─── 3. Floating Live Area Results Bar ─── */}
         <MobileResultsBar />
 
-        {/* ─── 4. Floating Bottom Toolbar ─── */}
         <MobileCanvasToolbar
           onOpenManualScale={() => setIsManualScaleOpen(true)}
           onOpenImagePicker={() => setIsImagePickerOpen(true)}
@@ -101,7 +96,6 @@ export default function LandMeasurementScreen() {
         />
       </View>
 
-      {/* ─── 5. Modals ─── */}
       <ScaleCalibrationModal
         visible={isDistanceModalOpen}
         kind='distance'
