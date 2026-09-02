@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -17,9 +17,7 @@ import {
   Scaling,
   PenLine,
   FileSpreadsheet,
-  Phone,
   Briefcase,
-  Star,
   FolderKanban,
   ChevronRight,
   Calculator,
@@ -27,11 +25,13 @@ import {
 } from 'lucide-react-native';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
+import { SurveyorCard } from '../../components/surveyors/surveyor-card';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { useCalculations } from '../../hooks/queries/use-calculations';
+import { useSurveyors } from '../../hooks/queries/use-surveyors';
 import { useMapStore } from '../../features/land-measurement/store/useMapStore';
 import { calculatePolygonData } from '../../features/land-measurement/utils/calculations';
 import { PLOT_COLOR_PALETTE } from '../../features/land-measurement/utils/canvas';
@@ -39,35 +39,31 @@ import { toBengaliDigits, SuccessToast } from '../../lib/utils';
 import type { TCalculation, Point } from '../../types/calculation';
 import type { PlotRecord } from '../../features/land-measurement/types/map';
 
-const TOP_SURVEYORS = [
-  {
-    id: '1',
-    name: 'মো. হাবিবুর রহমান',
-    location: 'দিনাজপুর সদর',
-    rating: '৪.৯',
-    exp: '১৫+ বছর',
-    verified: true,
-  },
-  {
-    id: '2',
-    name: 'আব্দুল করিম পাটোয়ারী',
-    location: 'মিরপুর, ঢাকা',
-    rating: '৫.০',
-    exp: '১০+ বছর',
-    verified: true,
-  },
-];
-
 export default function HomeScreen() {
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
 
-  // ── TanStack Query: auto-cached, stale-while-revalidate ──────────────────
-  const { data: allCalculations = [], isLoading: loadingCalculations, refetch } = useCalculations();
+  const {
+    data: allCalculations = [],
+    isLoading: loadingCalculations,
+    isRefetching: refetchingCalculations,
+    refetch: refetchCalculations,
+  } = useCalculations();
   const realCalculations = allCalculations.slice(0, 3);
 
+  // Web home requests verified surveyors from the same public directory.
+  // The backend already restricts the public directory to APPROVED profiles.
+  // Mobile keeps the home preview intentionally compact at two cards.
+  const featuredSurveyorsQuery = useSurveyors({ limit: 2 });
+  const featuredSurveyors = featuredSurveyorsQuery.data?.surveyors ?? [];
+
   const { isAuthenticated } = useAuthStore();
+
+  const refreshHome = () => {
+    void refetchCalculations();
+    void featuredSurveyorsQuery.refetch();
+  };
 
   const handleOpenCalculation = (calculation: TCalculation) => {
     const scaleValue = calculation.scalePxPerUnit || null;
@@ -115,14 +111,23 @@ export default function HomeScreen() {
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
-          refreshing={loadingCalculations}
-          onRefresh={refetch}
-          tintColor='#16a34a'
+          refreshing={
+            loadingCalculations ||
+            refetchingCalculations ||
+            featuredSurveyorsQuery.isRefetching
+          }
+          onRefresh={refreshHome}
+          tintColor={colors.primary}
         />
       }
     >
-      {/* ─── 1. Hero Action Banner (Primary CTA for Land Measurement) ─── */}
-      <View style={[styles.heroCard, { backgroundColor: colors.heroBg, borderColor: colors.heroBorder }]}>
+      {/* 1. Hero Action Banner */}
+      <View
+        style={[
+          styles.heroCard,
+          { backgroundColor: colors.heroBg, borderColor: colors.heroBorder },
+        ]}
+      >
         <View style={styles.heroHeader}>
           <View style={styles.proTag}>
             <Sparkles size={12} color='#22c55e' />
@@ -155,23 +160,29 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* ─── 2. Specialized Tools (Exact 4 Specialized Tools: Title & Badge Only) ─── */}
+      {/* 2. Specialized Tools */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>অন্যান্য টুলস</Text>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/tools')} activeOpacity={0.7}>
+        <TouchableOpacity
+          onPress={() => router.push('/(tabs)/tools')}
+          activeOpacity={0.7}
+        >
           <Text style={[styles.seeAllText, { color: colors.primary }]}>সব টুলস →</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Row 1: Mouza Map Studio + Mouza Geo Studio */}
       <View style={styles.grid}>
-        {/* Tool 1: Mouza Map Studio */}
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          style={[
+            styles.toolCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}
           onPress={() => router.push('/(tools)/land-measurement')}
         >
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
+          <View
+            style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}
+          >
             <Layers size={19} color='#059669' strokeWidth={2} />
           </View>
           <View style={styles.toolTextCol}>
@@ -180,13 +191,17 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Tool 2: Mouza Geo Studio */}
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          style={[
+            styles.toolCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}
           onPress={() => router.push('/(tools)/land-measurement')}
         >
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}>
+          <View
+            style={[styles.iconBox, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}
+          >
             <Globe size={19} color='#16a34a' strokeWidth={2} />
           </View>
           <View style={styles.toolTextCol}>
@@ -196,15 +211,18 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Row 2: Pantagraph + Digital Map Tracing */}
       <View style={styles.grid}>
-        {/* Tool 3: Pantagraph */}
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          style={[
+            styles.toolCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}
           onPress={() => router.push('/(tools)/pantagraph')}
         >
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.12)' }]}>
+          <View
+            style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.12)' }]}
+          >
             <Scaling size={19} color='#0891b2' strokeWidth={2} />
           </View>
           <View style={styles.toolTextCol}>
@@ -213,13 +231,17 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Tool 4: Digital Map Tracing */}
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          style={[
+            styles.toolCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}
           onPress={() => router.push('/(tools)/tracer')}
         >
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+          <View
+            style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}
+          >
             <PenLine size={19} color='#d97706' strokeWidth={2} />
           </View>
           <View style={styles.toolTextCol}>
@@ -229,7 +251,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ─── 3. Saved Calculations Section ─── */}
+      {/* 3. Saved Calculations */}
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleRow}>
           <FolderKanban size={16} color={colors.primary} />
@@ -253,7 +275,10 @@ export default function HomeScreen() {
       ) : !isAuthenticated ? (
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[styles.emptyProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          style={[
+            styles.emptyProjectCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}
           onPress={() => router.push('/(auth)/login')}
         >
           <FolderKanban size={22} color={colors.textMuted} />
@@ -270,7 +295,10 @@ export default function HomeScreen() {
       ) : realCalculations.length === 0 ? (
         <TouchableOpacity
           activeOpacity={0.85}
-          style={[styles.emptyProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          style={[
+            styles.emptyProjectCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+          ]}
           onPress={() => router.push('/land-measurement')}
         >
           <Calculator size={22} color={colors.primary} />
@@ -300,15 +328,26 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={project.id}
                 activeOpacity={0.8}
-                style={[styles.savedProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+                style={[
+                  styles.savedProjectCard,
+                  { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                ]}
                 onPress={() => handleOpenCalculation(project)}
               >
                 <View style={styles.savedProjectLeft}>
-                  <View style={[styles.fileIconBox, { backgroundColor: 'rgba(22, 163, 74, 0.1)' }]}>
+                  <View
+                    style={[
+                      styles.fileIconBox,
+                      { backgroundColor: 'rgba(22, 163, 74, 0.1)' },
+                    ]}
+                  >
                     <FileSpreadsheet size={18} color='#16a34a' />
                   </View>
                   <View style={styles.savedProjectDetails}>
-                    <Text style={[styles.savedProjectName, { color: colors.text }]} numberOfLines={1}>
+                    <Text
+                      style={[styles.savedProjectName, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
                       {project.name}
                     </Text>
                     <View style={styles.savedProjectMeta}>
@@ -329,7 +368,10 @@ export default function HomeScreen() {
                       {toBengaliDigits(totalShotok.toFixed(2))} শতাংশ
                     </Text>
                   ) : null}
-                  <Badge label={plotCount > 0 ? 'সম্পন্ন' : 'খসড়া'} variant={plotCount > 0 ? 'pro' : 'warning'} />
+                  <Badge
+                    label={plotCount > 0 ? 'সম্পন্ন' : 'খসড়া'}
+                    variant={plotCount > 0 ? 'pro' : 'warning'}
+                  />
                 </View>
               </TouchableOpacity>
             );
@@ -337,58 +379,72 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* ─── 4. Verified Surveyors Section ─── */}
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>ভেরিফাইড সার্ভেয়ার</Text>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/surveyors')} activeOpacity={0.7}>
-          <Text style={[styles.seeAllText, { color: colors.primary }]}>সকল সার্ভেয়ার →</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.surveyorsGrid}>
-        {TOP_SURVEYORS.map((s) => (
-          <View
-            key={s.id}
-            style={[styles.surveyorMiniCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-          >
-            <View style={styles.surveyorMiniHeader}>
-              <View style={[styles.avatarCircle, { backgroundColor: colors.primary }]}>
-                <Text style={styles.avatarChar}>{s.name.charAt(3) || 'আ'}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.surveyorMiniName, { color: colors.text }]} numberOfLines={1}>{s.name}</Text>
-                <Text style={[styles.surveyorMiniLocation, { color: colors.textMuted }]}>{s.location}</Text>
-              </View>
-            </View>
-
-            <View style={[styles.surveyorMiniFooter, { borderTopColor: colors.border }]}>
-              <View style={styles.ratingBadge}>
-                <Star size={10} color='#f59e0b' fill='#f59e0b' />
-                <Text style={[styles.ratingText, { color: colors.textMuted }]}>{s.rating} • {s.exp}</Text>
-              </View>
-              <TouchableOpacity
-                activeOpacity={0.75}
-                style={[styles.callMiniBtn, { backgroundColor: colors.primary }]}
-              >
-                <Phone size={11} color='#ffffff' />
-                <Text style={styles.callMiniBtnText}>কল</Text>
-              </TouchableOpacity>
-            </View>
+      {/* 4. Verified Surveyors: real API preview */}
+      {(featuredSurveyorsQuery.isLoading || featuredSurveyors.length > 0) ? (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>ভেরিফাইড সার্ভেয়ার</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/surveyors')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.seeAllText, { color: colors.primary }]}>সকল সার্ভেয়ার →</Text>
+            </TouchableOpacity>
           </View>
-        ))}
-      </View>
 
-      {/* ─── 5. Surveyor Career Banner ─── */}
-      <View style={[styles.careerBanner, { backgroundColor: theme === 'dark' ? '#064e3b25' : '#f0fdf4', borderColor: theme === 'dark' ? '#064e3b' : '#bbf7d0' }]}>
+          {featuredSurveyorsQuery.isLoading ? (
+            <View style={styles.homeProjectsLoading}>
+              <ActivityIndicator size='small' color={colors.primary} />
+              <Text style={[styles.metaText, { color: colors.textMuted }]}>সার্ভেয়ার লোড হচ্ছে...</Text>
+            </View>
+          ) : (
+            <View style={styles.featuredSurveyorList}>
+              {featuredSurveyors.map((surveyor) => (
+                <SurveyorCard
+                  key={surveyor.id || surveyor.slug}
+                  surveyor={surveyor}
+                  compact
+                />
+              ))}
+            </View>
+          )}
+        </>
+      ) : null}
+
+      {/* 5. Surveyor Career Banner */}
+      <View
+        style={[
+          styles.careerBanner,
+          {
+            backgroundColor: theme === 'dark' ? '#064e3b25' : '#f0fdf4',
+            borderColor: theme === 'dark' ? '#064e3b' : '#bbf7d0',
+          },
+        ]}
+      >
         <View style={styles.careerBannerLeft}>
-          <View style={[styles.careerIconCircle, { backgroundColor: theme === 'dark' ? '#064e3b' : '#dcfce7' }]}>
+          <View
+            style={[
+              styles.careerIconCircle,
+              { backgroundColor: theme === 'dark' ? '#064e3b' : '#dcfce7' },
+            ]}
+          >
             <Briefcase size={20} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.careerTitle, { color: theme === 'dark' ? '#4ade80' : '#15803d' }]}>
+            <Text
+              style={[
+                styles.careerTitle,
+                { color: theme === 'dark' ? '#4ade80' : '#15803d' },
+              ]}
+            >
               আপনি কি পেশাদার সার্ভেয়ার?
             </Text>
-            <Text style={[styles.careerDesc, { color: theme === 'dark' ? '#86efac' : '#166534' }]}>
+            <Text
+              style={[
+                styles.careerDesc,
+                { color: theme === 'dark' ? '#86efac' : '#166534' },
+              ]}
+            >
               আমাদের প্ল্যাটফর্মে ভেরিফাইড আমিন হিসেবে যোগ দিয়ে সরাসরি নতুন ক্লায়েন্ট পান।
             </Text>
           </View>
@@ -397,7 +453,7 @@ export default function HomeScreen() {
           title='সার্ভেয়ার হিসেবে যোগ দিন'
           size='sm'
           variant='primary'
-          onPress={() => router.push('/(tabs)/surveyors')}
+          onPress={() => router.push('/join-as-surveyor')}
           style={{ alignSelf: 'flex-start', marginTop: 4 }}
         />
       </View>
@@ -406,14 +462,8 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    padding: 14,
-    gap: 12,
-    paddingBottom: 28,
-  },
+  container: { flex: 1 },
+  content: { padding: 14, gap: 12, paddingBottom: 28 },
   heroCard: {
     borderRadius: 14,
     padding: 16,
@@ -456,14 +506,8 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sansRegular,
     lineHeight: 18,
   },
-  heroActionRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-  },
-  heroBtn: {
-    flex: 1,
-  },
+  heroActionRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  heroBtn: { flex: 1 },
   heroBtnOutline: {
     flex: 1,
     borderColor: 'rgba(255,255,255,0.25)',
@@ -475,37 +519,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
     paddingHorizontal: 2,
   },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sectionTitle: {
-    fontSize: 14.5,
-    fontFamily: Fonts.headingBold,
-  },
-  sectionSubtitle: {
-    fontSize: 10.5,
-    fontFamily: Fonts.sansRegular,
-    marginTop: 1,
-  },
-  seeAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  seeAllText: {
-    fontSize: 11.5,
-    fontFamily: Fonts.headingSemiBold,
-  },
-  recentCountText: {
-    fontSize: 11,
-    fontFamily: Fonts.sansMedium,
-  },
-  grid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { fontSize: 14.5, fontFamily: Fonts.headingBold },
+  seeAllRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  seeAllText: { fontSize: 11.5, fontFamily: Fonts.headingSemiBold },
+  grid: { flexDirection: 'row', gap: 10 },
   toolCard: {
     flex: 1,
     flexDirection: 'row',
@@ -527,28 +545,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  toolTextCol: {
-    flex: 1,
-    gap: 3,
-    alignItems: 'flex-start',
-  },
-  toolTitle: {
-    fontSize: 12.5,
-    fontFamily: Fonts.headingBold,
-  },
-  toolDesc: {
-    fontSize: 10.5,
-    fontFamily: Fonts.sansRegular,
-    lineHeight: 14,
-  },
-  savedProjectsList: {
-    gap: 8,
-  },
-  homeProjectsLoading: {
-    paddingVertical: 18,
-    alignItems: 'center',
-    gap: 6,
-  },
+  toolTextCol: { flex: 1, gap: 3, alignItems: 'flex-start' },
+  toolTitle: { fontSize: 12.5, fontFamily: Fonts.headingBold },
+  savedProjectsList: { gap: 8 },
+  homeProjectsLoading: { paddingVertical: 18, alignItems: 'center', gap: 6 },
   emptyProjectCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -558,10 +558,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderStyle: 'dashed',
   },
-  emptyProjectTitle: {
-    fontSize: 12.5,
-    fontFamily: Fonts.headingBold,
-  },
+  emptyProjectTitle: { fontSize: 12.5, fontFamily: Fonts.headingBold },
   savedProjectCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -583,99 +580,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  savedProjectDetails: {
-    flex: 1,
-    gap: 2,
-  },
-  savedProjectName: {
-    fontSize: 12.5,
-    fontFamily: Fonts.headingBold,
-  },
-  savedProjectMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 10.5,
-    fontFamily: Fonts.sansRegular,
-  },
-  metaDot: {
-    fontSize: 10.5,
-  },
-  savedProjectRight: {
-    alignItems: 'flex-end',
-    gap: 3,
-  },
-  savedProjectArea: {
-    fontSize: 12.5,
-    fontFamily: Fonts.headingBold,
-  },
-  surveyorsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  surveyorMiniCard: {
-    flex: 1,
-    padding: 10,
-    gap: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  surveyorMiniHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  avatarCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarChar: {
-    fontSize: 13,
-    fontFamily: Fonts.headingBold,
-    color: '#ffffff',
-  },
-  surveyorMiniName: {
-    fontSize: 11.5,
-    fontFamily: Fonts.headingBold,
-  },
-  surveyorMiniLocation: {
-    fontSize: 9.5,
-    fontFamily: Fonts.sansRegular,
-  },
-  surveyorMiniFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    paddingTop: 6,
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  ratingText: {
-    fontSize: 10,
-    fontFamily: Fonts.sansMedium,
-  },
-  callMiniBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 5,
-  },
-  callMiniBtnText: {
-    fontSize: 10,
-    fontFamily: Fonts.headingBold,
-    color: '#ffffff',
-  },
+  savedProjectDetails: { flex: 1, gap: 2 },
+  savedProjectName: { fontSize: 12.5, fontFamily: Fonts.headingBold },
+  savedProjectMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { fontSize: 10.5, fontFamily: Fonts.sansRegular },
+  metaDot: { fontSize: 10.5 },
+  savedProjectRight: { alignItems: 'flex-end', gap: 3 },
+  savedProjectArea: { fontSize: 12.5, fontFamily: Fonts.headingBold },
+  featuredSurveyorList: { gap: 8 },
   careerBanner: {
     gap: 8,
     padding: 14,
@@ -683,11 +595,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginTop: 4,
   },
-  careerBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
+  careerBannerLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   careerIconCircle: {
     width: 36,
     height: 36,
@@ -695,10 +603,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  careerTitle: {
-    fontSize: 13.5,
-    fontFamily: Fonts.headingBold,
-  },
+  careerTitle: { fontSize: 13.5, fontFamily: Fonts.headingBold },
   careerDesc: {
     fontSize: 11,
     fontFamily: Fonts.sansRegular,
