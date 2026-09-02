@@ -449,12 +449,13 @@ export function MobileMapCanvas() {
       const xRatio = touch.locationX / viewport.width;
       return current.mode === 'drawing_plot'
         ? xRatio >= 0.55 && xRatio <= 0.84
-        : xRatio >= 0.74;
+        : xRatio >= 0.80;
     });
     if (!toolbarTouch) return false;
 
     if (!pointGestureLatchRef.current) {
       pointGestureLatchRef.current = true;
+      current.setStageTransform(transformRef.current);
       current.addPointAt(screenToCanvas({ x: viewport.width / 2, y: viewport.height / 2 }));
       scheduleLiveOverlay(transformRef.current);
     }
@@ -464,7 +465,7 @@ export function MobileMapCanvas() {
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderTerminationRequest: () => true,
+    onPanResponderTerminationRequest: () => false,
     onPanResponderGrant: (event) => {
       const point = { x: event.nativeEvent.locationX, y: event.nativeEvent.locationY };
       panStartRef.current = { ...transformRef.current.pos };
