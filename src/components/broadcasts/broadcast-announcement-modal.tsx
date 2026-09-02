@@ -88,32 +88,33 @@ export function BroadcastAnnouncementModal() {
   const broadcastsQuery = useActiveBroadcasts();
   const [queue, setQueue] = useState<TBroadcast[]>([]);
 
-  const broadcasts = broadcastsQuery.data ?? [];
+  const broadcasts = broadcastsQuery.data;
   const current = queue[0] ?? null;
   const currentType = useMemo(() => current ? typeConfig(current.type) : null, [current]);
 
   useEffect(() => {
     let cancelled = false;
+    const items = broadcasts ?? [];
 
     async function prepareQueue() {
-      if (broadcasts.length === 0) {
+      if (items.length === 0) {
         if (!cancelled) setQueue([]);
         return;
       }
 
       try {
-        const keys = broadcasts.map((item) => `${DISMISS_KEY_PREFIX}${item.id}`);
+        const keys = items.map((item) => `${DISMISS_KEY_PREFIX}${item.id}`);
         const stored = await AsyncStorage.multiGet(keys);
         const dismissedKeys = new Set(
           stored.filter(([, value]) => value === 'true').map(([key]) => key)
         );
-        const unseen = broadcasts.filter(
+        const unseen = items.filter(
           (item) => !dismissedKeys.has(`${DISMISS_KEY_PREFIX}${item.id}`)
         );
         if (!cancelled) setQueue(unseen);
       } catch {
         // Storage failure must not make a non-critical announcement crash the app.
-        if (!cancelled) setQueue(broadcasts);
+        if (!cancelled) setQueue(items);
       }
     }
 
