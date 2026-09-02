@@ -150,10 +150,10 @@ export default function HomeScreen() {
             icon={<Map size={15} color='#fff' />}
           />
           <Button
-            title='একক রূপান্তর'
+            title='স্কেল গাইড'
             variant='outline'
             size='md'
-            onPress={() => router.push('/(tools)/unit-converter')}
+            onPress={() => router.push('/(tools)/scale-guide')}
             style={styles.heroBtnOutline}
             textStyle={{ color: '#ffffff' }}
           />
