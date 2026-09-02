@@ -31,6 +31,12 @@ const emptySessionState = {
   isAuthenticated: false,
 } as const;
 
+const MOBILE_APP_ROLE_ERROR =
+  'এই মোবাইল অ্যাপটি শুধু সাধারণ ব্যবহারকারী ও সার্ভেয়ারদের জন্য। অ্যাডমিন প্যানেল ওয়েবে ব্যবহার করুন।';
+
+const isMobileAppUser = (user: TAuthUser) =>
+  user.role === 'USER' || user.role === 'SURVEYOR';
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   ...emptySessionState,
   isLoading: true,
@@ -48,6 +54,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (!hasStoredSession) {
         await SessionStorage.setCachedUser(null);
+        set({ ...emptySessionState, isLoading: false });
+        return;
+      }
+
+      // Never hydrate an admin identity into the mobile UI, even briefly.
+      if (cachedUser && !isMobileAppUser(cachedUser)) {
+        await Promise.all([SessionStorage.clear(), clearQueryCache()]);
         set({ ...emptySessionState, isLoading: false });
         return;
       }
@@ -72,6 +85,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // A fresh login/verification can represent a different account. Remove all
     // persisted server-state before hydrating the new identity.
     await clearQueryCache();
+
+    if (user && !isMobileAppUser(user)) {
+      await SessionStorage.clear();
+      set({ ...emptySessionState, isLoading: false });
+      throw new Error(MOBILE_APP_ROLE_ERROR);
+    }
+
     await SessionStorage.setTokens(tokens);
 
     if (user) {
@@ -94,6 +114,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setUser: async (user: TAuthUser) => {
+    if (!isMobileAppUser(user)) {
+      await get().clearLocalSession();
+      throw new Error(MOBILE_APP_ROLE_ERROR);
+    }
+
     await SessionStorage.setCachedUser(user);
     set({ user, isAuthenticated: true });
   },
@@ -102,6 +127,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const res = await AuthService.getMe();
 
     if (res.success && res.data?.user) {
+      if (!isMobileAppUser(res.data.user)) {
+        await get().clearLocalSession();
+        throw new Error(MOBILE_APP_ROLE_ERROR);
+      }
+
       await get().setUser(res.data.user);
       return res.data.user;
     }
