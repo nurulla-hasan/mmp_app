@@ -28,9 +28,20 @@ import { SuccessToast, ErrorToast } from '../../lib/utils';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
 
+function getSafeCallbackUrl(value?: string) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://')) {
+    return null;
+  }
+  return value;
+}
+
 export default function AuthScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ tab?: 'login' | 'register' }>();
+  const params = useLocalSearchParams<{
+    tab?: 'login' | 'register';
+    callbackUrl?: string;
+  }>();
+  const callbackUrl = getSafeCallbackUrl(params.callbackUrl);
   const { theme } = useThemeStore();
   const isDark = theme === 'dark';
   const { setSession } = useAuthStore();
@@ -89,7 +100,9 @@ export default function AuthScreen() {
       if (res.success && res.data) {
         await setSession(res.data);
         SuccessToast('লগইন সফল হয়েছে!');
-        if (router.canGoBack()) {
+        if (callbackUrl) {
+          router.replace(callbackUrl as never);
+        } else if (router.canGoBack()) {
           router.back();
         } else {
           router.replace('/(tabs)');
@@ -99,7 +112,10 @@ export default function AuthScreen() {
           ErrorToast(res.message);
           router.push({
             pathname: '/(auth)/verify-code',
-            params: { email: email.trim() },
+            params: {
+              email: email.trim(),
+              ...(callbackUrl ? { callbackUrl } : {}),
+            },
           });
           return;
         }
@@ -127,7 +143,10 @@ export default function AuthScreen() {
         SuccessToast('অ্যাকাউন্ট তৈরি হয়েছে! আপনার ইমেইল যাচাই করুন।');
         router.push({
           pathname: '/(auth)/verify-code',
-          params: { email: email.trim() },
+          params: {
+            email: email.trim(),
+            ...(callbackUrl ? { callbackUrl } : {}),
+          },
         });
       } else {
         ErrorToast(res.message || 'অ্যাকাউন্ট তৈরি করা যায়নি। আবার চেষ্টা করুন।');
