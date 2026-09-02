@@ -41,11 +41,13 @@ export function ProAccessGate({ children }: ProAccessGateProps) {
   useEffect(() => {
     if (!isProTool || authLoading) return;
 
-    // Web parity: Pro routes are private. Guests must sign in first. Using push
-    // keeps the requested Pro route under the auth screen, so successful login's
-    // existing router.back() returns to this guard automatically.
+    // Web parity: Pro routes are private. Guests go to login with a safe
+    // callback route, then return to the originally requested tool after auth.
     if (!isAuthenticated) {
-      router.push('/(auth)/login');
+      router.replace({
+        pathname: '/(auth)/login',
+        params: { callbackUrl: `/(tools)/${currentScreen}` },
+      });
       return;
     }
 
@@ -59,6 +61,7 @@ export function ProAccessGate({ children }: ProAccessGateProps) {
     }
   }, [
     authLoading,
+    currentScreen,
     hasProAccess,
     isAuthenticated,
     isProTool,
