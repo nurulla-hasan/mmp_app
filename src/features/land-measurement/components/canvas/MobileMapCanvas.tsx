@@ -61,9 +61,12 @@ type BadgeProps = {
 
 function SvgBadge({ x, y, text, stageScale, color, rotation = 0, compact = false }: BadgeProps) {
   const safeScale = Math.max(stageScale, 0.01);
-  const fontSize = (compact ? 10 : 11.5) / safeScale;
-  const height = (compact ? 19 : 23) / safeScale;
-  const screenWidth = Math.max(compact ? 42 : 58, text.length * (compact ? 5.7 : 6.6) + 14);
+  const fontSize = (compact ? 8.5 : 11.5) / safeScale;
+  const height = (compact ? 15 : 23) / safeScale;
+  const screenWidth = Math.max(
+    compact ? 34 : 58,
+    text.length * (compact ? 4.9 : 6.6) + (compact ? 10 : 14),
+  );
   const width = screenWidth / safeScale;
 
   return (
@@ -73,12 +76,12 @@ function SvgBadge({ x, y, text, stageScale, color, rotation = 0, compact = false
         y={-height / 2}
         width={width}
         height={height}
-        rx={5 / safeScale}
+        rx={(compact ? 3.5 : 5) / safeScale}
         fill={color}
         fillOpacity={0.94}
         stroke='#ffffff'
         strokeOpacity={0.22}
-        strokeWidth={0.8 / safeScale}
+        strokeWidth={(compact ? 0.6 : 0.8) / safeScale}
       />
       <SvgText
         x={0}
@@ -318,15 +321,22 @@ export function MobileMapCanvas() {
   }, [viewport.height, viewport.width]);
 
   const scheduleLiveOverlay = useCallback((transform: Transform) => {
+    const snapshot = useMapStore.getState();
+    const measurementActive = snapshot.mode === 'drawing_plot' || snapshot.mode === 'calibrating';
+    if (!measurementActive) return;
+
     pendingLiveTransformRef.current = transform;
     if (liveRafRef.current !== null) return;
     liveRafRef.current = requestAnimationFrame(() => {
       liveRafRef.current = null;
       const pending = pendingLiveTransformRef.current;
-      if (pending) {
-        liveOverlayRef.current?.update(getLiveOverlay(pending));
-        magnifierRef.current?.update(pending);
-      }
+      if (!pending) return;
+
+      const current = useMapStore.getState();
+      const active = current.mode === 'drawing_plot' || current.mode === 'calibrating';
+      if (!active) return;
+      liveOverlayRef.current?.update(getLiveOverlay(pending));
+      if (current.isMagnifierEnabled) magnifierRef.current?.update(pending);
     });
   }, [getLiveOverlay]);
 
@@ -410,7 +420,7 @@ export function MobileMapCanvas() {
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderTerminationRequest: () => false,
+    onPanResponderTerminationRequest: () => true,
     onPanResponderGrant: (event) => {
       const point = { x: event.nativeEvent.locationX, y: event.nativeEvent.locationY };
       panStartRef.current = { ...transformRef.current.pos };
@@ -472,6 +482,7 @@ export function MobileMapCanvas() {
       pinchRef.current = null;
       commitTransform(transformRef.current);
     },
+    onShouldBlockNativeResponder: () => false,
   }), [applyNativeTransform, commitTransform, findAnchor, scheduleManualAnchorMove, screenToCanvas]);
 
   const onLayout = (event: LayoutChangeEvent) => {
