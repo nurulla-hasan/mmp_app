@@ -1,3 +1,4 @@
+import { Gesture } from 'react-native-gesture-handler';
 import { makeMutable } from 'react-native-reanimated';
 import { useMapStore } from '../../store/useMapStore';
 import type { Point } from '../../types/map';
@@ -54,3 +55,16 @@ export function commitCenterPointFromRuntime() {
   useMapStore.getState().addCenterPoint();
   return true;
 }
+
+/**
+ * One native Point recognizer is shared by the toolbar and referenced by the
+ * canvas Pan gesture as an external simultaneous gesture. That explicit native
+ * relationship is what allows finger #1 to keep panning while finger #2 taps
+ * Point on Android; separate handlers are exclusive by default.
+ */
+export const canvasPointActionGesture = Gesture.Tap()
+  .maxDistance(18)
+  .runOnJS(true)
+  .onEnd((_event, success) => {
+    if (success) commitCenterPointFromRuntime();
+  });
