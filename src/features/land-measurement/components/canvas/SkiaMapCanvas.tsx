@@ -64,6 +64,7 @@ import {
 type Size = { width: number; height: number };
 type Transform = { scale: number; pos: Point };
 type LiveOverlayData = {
+  /** Canvas-space anchors. They are transformed on the UI thread at render time. */
   start: Point | null;
   end: Point;
   label: { point: Point; text: string; rotation: number; fontPx: number } | null;
@@ -541,6 +542,31 @@ export function SkiaMapCanvas() {
     return parts.join(' ');
   });
 
+  /**
+   * The map/points move on the UI thread. Keep the live line endpoints on that
+   * exact transform too; otherwise a JS RAF can trail one frame behind during
+   * fast panning and make the dashed line look detached from its point.
+   */
+  const liveLinePath = useDerivedValue(() => {
+    if (!liveOverlay.start) return '';
+    const startX = liveOverlay.start.x * zoom.value + translateX.value;
+    const startY = liveOverlay.start.y * zoom.value + translateY.value;
+    const endX = liveOverlay.snapped
+      ? liveOverlay.end.x * zoom.value + translateX.value
+      : viewport.width / 2;
+    const endY = liveOverlay.snapped
+      ? liveOverlay.end.y * zoom.value + translateY.value
+      : viewport.height / 2;
+    return `M ${startX} ${startY} L ${endX} ${endY}`;
+  });
+
+  const liveEndX = useDerivedValue(() => liveOverlay.snapped
+    ? liveOverlay.end.x * zoom.value + translateX.value
+    : viewport.width / 2);
+  const liveEndY = useDerivedValue(() => liveOverlay.snapped
+    ? liveOverlay.end.y * zoom.value + translateY.value
+    : viewport.height / 2);
+
   useEffect(() => {
     translateX.value = stagePos.x;
     translateY.value = stagePos.y;
@@ -671,8 +697,8 @@ export function SkiaMapCanvas() {
     }
 
     return {
-      start: startCanvas ? toScreen(startCanvas) : null,
-      end: toScreen(target),
+      start: startCanvas,
+      end: target,
       label,
       color: UI_CONFIG.colors.drawPrimary,
       snapped: distance(raw, target) * transform.scale > 2,
@@ -1396,7 +1422,7 @@ export function SkiaMapCanvas() {
               {liveOverlay.start && (
                 <Group>
                   <Path
-                    path={linePath(liveOverlay.start, liveOverlay.end)}
+                    path={liveLinePath as any}
                     color={liveOverlay.color}
                     style='stroke'
                     strokeWidth={UI_CONFIG.strokeWidth.xxthick}
@@ -1418,8 +1444,8 @@ export function SkiaMapCanvas() {
                   )}
                   {liveOverlay.snapped && (
                     <Circle
-                      cx={liveOverlay.end.x}
-                      cy={liveOverlay.end.y}
+                      cx={liveEndX as any}
+                      cy={liveEndY as any}
                       r={UI_CONFIG.radius.xlarge}
                       color={liveOverlay.color}
                       style='stroke'
@@ -1468,19 +1494,20 @@ export function SkiaMapCanvas() {
               {(mode === 'drawing_plot' || mode === 'calibrating') && (
                 <Group>
                   <Path
-                    path={`M ${viewport.width / 2 - 13} ${viewport.height / 2} L ${viewport.width / 2 - 3} ${viewport.height / 2} M ${viewport.width / 2 + 3} ${viewport.height / 2} L ${viewport.width / 2 + 13} ${viewport.height / 2} M ${viewport.width / 2} ${viewport.height / 2 - 13} L ${viewport.width / 2} ${viewport.height / 2 - 3} M ${viewport.width / 2} ${viewport.height / 2 + 3} L ${viewport.width / 2} ${viewport.height / 2 + 13}`}
+                    path={`M ${viewport.width / 2 - 11} ${viewport.height / 2} L ${viewport.width / 2 - 3.5} ${viewport.height / 2} M ${viewport.width / 2 + 3.5} ${viewport.height / 2} L ${viewport.width / 2 + 11} ${viewport.height / 2} M ${viewport.width / 2} ${viewport.height / 2 - 11} L ${viewport.width / 2} ${viewport.height / 2 - 3.5} M ${viewport.width / 2} ${viewport.height / 2 + 3.5} L ${viewport.width / 2} ${viewport.height / 2 + 11}`}
                     color='#ffffff'
                     style='stroke'
-                    strokeWidth={3.5}
-                    opacity={0.8}
+                    strokeWidth={2.2}
+                    opacity={0.56}
                   />
                   <Path
-                    path={`M ${viewport.width / 2 - 13} ${viewport.height / 2} L ${viewport.width / 2 - 3} ${viewport.height / 2} M ${viewport.width / 2 + 3} ${viewport.height / 2} L ${viewport.width / 2 + 13} ${viewport.height / 2} M ${viewport.width / 2} ${viewport.height / 2 - 13} L ${viewport.width / 2} ${viewport.height / 2 - 3} M ${viewport.width / 2} ${viewport.height / 2 + 3} L ${viewport.width / 2} ${viewport.height / 2 + 13}`}
+                    path={`M ${viewport.width / 2 - 11} ${viewport.height / 2} L ${viewport.width / 2 - 3.5} ${viewport.height / 2} M ${viewport.width / 2 + 3.5} ${viewport.height / 2} L ${viewport.width / 2 + 11} ${viewport.height / 2} M ${viewport.width / 2} ${viewport.height / 2 - 11} L ${viewport.width / 2} ${viewport.height / 2 - 3.5} M ${viewport.width / 2} ${viewport.height / 2 + 3.5} L ${viewport.width / 2} ${viewport.height / 2 + 11}`}
                     color='#ef4444'
                     style='stroke'
-                    strokeWidth={1.5}
+                    strokeWidth={1.1}
                   />
-                  <Circle cx={viewport.width / 2} cy={viewport.height / 2} r={2} color='#ef4444' />
+                  <Circle cx={viewport.width / 2} cy={viewport.height / 2} r={2.25} color='#ffffff' opacity={0.72} />
+                  <Circle cx={viewport.width / 2} cy={viewport.height / 2} r={1.15} color='#ef4444' />
                 </Group>
               )}
             </Canvas>
