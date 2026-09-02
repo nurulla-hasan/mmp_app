@@ -21,7 +21,7 @@ export default function LandMeasurementScreen() {
   const plots = useMapStore((state) => state.plots);
   const isDistanceModalOpen = useMapStore((state) => state.isDistanceModalOpen);
   const startCalibration = useMapStore((state) => state.startCalibration);
-  const retryCalibration = useMapStore((state) => state.retryCalibration);
+  const cancelCalibration = useMapStore((state) => state.cancelCalibration);
 
   const [isManualScaleOpen, setIsManualScaleOpen] = useState(false);
   const [isImagePickerOpen, setIsImagePickerOpen] = useState(false);
@@ -105,7 +105,7 @@ export default function LandMeasurementScreen() {
       <ScaleCalibrationModal
         visible={isDistanceModalOpen}
         kind='distance'
-        onClose={retryCalibration}
+        onClose={cancelCalibration}
       />
       <ScaleCalibrationModal
         visible={isManualScaleOpen}
