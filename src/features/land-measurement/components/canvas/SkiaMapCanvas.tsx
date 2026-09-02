@@ -1,7 +1,6 @@
 import React, {
   memo,
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -82,7 +81,6 @@ const midpoint = (a: Point, b: Point): Point => ({
 });
 
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
-const MANUAL_DIVIDE_PREVIEW_INTERVAL_MS = 40;
 
 const clamp = (value: number, min: number, max: number) => {
   'worklet';
@@ -203,7 +201,7 @@ function makeParagraph(text: string, color: string, fontSize: number, width: num
       color: Skia.Color(color),
       fontSize,
       fontStyle: { weight: bold ? 700 : 500 },
-      locale: 'bn-BD',
+      locale: 'en-US',
       heightMultiplier: 1.05,
     })
     .addText(text)
@@ -219,7 +217,7 @@ function makeMeasuredParagraph(text: string, color: string, fontSize: number) {
       color: Skia.Color(color),
       fontSize,
       fontStyle: { weight: 700 },
-      locale: 'bn-BD',
+      locale: 'en-US',
       heightMultiplier: 1.05,
     })
     .addText(text)
@@ -500,11 +498,9 @@ export function SkiaMapCanvas() {
   });
   const [magnifierTransform, setMagnifierTransform] = useState<Transform>({ scale: stageScale, pos: stagePos });
 
-  const deferredManualCutLine = useDeferredValue(manualCutLine);
   const liveRafRef = useRef<number | null>(null);
   const pendingLiveTransformRef = useRef<Transform | null>(null);
-  const manualPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const manualPreviewLastAtRef = useRef(0);
+  const manualPreviewRafRef = useRef<number | null>(null);
   const pendingManualDragRef = useRef<ManualDrag | null>(null);
 
   const translateX = useSharedValue(stagePos.x);
@@ -597,8 +593,8 @@ export function SkiaMapCanvas() {
   const selectedPlotPoints = selectedPlot?.points ?? [];
 
   const splitPreview = useMemo(() => {
-    if (!selectedPlot || !deferredManualCutLine || deferredManualCutLine.length < 2 || !scale) return null;
-    const split = splitPolygonByPolyline(selectedPlot.points, deferredManualCutLine);
+    if (!selectedPlot || !manualCutLine || manualCutLine.length < 2 || !scale) return null;
+    const split = splitPolygonByPolyline(selectedPlot.points, manualCutLine);
     if (!split || split.poly1.length < 3 || split.poly2.length < 3) return null;
     const resultA = calculatePolygonData(split.poly1, scale);
     const resultB = calculatePolygonData(split.poly2, scale);
@@ -611,7 +607,7 @@ export function SkiaMapCanvas() {
       centerA: getVisualCenter(split.poly1),
       centerB: getVisualCenter(split.poly2),
     };
-  }, [deferredManualCutLine, scale, selectedPlot]);
+  }, [manualCutLine, scale, selectedPlot]);
 
   const getLiveOverlay = useCallback((transform: Transform): LiveOverlayData => {
     const current = useMapStore.getState();
@@ -753,16 +749,17 @@ export function SkiaMapCanvas() {
   }, []);
 
   /**
-   * The red anchors and dashed line are already driven by shared values on the
-   * UI thread. Only the expensive split preview needs JS/store updates. Limit
-   * that preview to ~25Hz so a 120Hz touch stream cannot flood Zustand/React.
-   * The final released point is always committed synchronously below.
+   * Red anchors and the dashed line are UI-thread driven. Split fill/area
+   * preview is JS geometry, so coalesce the 120Hz touch stream to one update
+   * per available JS animation frame. This mirrors the web RAF pattern without
+   * the visible 40ms lag from the old timer throttle.
    */
   const scheduleManualAnchorMove = useCallback((index: number, x: number, y: number) => {
     pendingManualDragRef.current = { index, x, y };
+    if (manualPreviewRafRef.current !== null) return;
 
-    const flushPreview = () => {
-      manualPreviewTimerRef.current = null;
+    manualPreviewRafRef.current = requestAnimationFrame(() => {
+      manualPreviewRafRef.current = null;
       const pending = pendingManualDragRef.current;
       pendingManualDragRef.current = null;
       if (!pending) return;
@@ -771,27 +768,14 @@ export function SkiaMapCanvas() {
       if (!currentLine || pending.index < 0 || pending.index >= currentLine.length) return;
       const nextLine = [...currentLine];
       nextLine[pending.index] = { x: pending.x, y: pending.y };
-      manualPreviewLastAtRef.current = Date.now();
       state.setManualCutLine(nextLine);
-    };
-
-    const elapsed = Date.now() - manualPreviewLastAtRef.current;
-    if (elapsed >= MANUAL_DIVIDE_PREVIEW_INTERVAL_MS && manualPreviewTimerRef.current === null) {
-      flushPreview();
-      return;
-    }
-
-    if (manualPreviewTimerRef.current !== null) return;
-    manualPreviewTimerRef.current = setTimeout(
-      flushPreview,
-      Math.max(1, MANUAL_DIVIDE_PREVIEW_INTERVAL_MS - elapsed),
-    );
+    });
   }, []);
 
   const finishManualAnchorMove = useCallback((index: number, x: number, y: number) => {
-    if (manualPreviewTimerRef.current !== null) {
-      clearTimeout(manualPreviewTimerRef.current);
-      manualPreviewTimerRef.current = null;
+    if (manualPreviewRafRef.current !== null) {
+      cancelAnimationFrame(manualPreviewRafRef.current);
+      manualPreviewRafRef.current = null;
     }
     pendingManualDragRef.current = null;
 
@@ -820,7 +804,6 @@ export function SkiaMapCanvas() {
     const nextLine = [...currentLine];
     nextLine[index] = finalPoint;
     state.setManualCutLine(nextLine);
-    manualPreviewLastAtRef.current = Date.now();
     dragVisualX.value = finalPoint.x;
     dragVisualY.value = finalPoint.y;
     requestAnimationFrame(() => {
@@ -859,7 +842,7 @@ export function SkiaMapCanvas() {
 
   useEffect(() => () => {
     if (liveRafRef.current !== null) cancelAnimationFrame(liveRafRef.current);
-    if (manualPreviewTimerRef.current !== null) clearTimeout(manualPreviewTimerRef.current);
+    if (manualPreviewRafRef.current !== null) cancelAnimationFrame(manualPreviewRafRef.current);
   }, []);
 
   const resetView = useCallback(() => {
@@ -1226,12 +1209,12 @@ export function SkiaMapCanvas() {
   };
 
   const instruction = mode === 'calibrating'
-    ? calibrationPoints.length === 0 ? 'ক্রসহেয়ার স্কেল বারের শুরুতে আনুন' : 'ক্রসহেয়ার স্কেল বারের শেষে আনুন'
+    ? calibrationPoints.length === 0 ? 'Move the crosshair to the start of the scale bar' : 'Move the crosshair to the end of the scale bar'
     : mode === 'drawing_plot'
-      ? plotPoints.length < 3 ? `ক্রসহেয়ার কোণায় এনে পয়েন্ট যোগ করুন (${plotPoints.length}/৩)` : 'আরও পয়েন্ট দিন অথবা শেষ করুন'
+      ? plotPoints.length < 3 ? `Move the crosshair to a corner and add a point (${plotPoints.length}/3)` : 'Add more points or finish the plot'
       : mode === 'manual_divide_plot'
-        ? selectedPlot ? 'লাল পয়েন্ট টেনে কাটিং লাইন ঠিক করুন' : 'যে প্লট ভাগ করবেন সেটিতে ট্যাপ করুন'
-        : mapImage ? 'এক আঙুলে প্যান • দুই আঙুলে জুম' : 'শুরু করতে মৌজা ম্যাপ যোগ করুন';
+        ? selectedPlot ? 'Drag the red points to adjust the cut line' : 'Tap the plot you want to divide'
+        : mapImage ? 'One finger to pan • Two fingers to zoom' : 'Add a mouza map to begin';
 
   const magnifier = useMemo(() => {
     if (!mapImage || !isMagnifierEnabled || viewport.width <= 0 || (mode !== 'drawing_plot' && mode !== 'calibrating')) return null;
@@ -1316,7 +1299,7 @@ export function SkiaMapCanvas() {
                         <SkiaAreaBadge
                           x={label.center.x}
                           y={label.center.y}
-                          text={`${plot.results.shotok.toFixed(2)} শতক`}
+                          text={`${plot.results.shotok.toFixed(2)} shotok`}
                           stageScale={stageScale}
                           color={color}
                           rotation={label.rotation}
@@ -1333,14 +1316,14 @@ export function SkiaMapCanvas() {
                     <SkiaAreaBadge
                       x={splitPreview.centerA.x}
                       y={splitPreview.centerA.y}
-                      text={`${splitPreview.resultA.shotok.toFixed(2)} শতক`}
+                      text={`${splitPreview.resultA.shotok.toFixed(2)} shotok`}
                       stageScale={stageScale}
                       color={selectedPlot.color ?? '#0F766E'}
                     />
                     <SkiaAreaBadge
                       x={splitPreview.centerB.x}
                       y={splitPreview.centerB.y}
-                      text={`${splitPreview.resultB.shotok.toFixed(2)} শতক`}
+                      text={`${splitPreview.resultB.shotok.toFixed(2)} shotok`}
                       stageScale={stageScale}
                       color='#0284C7'
                     />
@@ -1541,8 +1524,8 @@ export function SkiaMapCanvas() {
 
       {!mapImage && (
         <View pointerEvents='none' style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>মৌজা ম্যাপ যোগ করুন</Text>
-          <Text style={styles.emptyText}>স্কেল ও জমির সীমানা মাপতে ম্যাপের ছবি প্রয়োজন</Text>
+          <Text style={styles.emptyTitle}>Add Mouza Map</Text>
+          <Text style={styles.emptyText}>Add a map image to set scale and measure land boundaries</Text>
         </View>
       )}
       <View pointerEvents='none' style={styles.instructionPill}>
