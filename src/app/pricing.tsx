@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import { Check, CheckCircle2, Clock, Crown, Lock, Sparkles, Star, Zap } from 'lu
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { ManualCheckoutModal } from '../components/subscription/manual-checkout-modal';
+import { LoadingSkeleton, useSkeletonPulse } from '../components/ui/loading-skeleton';
 import { Colors } from '../constants/colors';
 import { Fonts } from '../constants/typography';
 import { useThemeStore } from '../stores/theme-store';
@@ -35,6 +35,8 @@ const PRO_FEATURES = [
   'প্রজেক্ট সেভ ও professional export workflow',
 ];
 
+type PricingColors = (typeof Colors)['light'];
+
 function formatDate(value?: string | null) {
   if (!value) return '';
   try {
@@ -54,6 +56,41 @@ function periodText(plan: TPlan) {
   if (plan.billingCycle === 'YEARLY') return '/বছর';
   if (plan.billingCycle === 'LIFETIME') return 'আজীবন';
   return `/${toBengaliDigits(plan.durationDays)} দিন`;
+}
+
+function PricingPlansSkeleton({ colors }: { colors: PricingColors }) {
+  const opacity = useSkeletonPulse(true);
+
+  return (
+    <View style={styles.planList}>
+      {[0, 1].map((item) => (
+        <View
+          key={`plan-skeleton-${item}`}
+          style={[styles.planCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+        >
+          <View style={styles.planTopRow}>
+            <LoadingSkeleton opacity={opacity} color={colors.skeleton} style={styles.skeletonPlanIcon} />
+            <View style={styles.skeletonPlanHeading}>
+              <LoadingSkeleton opacity={opacity} color={colors.skeleton} style={styles.skeletonPlanName} />
+              <LoadingSkeleton opacity={opacity} color={colors.skeletonSoft} style={styles.skeletonPlanDescShort} />
+            </View>
+          </View>
+          <LoadingSkeleton opacity={opacity} color={colors.skeletonSoft} style={styles.skeletonDescription} />
+          <LoadingSkeleton opacity={opacity} color={colors.skeleton} style={styles.skeletonPrice} />
+          <LoadingSkeleton opacity={opacity} color={colors.skeletonSoft} style={styles.skeletonDuration} />
+          <View style={styles.features}>
+            {[0, 1, 2, 3].map((feature) => (
+              <View key={`feature-skeleton-${item}-${feature}`} style={styles.featureRow}>
+                <LoadingSkeleton opacity={opacity} color={colors.skeleton} style={styles.skeletonCheck} />
+                <LoadingSkeleton opacity={opacity} color={colors.skeletonSoft} style={[styles.skeletonFeature, feature % 2 ? styles.skeletonFeatureShort : null]} />
+              </View>
+            ))}
+          </View>
+          <LoadingSkeleton opacity={opacity} color={colors.skeleton} style={styles.skeletonCta} />
+        </View>
+      ))}
+    </View>
+  );
 }
 
 export default function PricingScreen() {
@@ -135,7 +172,7 @@ export default function PricingScreen() {
       ) : null}
 
       {plansQuery.isLoading ? (
-        <View style={styles.loading}><ActivityIndicator color={colors.primary} /><Text style={[styles.stateText, { color: colors.textMuted }]}>প্ল্যান লোড হচ্ছে...</Text></View>
+        <PricingPlansSkeleton colors={colors} />
       ) : plansQuery.isError ? (
         <View style={[styles.errorCard, { backgroundColor: colors.card, borderColor: colors.border }]}><Text style={[styles.errorTitle, { color: colors.text }]}>প্ল্যান লোড করা যায়নি</Text><Text style={[styles.stateText, { color: colors.textMuted }]}>ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।</Text><Button title='আবার চেষ্টা করুন' size='sm' onPress={() => plansQuery.refetch()} /></View>
       ) : plans.length === 0 ? (
@@ -248,7 +285,6 @@ const styles = StyleSheet.create({
   statusTitleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
   statusTitle: { fontSize: 11.5, fontFamily: Fonts.headingBold },
   statusText: { marginTop: 2, fontSize: 9.5, fontFamily: Fonts.sansRegular },
-  loading: { minHeight: 180, alignItems: 'center', justifyContent: 'center', gap: 8 },
   stateText: { fontSize: 10.5, lineHeight: 16, fontFamily: Fonts.sansRegular, textAlign: 'center' },
   errorCard: { borderWidth: 1, borderRadius: 14, padding: 24, alignItems: 'center', gap: 8 },
   errorTitle: { fontSize: 14, fontFamily: Fonts.headingBold, textAlign: 'center' },
@@ -279,4 +315,15 @@ const styles = StyleSheet.create({
   accessTitle: { flex: 1, fontSize: 13, fontFamily: Fonts.headingBold },
   accessFeature: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
   accessFeatureText: { flex: 1, fontSize: 10, lineHeight: 15, fontFamily: Fonts.sansRegular },
+  skeletonPlanIcon: { width: 42, height: 42, borderRadius: 11 },
+  skeletonPlanHeading: { flex: 1, gap: 7 },
+  skeletonPlanName: { width: '48%', height: 15 },
+  skeletonPlanDescShort: { width: '34%', height: 9 },
+  skeletonDescription: { width: '78%', height: 10 },
+  skeletonPrice: { width: 112, height: 30 },
+  skeletonDuration: { width: 126, height: 9 },
+  skeletonCheck: { width: 18, height: 18, borderRadius: 9 },
+  skeletonFeature: { width: '72%', height: 10, marginTop: 4 },
+  skeletonFeatureShort: { width: '58%' },
+  skeletonCta: { width: '100%', height: 42, borderRadius: 9, marginTop: 2 },
 });
