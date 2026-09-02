@@ -9,7 +9,7 @@ import {
 import { useMapStore } from '../../store/useMapStore';
 import { Fonts } from '../../../../constants/typography';
 import { toBengaliDigits } from '../../../../lib/utils';
-import { canvasPointActionGesture, commitCenterPointFromRuntime } from '../canvas/canvas-runtime';
+import { canvasPointActionGesture } from '../canvas/canvas-runtime';
 
 type Props = {
   onOpenManualScale: () => void;
@@ -61,19 +61,12 @@ function Action({ label, icon, onPress, active, disabled, primary, danger, compa
 
 /**
  * Point uses the same native recognizer that the canvas Pan marks as external
- * simultaneous. This is intentionally not a TouchableOpacity: Android may keep
- * the React responder owned by finger #1, while RNGH can still recognize the
- * second finger independently.
+ * simultaneous. Android can therefore keep finger #1 panning while finger #2
+ * commits the crosshair point independently.
  */
-function PointAction({ label, icon, disabled }: ActionProps) {
+function PointAction({ label, icon, disabled }: Omit<ActionProps, 'onPress'>) {
   const content = (
-    <View
-      style={[
-        styles.action,
-        styles.primary,
-        disabled && styles.disabled,
-      ]}
-    >
+    <View style={[styles.action, styles.primary, disabled && styles.disabled]}>
       {icon}
       <Text numberOfLines={1} style={[styles.actionLabel, styles.white]}>{label}</Text>
     </View>
@@ -85,43 +78,69 @@ function PointAction({ label, icon, disabled }: ActionProps) {
 
 export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOpenSave, onOpenLoad }: Props) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
-  const store = useMapStore();
-  const {
-    mode, mapImage, scale, plotPoints, plotPointsFuture, plots,
-    calibrationLine, calibrationLineFuture, isShowDiagonals, isMagnifierEnabled,
-    manualDividePlotId, manualCutLine, nudgeTarget,
-  } = store;
+
+  // Keep this component isolated from high-frequency canvas coordinates.
+  // Primitive selectors mean pan/zoom and divide-anchor movement do not rerender
+  // the toolbar unless a value that changes its UI actually changes.
+  const mode = useMapStore((state) => state.mode);
+  const hasMapImage = useMapStore((state) => Boolean(state.mapImage));
+  const hasScale = useMapStore((state) => Boolean(state.scale));
+  const plotPointCount = useMapStore((state) => state.plotPoints.length);
+  const plotFutureCount = useMapStore((state) => state.plotPointsFuture.length);
+  const plotCount = useMapStore((state) => state.plots.length);
+  const calibrationPointCount = useMapStore((state) => state.calibrationLine.length / 2);
+  const calibrationFutureCount = useMapStore((state) => state.calibrationLineFuture.length / 2);
+  const isShowDiagonals = useMapStore((state) => state.isShowDiagonals);
+  const isMagnifierEnabled = useMapStore((state) => state.isMagnifierEnabled);
+  const manualDividePlotId = useMapStore((state) => state.manualDividePlotId);
+  const manualCutPointCount = useMapStore((state) => state.manualCutLine?.length ?? 0);
+  const nudgeTarget = useMapStore((state) => state.nudgeTarget);
+
+  const startCalibration = useMapStore((state) => state.startCalibration);
+  const cancelCalibration = useMapStore((state) => state.cancelCalibration);
+  const undoCalibrationPoint = useMapStore((state) => state.undoCalibrationPoint);
+  const redoCalibrationPoint = useMapStore((state) => state.redoCalibrationPoint);
+  const cancelActiveMode = useMapStore((state) => state.cancelActiveMode);
+  const undoPlotAction = useMapStore((state) => state.undoPlotAction);
+  const redoPlotAction = useMapStore((state) => state.redoPlotAction);
+  const finishPlot = useMapStore((state) => state.finishPlot);
+  const cancelManualDivide = useMapStore((state) => state.cancelManualDivide);
+  const setNudgeTarget = useMapStore((state) => state.setNudgeTarget);
+  const nudgeManualCutLine = useMapStore((state) => state.nudgeManualCutLine);
+  const addManualCutPoint = useMapStore((state) => state.addManualCutPoint);
+  const removeManualCutPoint = useMapStore((state) => state.removeManualCutPoint);
+  const executeManualDivide = useMapStore((state) => state.executeManualDivide);
+  const clearMap = useMapStore((state) => state.clearMap);
+  const setIsShowDiagonals = useMapStore((state) => state.setIsShowDiagonals);
+  const setIsMagnifierEnabled = useMapStore((state) => state.setIsMagnifierEnabled);
+  const startPlotDrawing = useMapStore((state) => state.startPlotDrawing);
+  const startManualDivide = useMapStore((state) => state.startManualDivide);
 
   const beginCalibration = () => {
-    if (!mapImage) { onOpenImagePicker(); return; }
-    if (plots.length === 0) { store.startCalibration(); return; }
+    if (!hasMapImage) { onOpenImagePicker(); return; }
+    if (plotCount === 0) { startCalibration(); return; }
     Alert.alert('স্কেল আবার সেট করবেন?', 'স্কেল বদলালে বর্তমান সব প্লট মুছে যাবে।', [
       { text: 'বাতিল', style: 'cancel' },
-      { text: 'চালিয়ে যান', style: 'destructive', onPress: store.startCalibration },
+      { text: 'চালিয়ে যান', style: 'destructive', onPress: startCalibration },
     ]);
   };
 
   const resetMap = () => {
-    if (!mapImage) return;
+    if (!hasMapImage) return;
     Alert.alert('সব মুছে ফেলবেন?', 'বর্তমান ম্যাপ, স্কেল ছাড়া সব প্লট ও চলমান কাজ মুছে যাবে।', [
       { text: 'বাতিল', style: 'cancel' },
-      { text: 'মুছে ফেলুন', style: 'destructive', onPress: () => { store.clearMap(); setIsMoreOpen(false); } },
+      { text: 'মুছে ফেলুন', style: 'destructive', onPress: () => { clearMap(); setIsMoreOpen(false); } },
     ]);
   };
 
-  const addCenterPoint = () => {
-    commitCenterPointFromRuntime();
-  };
-
   if (mode === 'calibrating') {
-    const count = calibrationLine.length / 2;
     return (
       <View style={styles.wrapper}>
-        <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelCalibration} />
-        <Action label='আনডু' disabled={count === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={store.undoCalibrationPoint} />
-        <Action label='রিডু' disabled={calibrationLineFuture.length === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={store.redoCalibrationPoint} />
+        <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={cancelCalibration} />
+        <Action label='আনডু' disabled={calibrationPointCount === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={undoCalibrationPoint} />
+        <Action label='রিডু' disabled={calibrationFutureCount === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={redoCalibrationPoint} />
         <Action label='ম্যানুয়াল' icon={<Ruler size={18} color='#fbbf24' />} onPress={onOpenManualScale} />
-        <PointAction label={`পয়েন্ট ${toBengaliDigits(count)}/২`} disabled={count >= 2} icon={<Crosshair size={19} color='#fff' />} onPress={addCenterPoint} />
+        <PointAction label={`পয়েন্ট ${toBengaliDigits(calibrationPointCount)}/২`} disabled={calibrationPointCount >= 2} icon={<Crosshair size={19} color='#fff' />} />
       </View>
     );
   }
@@ -129,20 +148,20 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   if (mode === 'drawing_plot') {
     return (
       <View style={styles.wrapper}>
-        <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelActiveMode} />
-        <Action label='আনডু' disabled={plotPoints.length === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={store.undoPlotAction} />
-        <Action label='রিডু' disabled={plotPointsFuture.length === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={store.redoPlotAction} />
-        <PointAction label={`পয়েন্ট ${toBengaliDigits(plotPoints.length)}`} icon={<Crosshair size={19} color='#fff' />} onPress={addCenterPoint} />
-        <Action label='শেষ করুন' disabled={plotPoints.length < 3} icon={<Check size={19} color='#86efac' />} onPress={store.finishPlot} />
+        <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={cancelActiveMode} />
+        <Action label='আনডু' disabled={plotPointCount === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={undoPlotAction} />
+        <Action label='রিডু' disabled={plotFutureCount === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={redoPlotAction} />
+        <PointAction label={`পয়েন্ট ${toBengaliDigits(plotPointCount)}`} icon={<Crosshair size={19} color='#fff' />} />
+        <Action label='শেষ করুন' disabled={plotPointCount < 3} icon={<Check size={19} color='#86efac' />} onPress={finishPlot} />
       </View>
     );
   }
 
   if (mode === 'manual_divide_plot') {
-    if (!manualDividePlotId || !manualCutLine) {
+    if (!manualDividePlotId || manualCutPointCount === 0) {
       return (
         <View style={styles.wrapper}>
-          <Action label='Cancel' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelManualDivide} />
+          <Action label='Cancel' danger icon={<X size={18} color='#ef4444' />} onPress={cancelManualDivide} />
           <View style={styles.divideMessage}><Text style={styles.divideText}>Tap the plot to divide</Text></View>
         </View>
       );
@@ -158,18 +177,18 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
             <Text style={styles.divideHeading}>Adjust cut line</Text>
             <Text style={styles.divideTopText}>Move: {targetLabel}</Text>
           </View>
-          <TouchableOpacity onPress={() => store.setNudgeTarget(nextTarget)} style={styles.targetButton}>
+          <TouchableOpacity onPress={() => setNudgeTarget(nextTarget)} style={styles.targetButton}>
             <MoveHorizontal size={14} color='#bfdbfe' />
             <Text style={styles.targetText}>Target</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.divideActions}>
-          <Action compact label='Cancel' danger icon={<X size={17} color='#ef4444' />} onPress={store.cancelManualDivide} />
-          <Action compact label='Left' icon={<Undo2 size={17} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(-1)} />
-          <Action compact label='Right' icon={<Redo2 size={17} color='#cbd5e1' />} onPress={() => store.nudgeManualCutLine(1)} />
-          <Action compact label='Point +' icon={<Plus size={17} color='#93c5fd' />} onPress={store.addManualCutPoint} />
-          <Action compact label='Point −' disabled={manualCutLine.length <= 2} icon={<Minus size={17} color='#93c5fd' />} onPress={store.removeManualCutPoint} />
-          <Action compact label='Divide' primary icon={<Scissors size={17} color='#fff' />} onPress={store.executeManualDivide} />
+          <Action compact label='Cancel' danger icon={<X size={17} color='#ef4444' />} onPress={cancelManualDivide} />
+          <Action compact label='Left' icon={<Undo2 size={17} color='#cbd5e1' />} onPress={() => nudgeManualCutLine(-1)} />
+          <Action compact label='Right' icon={<Redo2 size={17} color='#cbd5e1' />} onPress={() => nudgeManualCutLine(1)} />
+          <Action compact label='Point +' icon={<Plus size={17} color='#93c5fd' />} onPress={addManualCutPoint} />
+          <Action compact label='Point −' disabled={manualCutPointCount <= 2} icon={<Minus size={17} color='#93c5fd' />} onPress={removeManualCutPoint} />
+          <Action compact label='Divide' primary icon={<Scissors size={17} color='#fff' />} onPress={executeManualDivide} />
         </View>
       </View>
     );
@@ -177,19 +196,19 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
 
   return <>
     {isMoreOpen && <View style={styles.morePanel}>
-      {plots.length > 0 && <Action label='সেভ' active icon={<BookmarkCheck size={18} color='#fff' />} onPress={() => { setIsMoreOpen(false); onOpenSave(); }} />}
+      {plotCount > 0 && <Action label='সেভ' active icon={<BookmarkCheck size={18} color='#fff' />} onPress={() => { setIsMoreOpen(false); onOpenSave(); }} />}
       <Action label='ড্রাইভ' icon={<HardDrive size={18} color='#94a3b8' />} onPress={() => void Linking.openURL('https://drive.google.com/drive/folders/1r0ryb1SyCeYV-41CM1WweokGDKT5t9RB')} />
-      <Action label='কর্ণ' active={isShowDiagonals} icon={isShowDiagonals ? <Eye size={18} color='#fff' /> : <EyeOff size={18} color='#94a3b8' />} onPress={() => store.setIsShowDiagonals(!isShowDiagonals)} />
+      <Action label='কর্ণ' active={isShowDiagonals} icon={isShowDiagonals ? <Eye size={18} color='#fff' /> : <EyeOff size={18} color='#94a3b8' />} onPress={() => setIsShowDiagonals(!isShowDiagonals)} />
       <Action label='সাহায্য' icon={<HelpCircle size={18} color='#94a3b8' />} onPress={() => Alert.alert('ব্যবহার', 'ম্যাপ নিন → স্কেল সেট করুন → ক্রসহেয়ার কোণায় এনে পয়েন্ট যোগ করুন → শেষ করুন।')} />
-      <Action label='রিসেট' danger disabled={!mapImage} icon={<RotateCcw size={18} color='#ef4444' />} onPress={resetMap} />
+      <Action label='রিসেট' danger disabled={!hasMapImage} icon={<RotateCcw size={18} color='#ef4444' />} onPress={resetMap} />
     </View>}
     <View style={styles.wrapper}>
       <Action label='ম্যাপ' icon={<ImageIcon size={18} color='#94a3b8' />} onPress={onOpenImagePicker} />
       <Action label='সেভড' icon={<FolderOpen size={18} color='#94a3b8' />} onPress={onOpenLoad} />
-      <Action label='স্কেল' icon={<Ruler size={18} color={scale ? '#94a3b8' : '#fbbf24'} />} onPress={beginCalibration} />
-      <Action label='আঁকুন' disabled={!mapImage || !scale} icon={<PenTool size={18} color='#94a3b8' />} onPress={store.startPlotDrawing} />
-      <Action label='ভাগ' disabled={plots.length === 0} icon={<Scissors size={18} color='#94a3b8' />} onPress={store.startManualDivide} />
-      <Action label='ম্যাগনিফাই' active={isMagnifierEnabled} icon={isMagnifierEnabled ? <SearchX size={18} color='#fff' /> : <Search size={18} color='#94a3b8' />} onPress={() => store.setIsMagnifierEnabled(!isMagnifierEnabled)} />
+      <Action label='স্কেল' icon={<Ruler size={18} color={hasScale ? '#94a3b8' : '#fbbf24'} />} onPress={beginCalibration} />
+      <Action label='আঁকুন' disabled={!hasMapImage || !hasScale} icon={<PenTool size={18} color='#94a3b8' />} onPress={startPlotDrawing} />
+      <Action label='ভাগ' disabled={plotCount === 0} icon={<Scissors size={18} color='#94a3b8' />} onPress={startManualDivide} />
+      <Action label='ম্যাগনিফাই' active={isMagnifierEnabled} icon={isMagnifierEnabled ? <SearchX size={18} color='#fff' /> : <Search size={18} color='#94a3b8' />} onPress={() => setIsMagnifierEnabled(!isMagnifierEnabled)} />
       <Action label='আরও' active={isMoreOpen} icon={<MoreHorizontal size={18} color={isMoreOpen ? '#fff' : '#94a3b8'} />} onPress={() => setIsMoreOpen((open) => !open)} />
     </View>
   </>;
