@@ -9,9 +9,17 @@ import type {
 import type { ApiResult } from '../types/auth';
 
 export const CalculationService = {
-  getCalculations: (searchTerm?: string): Promise<ApiResult<TCalculation[]>> => {
-    const query = searchTerm ? `?searchTerm=${encodeURIComponent(searchTerm)}` : '';
-    return apiFetch<TCalculation[]>(`${API_ENDPOINTS.calculations.root}${query}`, {
+  getCalculations: (
+    searchTerm?: string,
+    page = 1,
+    limit?: number,
+  ): Promise<ApiResult<TCalculation[]>> => {
+    const params = new URLSearchParams();
+    if (searchTerm?.trim()) params.set('searchTerm', searchTerm.trim());
+    if (page > 0) params.set('page', String(page));
+    if (limit && limit > 0) params.set('limit', String(limit));
+    const query = params.toString();
+    return apiFetch<TCalculation[]>(`${API_ENDPOINTS.calculations.root}${query ? `?${query}` : ''}`, {
       method: 'GET',
       auth: true,
     });
