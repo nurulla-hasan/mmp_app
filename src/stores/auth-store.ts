@@ -69,6 +69,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   setSession: async (tokens: AuthTokens, user?: TAuthUser) => {
+    // A fresh login/verification can represent a different account. Remove all
+    // persisted server-state before hydrating the new identity.
+    await clearQueryCache();
     await SessionStorage.setTokens(tokens);
 
     if (user) {

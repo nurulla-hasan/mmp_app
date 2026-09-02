@@ -70,8 +70,12 @@ export const AuthService = {
       auth: true,
     }),
 
-  updateMe: (payload: UpdateProfilePayload): Promise<ApiResult<{ user: TAuthUser }>> =>
-    apiFetch<{ user: TAuthUser }>(API_ENDPOINTS.auth.me, {
+  // Backend returns a safe user projection here. Merge it with the current
+  // /auth/me user instead of treating it as a complete auth identity.
+  updateMe: (
+    payload: UpdateProfilePayload
+  ): Promise<ApiResult<{ user: Partial<TAuthUser> }>> =>
+    apiFetch<{ user: Partial<TAuthUser> }>(API_ENDPOINTS.auth.me, {
       method: 'PATCH',
       body: payload,
       auth: true,
