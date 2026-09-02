@@ -28,19 +28,17 @@ import { LocateFixed, Minus, Plus } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { calculatePolygonData } from '../../utils/calculations';
 import {
+  clipLineToPolygon,
   getLogicalCorners,
   getSnappedPoint,
   getVisualCenter,
-  clipLineToPolygon,
 } from '../../utils/geometry';
 import { getDirectionalContainingPlot } from '../../utils/directionalPlot';
 import { splitPolygonByPolyline } from '../../utils/polygonDivision';
 import {
   AREA_LABEL_FONT_SCALE,
-  AREA_LABEL_HEIGHT_FACTOR,
   AREA_LABEL_PADDING_FACTOR,
   AREA_LABEL_RADIUS_FACTOR,
-  AREA_LABEL_WIDTH_FACTOR,
   MANUAL_DIVIDE_CORNER_SNAP_PX,
   MIN_DIAGONAL_DRAW_PX,
   MIN_EDGE_LABEL_FT,
@@ -55,7 +53,12 @@ import type { PlotRecord, Point } from '../../types/map';
 import { Fonts } from '../../../../constants/typography';
 import { getActivePlotDots, getActiveSegmentLabels, getPlotEdgeLabels } from './nativeStageGeometry';
 import { SkiaTiledMap } from './SkiaTiledMap';
-import { setCanvasRuntimeTransform } from './canvas-runtime';
+import {
+  canvasRuntimeScale,
+  canvasRuntimeX,
+  canvasRuntimeY,
+  setCanvasRuntimeTransform,
+} from './canvas-runtime';
 
 type Size = { width: number; height: number };
 type Transform = { scale: number; pos: Point };
@@ -66,8 +69,9 @@ type LiveOverlayData = {
   color: string;
   snapped: boolean;
 };
-
 type ManualDrag = { index: number; x: number; y: number };
+
+type SharedNumber = ReturnType<typeof useSharedValue<number>>;
 
 const midpoint = (a: Point, b: Point): Point => ({
   x: (a.x + b.x) / 2,
@@ -102,10 +106,52 @@ const rgba = (hex: string, alpha: number) => {
   return `rgba(${r},${g},${b},${alpha})`;
 };
 
+const getClosestPointOnSegmentWorklet = (px: number, py: number, p1: Point, p2: Point) => {
+  'worklet';
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 1e-12) return { x: p1.x, y: p1.y };
+  const rawT = ((px - p1.x) * dx + (py - p1.y) * dy) / lengthSquared;
+  const t = Math.max(0, Math.min(1, rawT));
+  return { x: p1.x + t * dx, y: p1.y + t * dy };
+};
+
+/** UI-thread equivalent of web getSnappedPoint for one polygon. */
+const getSnappedPointWorklet = (
+  px: number,
+  py: number,
+  polygon: Point[],
+  threshold: number,
+) => {
+  'worklet';
+  let minDistance = threshold;
+  let resultX = px;
+  let resultY = py;
+
+  for (let index = 0; index < polygon.length; index += 1) {
+    const closest = getClosestPointOnSegmentWorklet(
+      px,
+      py,
+      polygon[index],
+      polygon[(index + 1) % polygon.length],
+    );
+    const dx = closest.x - px;
+    const dy = closest.y - py;
+    const currentDistance = Math.sqrt(dx * dx + dy * dy);
+    if (currentDistance < minDistance) {
+      minDistance = currentDistance;
+      resultX = closest.x;
+      resultY = closest.y;
+    }
+  }
+
+  return { x: resultX, y: resultY };
+};
+
 const getCornerSnapPoint = (point: Point, polygon: Point[], threshold: number): Point | null => {
   let closest: Point | null = null;
   let closestDistance = threshold;
-
   for (const vertex of polygon) {
     const value = Math.hypot(point.x - vertex.x, point.y - vertex.y);
     if (value <= closestDistance) {
@@ -113,7 +159,6 @@ const getCornerSnapPoint = (point: Point, polygon: Point[], threshold: number): 
       closest = vertex;
     }
   }
-
   return closest ? { x: closest.x, y: closest.y } : null;
 };
 
@@ -133,6 +178,30 @@ function makeParagraph(text: string, color: string, fontSize: number, width: num
   return paragraph;
 }
 
+function makeMeasuredParagraph(text: string, color: string, fontSize: number) {
+  const paragraph = Skia.ParagraphBuilder.Make({ textAlign: TextAlign.Center })
+    .pushStyle({
+      color: Skia.Color(color),
+      fontSize,
+      fontStyle: { weight: 700 },
+      locale: 'bn-BD',
+      heightMultiplier: 1.05,
+    })
+    .addText(text)
+    .pop()
+    .build();
+
+  paragraph.layout(4096);
+  const runtimeParagraph = paragraph as any;
+  const intrinsicWidth = Number(runtimeParagraph.getLongestLine?.())
+    || Number(runtimeParagraph.getMaxIntrinsicWidth?.())
+    || text.length * fontSize * 0.66;
+  const textWidth = Math.max(fontSize * 2.5, intrinsicWidth);
+  paragraph.layout(textWidth + 1);
+  const textHeight = Number(runtimeParagraph.getHeight?.()) || fontSize * 1.08;
+  return { paragraph, textWidth, textHeight };
+}
+
 type LabelProps = {
   x: number;
   y: number;
@@ -144,12 +213,6 @@ type LabelProps = {
   opacity?: number;
 };
 
-/**
- * Web PlotEdgeLabels/StageActivePlot use colored text with a 2.2px white
- * outline, not a white label box. Skia Paragraph is kept for Bengali shaping;
- * the outline is reproduced by drawing the same shaped paragraph around the
- * fill at half the web stroke width.
- */
 const SkiaOutlinedText = memo(function SkiaOutlinedText({
   x,
   y,
@@ -174,7 +237,6 @@ const SkiaOutlinedText = memo(function SkiaOutlinedText({
     () => makeParagraph(text, 'rgba(255,255,255,0.95)', fontSize, width),
     [fontSize, text, width],
   );
-
   const offsets = useMemo(() => [
     [-outline, 0],
     [outline, 0],
@@ -204,17 +266,12 @@ const SkiaOutlinedText = memo(function SkiaOutlinedText({
           width={width}
         />
       ))}
-      <Paragraph
-        paragraph={fillParagraph}
-        x={-width / 2}
-        y={-height * 0.52}
-        width={width}
-      />
+      <Paragraph paragraph={fillParagraph} x={-width / 2} y={-height * 0.52} width={width} />
     </Group>
   );
 });
 
-/** Exact Skia equivalent of the web StagePlots/StageManualCut area tag. */
+/** Web Tag auto-sizes from the real shaped text. Do the same in Skia. */
 const SkiaAreaBadge = memo(function SkiaAreaBadge({
   x,
   y,
@@ -226,20 +283,14 @@ const SkiaAreaBadge = memo(function SkiaAreaBadge({
   const safeScale = Math.max(stageScale, 0.01);
   const fontSize = (UI_CONFIG.fontSize.small * AREA_LABEL_FONT_SCALE) / safeScale;
   const padding = (UI_CONFIG.padding.small * AREA_LABEL_PADDING_FACTOR) / safeScale;
-  const width = Math.max(
-    24 / safeScale,
-    text.length * fontSize * AREA_LABEL_WIDTH_FACTOR + padding * 2,
-  );
-  const height = Math.max(
-    10 / safeScale,
-    fontSize * AREA_LABEL_HEIGHT_FACTOR + padding * 2,
-  );
   const radius = (UI_CONFIG.radius.small * AREA_LABEL_RADIUS_FACTOR) / safeScale;
-  const shadowOffset = 1 / safeScale;
-  const paragraph = useMemo(
-    () => makeParagraph(text, '#ffffff', fontSize, width),
-    [fontSize, text, width],
+  const measured = useMemo(
+    () => makeMeasuredParagraph(text, '#ffffff', fontSize),
+    [fontSize, text],
   );
+  const width = measured.textWidth + padding * 2;
+  const height = Math.max(fontSize * 1.08, measured.textHeight) + padding * 2;
+  const shadow = 1.1 / safeScale;
 
   return (
     <Group
@@ -251,12 +302,12 @@ const SkiaAreaBadge = memo(function SkiaAreaBadge({
       ]}
     >
       <RoundedRect
-        x={-width / 2 + shadowOffset}
-        y={-height / 2 + shadowOffset}
+        x={-width / 2 + shadow}
+        y={-height / 2 + shadow}
         width={width}
         height={height}
         r={radius}
-        color='rgba(0,0,0,0.18)'
+        color='rgba(0,0,0,0.22)'
       />
       <RoundedRect
         x={-width / 2}
@@ -267,10 +318,10 @@ const SkiaAreaBadge = memo(function SkiaAreaBadge({
         color={color}
       />
       <Paragraph
-        paragraph={paragraph}
-        x={-width / 2}
-        y={-height * 0.52}
-        width={width}
+        paragraph={measured.paragraph}
+        x={-measured.textWidth / 2}
+        y={-measured.textHeight / 2}
+        width={measured.textWidth + 1}
       />
     </Group>
   );
@@ -295,14 +346,7 @@ const SkiaDiagonalBadge = memo(function SkiaDiagonalBadge({
 
   return (
     <Group transform={[{ translateX: x }, { translateY: y }]} opacity={0.8}>
-      <RoundedRect
-        x={-width / 2}
-        y={-height / 2}
-        width={width}
-        height={height}
-        r={padding}
-        color='#ffffff'
-      />
+      <RoundedRect x={-width / 2} y={-height / 2} width={width} height={height} r={padding} color='#ffffff' />
       <RoundedRect
         x={-width / 2}
         y={-height / 2}
@@ -313,12 +357,7 @@ const SkiaDiagonalBadge = memo(function SkiaDiagonalBadge({
         style='stroke'
         strokeWidth={UI_CONFIG.strokeWidth.thin / safeScale}
       />
-      <Paragraph
-        paragraph={paragraph}
-        x={-width / 2}
-        y={-height * 0.48}
-        width={width}
-      />
+      <Paragraph paragraph={paragraph} x={-width / 2} y={-height * 0.48} width={width} />
     </Group>
   );
 });
@@ -366,6 +405,41 @@ function PlotShape({
   );
 }
 
+type ManualAnchorProps = {
+  point: Point;
+  index: number;
+  stageScale: number;
+  dragIndex: SharedNumber;
+  dragX: SharedNumber;
+  dragY: SharedNumber;
+};
+
+const ManualAnchor = memo(function ManualAnchor({
+  point,
+  index,
+  stageScale,
+  dragIndex,
+  dragX,
+  dragY,
+}: ManualAnchorProps) {
+  const cx = useDerivedValue(() => dragIndex.value === index ? dragX.value : point.x);
+  const cy = useDerivedValue(() => dragIndex.value === index ? dragY.value : point.y);
+  const radius = UI_CONFIG.radius.xlarge / Math.max(stageScale, 0.01);
+  return (
+    <Group>
+      <Circle cx={cx as any} cy={cy as any} r={radius} color='#DC2626' />
+      <Circle
+        cx={cx as any}
+        cy={cy as any}
+        r={radius}
+        color='#ffffff'
+        style='stroke'
+        strokeWidth={UI_CONFIG.strokeWidth.thick / Math.max(stageScale, 0.01)}
+      />
+    </Group>
+  );
+});
+
 export function SkiaMapCanvas() {
   const mapImage = useMapStore((state) => state.mapImage);
   const mode = useMapStore((state) => state.mode);
@@ -389,10 +463,7 @@ export function SkiaMapCanvas() {
     color: UI_CONFIG.colors.drawPrimary,
     snapped: false,
   });
-  const [magnifierTransform, setMagnifierTransform] = useState<Transform>({
-    scale: stageScale,
-    pos: stagePos,
-  });
+  const [magnifierTransform, setMagnifierTransform] = useState<Transform>({ scale: stageScale, pos: stagePos });
 
   const deferredManualCutLine = useDeferredValue(manualCutLine);
   const liveRafRef = useRef<number | null>(null);
@@ -408,14 +479,28 @@ export function SkiaMapCanvas() {
   const pinchStartScale = useSharedValue(stageScale);
   const pinchCanvasX = useSharedValue(0);
   const pinchCanvasY = useSharedValue(0);
+  const pinchHasAnchor = useSharedValue(0);
   const pinchActive = useSharedValue(0);
   const draggingAnchor = useSharedValue(-1);
+  const dragVisualX = useSharedValue(0);
+  const dragVisualY = useSharedValue(0);
 
   const contentTransform = useDerivedValue(() => [
     { translateX: translateX.value },
     { translateY: translateY.value },
     { scale: zoom.value },
   ]);
+
+  const manualCutPath = useDerivedValue(() => {
+    if (!manualCutLine?.length) return '';
+    const parts: string[] = [];
+    for (let index = 0; index < manualCutLine.length; index += 1) {
+      const x = draggingAnchor.value === index ? dragVisualX.value : manualCutLine[index].x;
+      const y = draggingAnchor.value === index ? dragVisualY.value : manualCutLine[index].y;
+      parts.push(`${index === 0 ? 'M' : 'L'} ${x} ${y}`);
+    }
+    return parts.join(' ');
+  });
 
   useEffect(() => {
     translateX.value = stagePos.x;
@@ -441,20 +526,15 @@ export function SkiaMapCanvas() {
     () => plots.find((plot) => plot.id === manualDividePlotId) ?? null,
     [manualDividePlotId, plots],
   );
+  const selectedPlotPoints = selectedPlot?.points ?? [];
 
-  /** Web StageManualCut defers this expensive calculation while an anchor moves. */
   const splitPreview = useMemo(() => {
-    if (!selectedPlot || !deferredManualCutLine || deferredManualCutLine.length < 2 || !scale) {
-      return null;
-    }
-
+    if (!selectedPlot || !deferredManualCutLine || deferredManualCutLine.length < 2 || !scale) return null;
     const split = splitPolygonByPolyline(selectedPlot.points, deferredManualCutLine);
     if (!split || split.poly1.length < 3 || split.poly2.length < 3) return null;
-
     const resultA = calculatePolygonData(split.poly1, scale);
     const resultB = calculatePolygonData(split.poly2, scale);
     if (!resultA || !resultB) return null;
-
     return {
       poly1: split.poly1,
       poly2: split.poly2,
@@ -472,13 +552,7 @@ export function SkiaMapCanvas() {
       x: (viewport.width / 2 - transform.pos.x) / safeScale,
       y: (viewport.height / 2 - transform.pos.y) / safeScale,
     };
-
-    let target = getSnappedPoint(
-      raw,
-      current.plots.map((plot) => plot.points),
-      10 / safeScale,
-    );
-
+    let target = getSnappedPoint(raw, current.plots.map((plot) => plot.points), 10 / safeScale);
     if (
       current.mode === 'drawing_plot'
       && current.plotPoints.length >= 3
@@ -486,7 +560,6 @@ export function SkiaMapCanvas() {
     ) {
       target = current.plotPoints[0];
     }
-
     if (current.mode === 'drawing_plot' && current.plotPoints.length > 0) {
       const containing = getDirectionalContainingPlot(
         current.plots,
@@ -505,36 +578,23 @@ export function SkiaMapCanvas() {
 
     const calibration: Point[] = [];
     for (let index = 0; index < current.calibrationLine.length; index += 2) {
-      calibration.push({
-        x: current.calibrationLine[index],
-        y: current.calibrationLine[index + 1],
-      });
+      calibration.push({ x: current.calibrationLine[index], y: current.calibrationLine[index + 1] });
     }
-
     const startCanvas = current.mode === 'drawing_plot'
       ? current.plotPoints[current.plotPoints.length - 1] ?? null
       : current.mode === 'calibrating'
         ? calibration[0] ?? null
         : null;
-
     const toScreen = (point: Point): Point => ({
       x: point.x * transform.scale + transform.pos.x,
       y: point.y * transform.scale + transform.pos.y,
     });
-
-    const lengthFt = startCanvas && current.scale
-      ? distance(startCanvas, target) / current.scale
-      : 0;
+    const lengthFt = startCanvas && current.scale ? distance(startCanvas, target) / current.scale : 0;
     const distPx = startCanvas ? distance(startCanvas, target) : 0;
     const edgeScreenPx = distPx * transform.scale;
     let label: LiveOverlayData['label'] = null;
 
-    if (
-      startCanvas
-      && current.mode === 'drawing_plot'
-      && current.scale
-      && edgeScreenPx >= 34
-    ) {
+    if (startCanvas && current.mode === 'drawing_plot' && current.scale && edgeScreenPx >= 34) {
       const text = formatFeetInches(lengthFt);
       let fontPx = Math.min(UI_CONFIG.fontSize.small, Math.max(7.5, edgeScreenPx * 0.13));
       const widthPx = text.length * fontPx * 0.58;
@@ -542,12 +602,8 @@ export function SkiaMapCanvas() {
       if (widthPx > maxWidthPx && maxWidthPx > 0) {
         fontPx = Math.max(6.75, fontPx * maxWidthPx / widthPx);
       }
-
       const mid = midpoint(startCanvas, target);
       let point = mid;
-
-      // Web keeps the first live segment label centered. Interior-aware offset
-      // starts only after point #2 is committed.
       if (current.plotPoints.length > 1 && distPx >= 1) {
         const normalA = {
           x: -(target.y - startCanvas.y) / distPx,
@@ -563,12 +619,8 @@ export function SkiaMapCanvas() {
           + normalA.y * (plotCenter.y - mid.y) >= 0;
         const normal = facesCenter ? normalA : { x: -normalA.x, y: -normalA.y };
         const inset = Math.max(7, fontPx * 0.95) / transform.scale;
-        point = {
-          x: mid.x + normal.x * inset,
-          y: mid.y + normal.y * inset,
-        };
+        point = { x: mid.x + normal.x * inset, y: mid.y + normal.y * inset };
       }
-
       label = {
         point: toScreen(point),
         text,
@@ -602,37 +654,29 @@ export function SkiaMapCanvas() {
   const scheduleLiveOverlay = useCallback((transform: Transform) => {
     const current = useMapStore.getState();
     if (current.mode !== 'drawing_plot' && current.mode !== 'calibrating') return;
-
     pendingLiveTransformRef.current = transform;
     if (liveRafRef.current !== null) return;
-
     liveRafRef.current = requestAnimationFrame(() => {
       liveRafRef.current = null;
       const pending = pendingLiveTransformRef.current;
       if (!pending) return;
-
       const snapshot = useMapStore.getState();
       if (snapshot.mode !== 'drawing_plot' && snapshot.mode !== 'calibrating') {
         clearLiveOverlay();
         return;
       }
-
       setLiveOverlay(getLiveOverlay(pending));
       if (snapshot.isMagnifierEnabled) setMagnifierTransform(pending);
     });
   }, [clearLiveOverlay, getLiveOverlay]);
 
-  const updateRuntimeTransform = useCallback((nextScale: number, x: number, y: number) => {
-    setCanvasRuntimeTransform(nextScale, x, y);
+  const updateLiveOverlayFromUi = useCallback((nextScale: number, x: number, y: number) => {
     scheduleLiveOverlay({ scale: nextScale, pos: { x, y } });
   }, [scheduleLiveOverlay]);
 
   const commitGestureTransform = useCallback((nextScale: number, x: number, y: number) => {
     setCanvasRuntimeTransform(nextScale, x, y);
-    useMapStore.getState().setStageTransform({
-      scale: nextScale,
-      pos: { x, y },
-    });
+    useMapStore.getState().setStageTransform({ scale: nextScale, pos: { x, y } });
     scheduleLiveOverlay({ scale: nextScale, pos: { x, y } });
   }, [scheduleLiveOverlay]);
 
@@ -640,41 +684,23 @@ export function SkiaMapCanvas() {
     useMapStore.getState().setIsPinching(value);
   }, []);
 
-  /** Exact StageManualCut drag-move logic, RAF-throttled like web. */
   const scheduleManualAnchorMove = useCallback((index: number, x: number, y: number) => {
     pendingManualDragRef.current = { index, x, y };
     if (manualDragRafRef.current !== null) return;
-
     manualDragRafRef.current = requestAnimationFrame(() => {
       manualDragRafRef.current = null;
       const pending = pendingManualDragRef.current;
       pendingManualDragRef.current = null;
       if (!pending) return;
-
       const state = useMapStore.getState();
       const currentLine = state.manualCutLine;
-      const currentPlot = state.plots.find(
-        (item) => item.id === state.manualDividePlotId,
-      );
-      if (!currentLine || !currentPlot) return;
-      if (pending.index < 0 || pending.index >= currentLine.length) return;
-
-      const newLine = [...currentLine];
-      const isBoundary = pending.index === 0 || pending.index === currentLine.length - 1;
-      const snapThreshold = isBoundary
-        ? Number.POSITIVE_INFINITY
-        : 14 / Math.max(state.stageScale, 0.01);
-
-      newLine[pending.index] = getSnappedPoint(
-        { x: pending.x, y: pending.y },
-        [currentPlot.points],
-        snapThreshold,
-      );
-      state.setManualCutLine(newLine);
+      if (!currentLine || pending.index < 0 || pending.index >= currentLine.length) return;
+      const nextLine = [...currentLine];
+      nextLine[pending.index] = { x: pending.x, y: pending.y };
+      state.setManualCutLine(nextLine);
     });
   }, []);
 
-  /** Exact StageManualCut drag-end corner lock from web. */
   const finishManualAnchorMove = useCallback((index: number, x: number, y: number) => {
     if (manualDragRafRef.current !== null) {
       cancelAnimationFrame(manualDragRafRef.current);
@@ -684,17 +710,14 @@ export function SkiaMapCanvas() {
 
     const state = useMapStore.getState();
     const currentLine = state.manualCutLine;
-    const currentPlot = state.plots.find(
-      (item) => item.id === state.manualDividePlotId,
-    );
-    if (!currentLine || !currentPlot) return;
-    if (index < 0 || index >= currentLine.length) return;
+    const currentPlot = state.plots.find((item) => item.id === state.manualDividePlotId);
+    if (!currentLine || !currentPlot || index < 0 || index >= currentLine.length) {
+      draggingAnchor.value = -1;
+      return;
+    }
 
     const rawPoint = { x, y };
     const isBoundary = index === 0 || index === currentLine.length - 1;
-    const snapThreshold = isBoundary
-      ? Number.POSITIVE_INFINITY
-      : 14 / Math.max(state.stageScale, 0.01);
     const cornerSnap = isBoundary
       ? getCornerSnapPoint(
           rawPoint,
@@ -702,20 +725,24 @@ export function SkiaMapCanvas() {
           MANUAL_DIVIDE_CORNER_SNAP_PX / Math.max(state.stageScale, 0.01),
         )
       : null;
-
-    const newLine = [...currentLine];
-    newLine[index] = cornerSnap || getSnappedPoint(
+    const finalPoint = cornerSnap ?? getSnappedPoint(
       rawPoint,
       [currentPlot.points],
-      snapThreshold,
+      isBoundary ? Number.POSITIVE_INFINITY : 14 / Math.max(state.stageScale, 0.01),
     );
-    state.setManualCutLine(newLine);
-  }, []);
+    const nextLine = [...currentLine];
+    nextLine[index] = finalPoint;
+    state.setManualCutLine(nextLine);
+    dragVisualX.value = finalPoint.x;
+    dragVisualY.value = finalPoint.y;
+    requestAnimationFrame(() => {
+      draggingAnchor.value = -1;
+    });
+  }, [dragVisualX, dragVisualY, draggingAnchor]);
 
   const selectPlotAt = useCallback((screenX: number, screenY: number) => {
     const current = useMapStore.getState();
     if (current.mode !== 'manual_divide_plot' || current.manualDividePlotId) return;
-
     const runtimeScale = Math.max(zoom.value, 0.001);
     current.setStageTransform({
       scale: runtimeScale,
@@ -749,11 +776,7 @@ export function SkiaMapCanvas() {
 
   const resetView = useCallback(() => {
     if (!viewport.width || !viewport.height) return;
-
-    const nextFit = Math.min(
-      viewport.width / contentSize.width,
-      viewport.height / contentSize.height,
-    );
+    const nextFit = Math.min(viewport.width / contentSize.width, viewport.height / contentSize.height);
     const next = {
       scale: nextFit,
       pos: {
@@ -761,11 +784,13 @@ export function SkiaMapCanvas() {
         y: (viewport.height - contentSize.height * nextFit) / 2,
       },
     };
-
     setFitScale(nextFit);
     zoom.value = next.scale;
     translateX.value = next.pos.x;
     translateY.value = next.pos.y;
+    canvasRuntimeScale.value = next.scale;
+    canvasRuntimeX.value = next.pos.x;
+    canvasRuntimeY.value = next.pos.y;
     commitGestureTransform(next.scale, next.pos.x, next.pos.y);
   }, [
     commitGestureTransform,
@@ -780,24 +805,27 @@ export function SkiaMapCanvas() {
 
   useEffect(() => {
     if (mapImage?.uri && viewport.width && viewport.height) resetView();
-    // Reset only when a new image or viewport is introduced.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapImage?.uri, viewport.height, viewport.width]);
 
   const zoomAround = useCallback((factor: number) => {
     const currentScale = zoom.value;
-    const nextScale = clamp(currentScale * factor, STAGE_MIN_ZOOM, STAGE_MAX_ZOOM);
+    const minimumZoom = Math.min(STAGE_MIN_ZOOM, fitScale || STAGE_MIN_ZOOM);
+    const nextScale = clamp(currentScale * factor, minimumZoom, STAGE_MAX_ZOOM);
     const center = { x: viewport.width / 2, y: viewport.height / 2 };
     const ratio = nextScale / Math.max(currentScale, 0.001);
     const x = center.x - (center.x - translateX.value) * ratio;
     const y = center.y - (center.y - translateY.value) * ratio;
-
     zoom.value = nextScale;
     translateX.value = x;
     translateY.value = y;
+    canvasRuntimeScale.value = nextScale;
+    canvasRuntimeX.value = x;
+    canvasRuntimeY.value = y;
     commitGestureTransform(nextScale, x, y);
   }, [
     commitGestureTransform,
+    fitScale,
     translateX,
     translateY,
     viewport.height,
@@ -817,18 +845,21 @@ export function SkiaMapCanvas() {
         const safeScale = Math.max(zoom.value, 0.001);
         const canvasX = (event.x - translateX.value) / safeScale;
         const canvasY = (event.y - translateY.value) / safeScale;
-        // Web: radius 8 + hitStrokeWidth 30 => ~23 screen px hit radius.
         const threshold = 23 / safeScale;
         let closest = threshold;
-
         for (let index = 0; index < manualCutLine.length; index += 1) {
           const dx = manualCutLine[index].x - canvasX;
           const dy = manualCutLine[index].y - canvasY;
-          const value = Math.hypot(dx, dy);
+          const value = Math.sqrt(dx * dx + dy * dy);
           if (value <= closest) {
             closest = value;
             draggingAnchor.value = index;
           }
+        }
+        if (draggingAnchor.value >= 0) {
+          const point = manualCutLine[draggingAnchor.value];
+          dragVisualX.value = point.x;
+          dragVisualY.value = point.y;
         }
       }
     })
@@ -837,11 +868,19 @@ export function SkiaMapCanvas() {
 
       if (draggingAnchor.value >= 0) {
         const safeScale = Math.max(zoom.value, 0.001);
-        runOnJS(scheduleManualAnchorMove)(
-          draggingAnchor.value,
-          (event.x - translateX.value) / safeScale,
-          (event.y - translateY.value) / safeScale,
+        const rawX = (event.x - translateX.value) / safeScale;
+        const rawY = (event.y - translateY.value) / safeScale;
+        const boundary = draggingAnchor.value === 0
+          || draggingAnchor.value === (manualCutLine?.length ?? 1) - 1;
+        const snapped = getSnappedPointWorklet(
+          rawX,
+          rawY,
+          selectedPlotPoints,
+          boundary ? Number.POSITIVE_INFINITY : 14 / safeScale,
         );
+        dragVisualX.value = snapped.x;
+        dragVisualY.value = snapped.y;
+        runOnJS(scheduleManualAnchorMove)(draggingAnchor.value, snapped.x, snapped.y);
         return;
       }
 
@@ -849,7 +888,12 @@ export function SkiaMapCanvas() {
       const y = panStartY.value + event.translationY;
       translateX.value = x;
       translateY.value = y;
-      runOnJS(updateRuntimeTransform)(zoom.value, x, y);
+      canvasRuntimeScale.value = zoom.value;
+      canvasRuntimeX.value = x;
+      canvasRuntimeY.value = y;
+      if (mode === 'drawing_plot' || mode === 'calibrating') {
+        runOnJS(updateLiveOverlayFromUi)(zoom.value, x, y);
+      }
     })
     .onEnd((event: any) => {
       if (draggingAnchor.value >= 0) {
@@ -862,12 +906,16 @@ export function SkiaMapCanvas() {
       } else if (pinchActive.value === 0) {
         runOnJS(commitGestureTransform)(zoom.value, translateX.value, translateY.value);
       }
-      draggingAnchor.value = -1;
     })
     .onFinalize(() => {
-      draggingAnchor.value = -1;
+      if (pinchActive.value === 0 && draggingAnchor.value < 0) {
+        panStartX.value = translateX.value;
+        panStartY.value = translateY.value;
+      }
     }), [
       commitGestureTransform,
+      dragVisualX,
+      dragVisualY,
       draggingAnchor,
       finishManualAnchorMove,
       manualCutLine,
@@ -876,25 +924,37 @@ export function SkiaMapCanvas() {
       panStartY,
       pinchActive,
       scheduleManualAnchorMove,
+      selectedPlotPoints,
       translateX,
       translateY,
-      updateRuntimeTransform,
+      updateLiveOverlayFromUi,
       zoom,
     ]);
 
   const pinchGesture = useMemo(() => Gesture.Pinch()
-    .onStart((event: any) => {
+    .onStart(() => {
       pinchActive.value = 1;
+      pinchHasAnchor.value = 0;
       pinchStartScale.value = zoom.value;
-      const safeZoom = Math.max(zoom.value, 0.001);
-      pinchCanvasX.value = (event.focalX - translateX.value) / safeZoom;
-      pinchCanvasY.value = (event.focalY - translateY.value) / safeZoom;
       runOnJS(setPinching)(true);
     })
     .onUpdate((event: any) => {
+      // Android may report an unstable focal point on the activation frame.
+      // Anchor from the first real update frame, then preserve that image point
+      // under the moving focal point exactly like the web touch implementation.
+      if (pinchHasAnchor.value === 0) {
+        const safeZoom = Math.max(zoom.value, 0.001);
+        pinchStartScale.value = zoom.value;
+        pinchCanvasX.value = (event.focalX - translateX.value) / safeZoom;
+        pinchCanvasY.value = (event.focalY - translateY.value) / safeZoom;
+        pinchHasAnchor.value = 1;
+        return;
+      }
+
+      const minimumZoom = Math.min(STAGE_MIN_ZOOM, fitScale || STAGE_MIN_ZOOM);
       const nextScale = clamp(
         pinchStartScale.value * event.scale,
-        STAGE_MIN_ZOOM,
+        minimumZoom,
         STAGE_MAX_ZOOM,
       );
       const x = event.focalX - pinchCanvasX.value * nextScale;
@@ -903,34 +963,47 @@ export function SkiaMapCanvas() {
       zoom.value = nextScale;
       translateX.value = x;
       translateY.value = y;
-      runOnJS(updateRuntimeTransform)(nextScale, x, y);
+      canvasRuntimeScale.value = nextScale;
+      canvasRuntimeX.value = x;
+      canvasRuntimeY.value = y;
+      if (mode === 'drawing_plot' || mode === 'calibrating') {
+        runOnJS(updateLiveOverlayFromUi)(nextScale, x, y);
+      }
     })
     .onEnd(() => {
       runOnJS(commitGestureTransform)(zoom.value, translateX.value, translateY.value);
     })
     .onFinalize(() => {
+      pinchHasAnchor.value = 0;
       pinchActive.value = 0;
+      panStartX.value = translateX.value;
+      panStartY.value = translateY.value;
       runOnJS(setPinching)(false);
     }), [
       commitGestureTransform,
+      fitScale,
+      mode,
+      panStartX,
+      panStartY,
       pinchActive,
       pinchCanvasX,
       pinchCanvasY,
+      pinchHasAnchor,
       pinchStartScale,
       setPinching,
       translateX,
       translateY,
-      updateRuntimeTransform,
+      updateLiveOverlayFromUi,
       zoom,
     ]);
 
   const tapGesture = useMemo(() => Gesture.Tap()
     .maxDistance(8)
     .onEnd((event: any, success: boolean) => {
-      if (success && mode === 'manual_divide_plot' && !manualDividePlotId) {
+      if (success && pinchActive.value === 0 && mode === 'manual_divide_plot' && !manualDividePlotId) {
         runOnJS(selectPlotAt)(event.x, event.y);
       }
-    }), [manualDividePlotId, mode, selectPlotAt]);
+    }), [manualDividePlotId, mode, pinchActive, selectPlotAt]);
 
   const gesture = useMemo(
     () => Gesture.Simultaneous(panGesture, pinchGesture, tapGesture),
@@ -944,38 +1017,20 @@ export function SkiaMapCanvas() {
   };
 
   const instruction = mode === 'calibrating'
-    ? calibrationPoints.length === 0
-      ? 'ক্রসহেয়ার স্কেল বারের শুরুতে আনুন'
-      : 'ক্রসহেয়ার স্কেল বারের শেষে আনুন'
+    ? calibrationPoints.length === 0 ? 'ক্রসহেয়ার স্কেল বারের শুরুতে আনুন' : 'ক্রসহেয়ার স্কেল বারের শেষে আনুন'
     : mode === 'drawing_plot'
-      ? plotPoints.length < 3
-        ? `ক্রসহেয়ার কোণায় এনে পয়েন্ট যোগ করুন (${plotPoints.length}/৩)`
-        : 'আরও পয়েন্ট দিন অথবা শেষ করুন'
+      ? plotPoints.length < 3 ? `ক্রসহেয়ার কোণায় এনে পয়েন্ট যোগ করুন (${plotPoints.length}/৩)` : 'আরও পয়েন্ট দিন অথবা শেষ করুন'
       : mode === 'manual_divide_plot'
-        ? selectedPlot
-          ? 'লাল পয়েন্ট টেনে কাটিং লাইন ঠিক করুন'
-          : 'যে প্লট ভাগ করবেন সেটিতে ট্যাপ করুন'
-        : mapImage
-          ? 'এক আঙুলে প্যান • দুই আঙুলে জুম'
-          : 'শুরু করতে মৌজা ম্যাপ যোগ করুন';
+        ? selectedPlot ? 'লাল পয়েন্ট টেনে কাটিং লাইন ঠিক করুন' : 'যে প্লট ভাগ করবেন সেটিতে ট্যাপ করুন'
+        : mapImage ? 'এক আঙুলে প্যান • দুই আঙুলে জুম' : 'শুরু করতে মৌজা ম্যাপ যোগ করুন';
 
   const magnifier = useMemo(() => {
-    if (
-      !mapImage
-      || !isMagnifierEnabled
-      || viewport.width <= 0
-      || (mode !== 'drawing_plot' && mode !== 'calibrating')
-    ) {
-      return null;
-    }
-
+    if (!mapImage || !isMagnifierEnabled || viewport.width <= 0 || (mode !== 'drawing_plot' && mode !== 'calibrating')) return null;
     const radius = 55;
     const lens = { x: viewport.width - radius - 16, y: radius + 16 };
     const centerCanvas = {
-      x: (viewport.width / 2 - magnifierTransform.pos.x)
-        / Math.max(magnifierTransform.scale, 0.001),
-      y: (viewport.height / 2 - magnifierTransform.pos.y)
-        / Math.max(magnifierTransform.scale, 0.001),
+      x: (viewport.width / 2 - magnifierTransform.pos.x) / Math.max(magnifierTransform.scale, 0.001),
+      y: (viewport.height / 2 - magnifierTransform.pos.y) / Math.max(magnifierTransform.scale, 0.001),
     };
     const magnifiedScale = magnifierTransform.scale * 2.5;
     const magnifiedPos = {
@@ -986,16 +1041,8 @@ export function SkiaMapCanvas() {
       `M ${lens.x - radius} ${lens.y} A ${radius} ${radius} 0 1 0 ${lens.x + radius} ${lens.y} A ${radius} ${radius} 0 1 0 ${lens.x - radius} ${lens.y} Z`,
     );
     if (!clip) return null;
-
     return { radius, lens, magnifiedScale, magnifiedPos, clip };
-  }, [
-    isMagnifierEnabled,
-    magnifierTransform,
-    mapImage,
-    mode,
-    viewport.height,
-    viewport.width,
-  ]);
+  }, [isMagnifierEnabled, magnifierTransform, mapImage, mode, viewport.height, viewport.width]);
 
   return (
     <View style={styles.container} onLayout={onLayout}>
@@ -1004,7 +1051,6 @@ export function SkiaMapCanvas() {
           {viewport.width > 0 && viewport.height > 0 && (
             <Canvas style={StyleSheet.absoluteFill}>
               <Fill color='#090d16' />
-
               <Group transform={contentTransform as any}>
                 {mapImage && (
                   <SkiaTiledMap
@@ -1020,17 +1066,10 @@ export function SkiaMapCanvas() {
                   const label = getPolygonAreaLabelLayout(plot.points);
                   const edgeLabels = getPlotEdgeLabels(plot, scale, stageScale);
                   const color = plot.color ?? '#0F766E';
-                  const selectedForDivide = mode === 'manual_divide_plot'
-                    && manualDividePlotId === plot.id;
-
+                  const selectedForDivide = mode === 'manual_divide_plot' && manualDividePlotId === plot.id;
                   return (
                     <Group key={plot.id}>
-                      <PlotShape
-                        plot={plot}
-                        stageScale={stageScale}
-                        fillOpacity={selectedForDivide ? 0.18 : 0.1}
-                      />
-
+                      <PlotShape plot={plot} stageScale={stageScale} fillOpacity={selectedForDivide ? 0.18 : 0.1} />
                       {edgeLabels.map((edge) => (
                         <SkiaOutlinedText
                           key={edge.id}
@@ -1043,23 +1082,12 @@ export function SkiaMapCanvas() {
                           fontPx={edge.fontPx}
                         />
                       ))}
-
                       {isShowDiagonals && (plot.results.diagonals ?? []).map((diagonal, index) => {
                         const start = plot.points[diagonal.p1Index];
                         const end = plot.points[diagonal.p2Index];
-                        if (
-                          !start
-                          || !end
-                          || distance(start, end) <= MIN_DIAGONAL_DRAW_PX / Math.max(stageScale, 0.01)
-                        ) {
-                          return null;
-                        }
-
+                        if (!start || !end || distance(start, end) <= MIN_DIAGONAL_DRAW_PX / Math.max(stageScale, 0.01)) return null;
                         const mid = midpoint(start, end);
-                        const text = diagonal.lengthFt >= MIN_EDGE_LABEL_FT
-                          ? formatFeetInches(diagonal.lengthFt)
-                          : '';
-
+                        const text = diagonal.lengthFt >= MIN_EDGE_LABEL_FT ? formatFeetInches(diagonal.lengthFt) : '';
                         return (
                           <Group key={`${plot.id}-diag-${index}`}>
                             <Path
@@ -1069,26 +1097,12 @@ export function SkiaMapCanvas() {
                               strokeWidth={UI_CONFIG.strokeWidth.thin / Math.max(stageScale, 0.01)}
                               opacity={0.4}
                             >
-                              <DashPathEffect
-                                intervals={[
-                                  6 / Math.max(stageScale, 0.01),
-                                  6 / Math.max(stageScale, 0.01),
-                                ]}
-                              />
+                              <DashPathEffect intervals={[6 / Math.max(stageScale, 0.01), 6 / Math.max(stageScale, 0.01)]} />
                             </Path>
-                            {text ? (
-                              <SkiaDiagonalBadge
-                                x={mid.x}
-                                y={mid.y}
-                                text={text}
-                                stageScale={stageScale}
-                                color={color}
-                              />
-                            ) : null}
+                            {text ? <SkiaDiagonalBadge x={mid.x} y={mid.y} text={text} stageScale={stageScale} color={color} /> : null}
                           </Group>
                         );
                       })}
-
                       {mode !== 'manual_divide_plot' && (
                         <SkiaAreaBadge
                           x={label.center.x}
@@ -1103,18 +1117,10 @@ export function SkiaMapCanvas() {
                   );
                 })}
 
-                {/* Web StageManualCut: fill overlays only; original plot outline stays below. */}
                 {splitPreview && selectedPlot && (
                   <Group>
-                    <Path
-                      path={pathFromPoints(splitPreview.poly1, true)}
-                      color={rgba(selectedPlot.color ?? '#0F766E', 0.3)}
-                    />
-                    <Path
-                      path={pathFromPoints(splitPreview.poly2, true)}
-                      color={rgba('#0284C7', 0.3)}
-                    />
-
+                    <Path path={pathFromPoints(splitPreview.poly1, true)} color={rgba(selectedPlot.color ?? '#0F766E', 0.3)} />
+                    <Path path={pathFromPoints(splitPreview.poly2, true)} color={rgba('#0284C7', 0.3)} />
                     <SkiaAreaBadge
                       x={splitPreview.centerA.x}
                       y={splitPreview.centerA.y}
@@ -1143,28 +1149,19 @@ export function SkiaMapCanvas() {
                         strokeJoin='round'
                       />
                     )}
-
-                    {getActivePlotDots(plotPoints).map(({ point, index, isCorner }) => (
-                      isCorner ? (
-                        <Group key={`point-${index}`}>
-                          <Circle
-                            cx={point.x}
-                            cy={point.y}
-                            r={UI_CONFIG.radius.medium / Math.max(stageScale, 0.01)}
-                            color='#3182CE'
-                          />
-                          <Circle
-                            cx={point.x}
-                            cy={point.y}
-                            r={UI_CONFIG.radius.medium / Math.max(stageScale, 0.01)}
-                            color='#ffffff'
-                            style='stroke'
-                            strokeWidth={UI_CONFIG.strokeWidth.medium / Math.max(stageScale, 0.01)}
-                          />
-                        </Group>
-                      ) : null
-                    ))}
-
+                    {getActivePlotDots(plotPoints).map(({ point, index, isCorner }) => isCorner ? (
+                      <Group key={`point-${index}`}>
+                        <Circle cx={point.x} cy={point.y} r={UI_CONFIG.radius.medium / Math.max(stageScale, 0.01)} color='#3182CE' />
+                        <Circle
+                          cx={point.x}
+                          cy={point.y}
+                          r={UI_CONFIG.radius.medium / Math.max(stageScale, 0.01)}
+                          color='#ffffff'
+                          style='stroke'
+                          strokeWidth={UI_CONFIG.strokeWidth.medium / Math.max(stageScale, 0.01)}
+                        />
+                      </Group>
+                    ) : null)}
                     {getActiveSegmentLabels(plotPoints, scale, stageScale).map((edge) => (
                       <SkiaOutlinedText
                         key={edge.id}
@@ -1190,15 +1187,9 @@ export function SkiaMapCanvas() {
                         strokeWidth={UI_CONFIG.strokeWidth.xxthick / Math.max(stageScale, 0.01)}
                       />
                     )}
-
                     {calibrationPoints.map((point, index) => (
                       <Group key={`cal-${index}`}>
-                        <Circle
-                          cx={point.x}
-                          cy={point.y}
-                          r={UI_CONFIG.radius.medium / Math.max(stageScale, 0.01)}
-                          color={UI_CONFIG.colors.drawPrimary}
-                        />
+                        <Circle cx={point.x} cy={point.y} r={UI_CONFIG.radius.medium / Math.max(stageScale, 0.01)} color={UI_CONFIG.colors.drawPrimary} />
                         <Circle
                           cx={point.x}
                           cy={point.y}
@@ -1213,53 +1204,36 @@ export function SkiaMapCanvas() {
                 )}
 
                 {manualCutLine && selectedPlot && (() => {
-                  const clip = Skia.Path.MakeFromSVGString(
-                    pathFromPoints(selectedPlot.points, true),
-                  );
+                  const clip = Skia.Path.MakeFromSVGString(pathFromPoints(selectedPlot.points, true));
                   if (!clip) return null;
-
                   return (
                     <Group>
                       <Group clip={clip}>
                         <Path
-                          path={pathFromPoints(manualCutLine)}
+                          path={manualCutPath as any}
                           color='#DC2626'
                           style='stroke'
                           strokeWidth={UI_CONFIG.strokeWidth.thick / Math.max(stageScale, 0.01)}
                         >
-                          <DashPathEffect
-                            intervals={[
-                              8 / Math.max(stageScale, 0.01),
-                              8 / Math.max(stageScale, 0.01),
-                            ]}
-                          />
+                          <DashPathEffect intervals={[8 / Math.max(stageScale, 0.01), 8 / Math.max(stageScale, 0.01)]} />
                         </Path>
                       </Group>
-
                       {manualCutLine.map((point, index) => (
-                        <Group key={`cut-${index}`}>
-                          <Circle
-                            cx={point.x}
-                            cy={point.y}
-                            r={UI_CONFIG.radius.xlarge / Math.max(stageScale, 0.01)}
-                            color='#DC2626'
-                          />
-                          <Circle
-                            cx={point.x}
-                            cy={point.y}
-                            r={UI_CONFIG.radius.xlarge / Math.max(stageScale, 0.01)}
-                            color='#ffffff'
-                            style='stroke'
-                            strokeWidth={UI_CONFIG.strokeWidth.thick / Math.max(stageScale, 0.01)}
-                          />
-                        </Group>
+                        <ManualAnchor
+                          key={`cut-${index}`}
+                          point={point}
+                          index={index}
+                          stageScale={stageScale}
+                          dragIndex={draggingAnchor}
+                          dragX={dragVisualX}
+                          dragY={dragVisualY}
+                        />
                       ))}
                     </Group>
                   );
                 })()}
               </Group>
 
-              {/* Live line is screen-space, so web's screen widths are used directly. */}
               {liveOverlay.start && (
                 <Group>
                   <Path
@@ -1271,7 +1245,6 @@ export function SkiaMapCanvas() {
                   >
                     <DashPathEffect intervals={[8, 6]} />
                   </Path>
-
                   {liveOverlay.label && (
                     <SkiaOutlinedText
                       x={liveOverlay.label.point.x}
@@ -1284,7 +1257,6 @@ export function SkiaMapCanvas() {
                       opacity={0.95}
                     />
                   )}
-
                   {liveOverlay.snapped && (
                     <Circle
                       cx={liveOverlay.end.x}
@@ -1302,32 +1274,15 @@ export function SkiaMapCanvas() {
 
               {magnifier && mapImage && (
                 <Group>
-                  <Circle
-                    cx={magnifier.lens.x}
-                    cy={magnifier.lens.y}
-                    r={magnifier.radius + 2}
-                    color='#f8fafc'
-                  />
+                  <Circle cx={magnifier.lens.x} cy={magnifier.lens.y} r={magnifier.radius + 2} color='#f8fafc' />
                   <Group clip={magnifier.clip}>
-                    <Group
-                      transform={[
-                        { translateX: magnifier.magnifiedPos.x },
-                        { translateY: magnifier.magnifiedPos.y },
-                        { scale: magnifier.magnifiedScale },
-                      ]}
-                    >
-                      <SkiaSimpleImage
-                        uri={mapImage.uri}
-                        width={mapImage.width}
-                        height={mapImage.height}
-                      />
-                      {plots.map((plot) => (
-                        <PlotShape
-                          key={`mag-${plot.id}`}
-                          plot={plot}
-                          stageScale={magnifier.magnifiedScale}
-                        />
-                      ))}
+                    <Group transform={[
+                      { translateX: magnifier.magnifiedPos.x },
+                      { translateY: magnifier.magnifiedPos.y },
+                      { scale: magnifier.magnifiedScale },
+                    ]}>
+                      <SkiaSimpleImage uri={mapImage.uri} width={mapImage.width} height={mapImage.height} />
+                      {plots.map((plot) => <PlotShape key={`mag-${plot.id}`} plot={plot} stageScale={magnifier.magnifiedScale} />)}
                       {plotPoints.length > 0 && mode === 'drawing_plot' && (
                         <Path
                           path={pathFromPoints(plotPoints)}
@@ -1346,18 +1301,8 @@ export function SkiaMapCanvas() {
                     style='stroke'
                     strokeWidth={3}
                   />
-                  <Path
-                    path={`M ${magnifier.lens.x - 10} ${magnifier.lens.y} L ${magnifier.lens.x + 10} ${magnifier.lens.y}`}
-                    color='#ef4444'
-                    style='stroke'
-                    strokeWidth={2}
-                  />
-                  <Path
-                    path={`M ${magnifier.lens.x} ${magnifier.lens.y - 10} L ${magnifier.lens.x} ${magnifier.lens.y + 10}`}
-                    color='#ef4444'
-                    style='stroke'
-                    strokeWidth={2}
-                  />
+                  <Path path={`M ${magnifier.lens.x - 10} ${magnifier.lens.y} L ${magnifier.lens.x + 10} ${magnifier.lens.y}`} color='#ef4444' style='stroke' strokeWidth={2} />
+                  <Path path={`M ${magnifier.lens.x} ${magnifier.lens.y - 10} L ${magnifier.lens.x} ${magnifier.lens.y + 10}`} color='#ef4444' style='stroke' strokeWidth={2} />
                 </Group>
               )}
 
@@ -1376,12 +1321,7 @@ export function SkiaMapCanvas() {
                     style='stroke'
                     strokeWidth={1.5}
                   />
-                  <Circle
-                    cx={viewport.width / 2}
-                    cy={viewport.height / 2}
-                    r={2}
-                    color='#ef4444'
-                  />
+                  <Circle cx={viewport.width / 2} cy={viewport.height / 2} r={2} color='#ef4444' />
                 </Group>
               )}
             </Canvas>
@@ -1392,16 +1332,12 @@ export function SkiaMapCanvas() {
       {!mapImage && (
         <View pointerEvents='none' style={styles.emptyState}>
           <Text style={styles.emptyTitle}>মৌজা ম্যাপ যোগ করুন</Text>
-          <Text style={styles.emptyText}>
-            স্কেল ও জমির সীমানা মাপতে ম্যাপের ছবি প্রয়োজন
-          </Text>
+          <Text style={styles.emptyText}>স্কেল ও জমির সীমানা মাপতে ম্যাপের ছবি প্রয়োজন</Text>
         </View>
       )}
-
       <View pointerEvents='none' style={styles.instructionPill}>
         <Text style={styles.instructionText}>{instruction}</Text>
       </View>
-
       <View style={styles.zoomControls}>
         <TouchableOpacity style={styles.zoomButton} onPress={() => zoomAround(1.25)}>
           <Plus size={18} color='#e2e8f0' />
@@ -1418,37 +1354,11 @@ export function SkiaMapCanvas() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    overflow: 'hidden',
-    backgroundColor: '#090d16',
-  },
-  emptyState: {
-    position: 'absolute',
-    top: '42%',
-    left: 28,
-    right: 28,
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    color: '#cbd5e1',
-    fontFamily: Fonts.headingBold,
-    fontSize: 16,
-  },
-  emptyText: {
-    marginTop: 3,
-    color: '#64748b',
-    fontFamily: Fonts.sansRegular,
-    fontSize: 11,
-    textAlign: 'center',
-  },
-  instructionPill: {
-    position: 'absolute',
-    top: 10,
-    left: 12,
-    right: 58,
-    alignItems: 'flex-start',
-  },
+  container: { flex: 1, overflow: 'hidden', backgroundColor: '#090d16' },
+  emptyState: { position: 'absolute', top: '42%', left: 28, right: 28, alignItems: 'center' },
+  emptyTitle: { color: '#cbd5e1', fontFamily: Fonts.headingBold, fontSize: 16 },
+  emptyText: { marginTop: 3, color: '#64748b', fontFamily: Fonts.sansRegular, fontSize: 11, textAlign: 'center' },
+  instructionPill: { position: 'absolute', top: 10, left: 12, right: 58, alignItems: 'flex-start' },
   instructionText: {
     overflow: 'hidden',
     borderRadius: 8,
