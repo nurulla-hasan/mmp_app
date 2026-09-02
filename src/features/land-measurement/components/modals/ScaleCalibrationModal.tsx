@@ -29,10 +29,17 @@ export function ScaleCalibrationModal({ visible, kind, onClose }: Props) {
   const submit = () => {
     const numeric = Number(value.replace(',', '.'));
     const success = kind === 'distance' ? submitCalibrationDistance(numeric) : submitManualScale(numeric);
-    if (success) onClose();
+    if (!success) return;
+
+    // Distance calibration owns its visibility in the store. Its successful
+    // submit already switches mode to `none` and closes the modal. Calling the
+    // parent close callback here used to restart calibration immediately.
+    if (kind === 'manual') onClose();
   };
 
-  const retry = () => { retryCalibration(); onClose(); };
+  const retry = () => {
+    retryCalibration();
+  };
 
   return (
     <Modal visible={visible} transparent animationType='fade' onRequestClose={onClose}>
