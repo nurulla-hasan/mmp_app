@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { AlertTriangle, BadgeCheck, Briefcase, Clock, LogIn, UserPlus } from 'lucide-react-native';
 import { Button } from '../components/ui/button';
@@ -17,6 +17,7 @@ import type { SurveyorApplicationPayload } from '../types/surveyor';
 
 export default function JoinAsSurveyorScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const { user, isAuthenticated } = useAuthStore();
@@ -36,161 +37,158 @@ export default function JoinAsSurveyorScreen() {
   };
 
   return (
-    <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps='handled'
-      >
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>সার্ভেয়ার হিসেবে যোগ দিন</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            আপনার পেশাদার ভূমি জরিপ সেবা নতুন ক্লায়েন্টদের কাছে পৌঁছে দিন।
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={[styles.content, { paddingTop: 14 + insets.top }]}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps='handled'
+    >
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>সার্ভেয়ার হিসেবে যোগ দিন</Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+          আপনার পেশাদার ভূমি জরিপ সেবা নতুন ক্লায়েন্টদের কাছে পৌঁছে দিন।
+        </Text>
+      </View>
+
+      {profile ? (
+        <View
+          style={[
+            styles.stateCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          {profile.verificationStatus === 'APPROVED' ? (
+            <BadgeCheck size={38} color={colors.primary} />
+          ) : profile.verificationStatus === 'REJECTED' ? (
+            <AlertTriangle size={38} color='#ef4444' />
+          ) : (
+            <Clock size={38} color='#d97706' />
+          )}
+
+          <Text style={[styles.stateTitle, { color: colors.text }]}>আপনার সার্ভেয়ার আবেদন</Text>
+          <Badge
+            label={
+              profile.verificationStatus === 'APPROVED'
+                ? 'অনুমোদিত'
+                : profile.verificationStatus === 'REJECTED'
+                  ? 'প্রত্যাখ্যাত'
+                  : 'যাচাইয়ের অপেক্ষায়'
+            }
+            variant={profile.verificationStatus === 'APPROVED' ? 'success' : 'warning'}
+          />
+          <Text style={[styles.stateText, { color: colors.textMuted }]}>
+            {profile.verificationStatus === 'APPROVED'
+              ? 'আপনার প্রোফাইল এখন পাবলিক সার্ভেয়ার ডিরেক্টরিতে সক্রিয়।'
+              : profile.verificationStatus === 'REJECTED'
+                ? profile.adminNote ||
+                  'আবেদনটি অনুমোদন করা হয়নি। বিস্তারিত জানতে সাপোর্টের সাথে যোগাযোগ করুন।'
+                : 'অ্যাডমিন আপনার পেশাদার তথ্য ও সনদ যাচাই করছে। অনুমোদনের পর প্রোফাইল ডিরেক্টরিতে দেখা যাবে।'}
+          </Text>
+
+          {profile.verificationStatus === 'APPROVED' && user?.role === 'SURVEYOR' ? (
+            <View style={styles.actions}>
+              <Button
+                title='প্রোফাইল এডিট করুন'
+                onPress={() => router.push('/surveyor-profile')}
+              />
+              {profile.slug ? (
+                <Button
+                  title='পাবলিক প্রোফাইল'
+                  variant='outline'
+                  onPress={() =>
+                    router.push({
+                      pathname: '/surveyors/[slug]',
+                      params: { slug: profile.slug! },
+                    })
+                  }
+                />
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      ) : districtsLoading || servicesLoading ? (
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={[styles.stateText, { color: colors.textMuted }]}>
+            আবেদন ফর্ম প্রস্তুত হচ্ছে...
           </Text>
         </View>
-
-        {profile ? (
-          <View
-            style={[
-              styles.stateCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-            ]}
-          >
-            {profile.verificationStatus === 'APPROVED' ? (
-              <BadgeCheck size={38} color={colors.primary} />
-            ) : profile.verificationStatus === 'REJECTED' ? (
-              <AlertTriangle size={38} color='#ef4444' />
-            ) : (
-              <Clock size={38} color='#d97706' />
-            )}
-
-            <Text style={[styles.stateTitle, { color: colors.text }]}>আপনার সার্ভেয়ার আবেদন</Text>
-            <Badge
-              label={
-                profile.verificationStatus === 'APPROVED'
-                  ? 'অনুমোদিত'
-                  : profile.verificationStatus === 'REJECTED'
-                    ? 'প্রত্যাখ্যাত'
-                    : 'যাচাইয়ের অপেক্ষায়'
-              }
-              variant={profile.verificationStatus === 'APPROVED' ? 'success' : 'warning'}
-            />
-            <Text style={[styles.stateText, { color: colors.textMuted }]}> 
-              {profile.verificationStatus === 'APPROVED'
-                ? 'আপনার প্রোফাইল এখন পাবলিক সার্ভেয়ার ডিরেক্টরিতে সক্রিয়।'
-                : profile.verificationStatus === 'REJECTED'
-                  ? profile.adminNote ||
-                    'আবেদনটি অনুমোদন করা হয়নি। বিস্তারিত জানতে সাপোর্টের সাথে যোগাযোগ করুন।'
-                  : 'অ্যাডমিন আপনার পেশাদার তথ্য ও সনদ যাচাই করছে। অনুমোদনের পর প্রোফাইল ডিরেক্টরিতে দেখা যাবে।'}
-            </Text>
-
-            {profile.verificationStatus === 'APPROVED' && user?.role === 'SURVEYOR' ? (
-              <View style={styles.actions}>
-                <Button
-                  title='প্রোফাইল এডিট করুন'
-                  onPress={() => router.push('/surveyor-profile')}
-                />
-                {profile.slug ? (
+      ) : (
+        <>
+          {!isAuthenticated ? (
+            <View
+              style={[
+                styles.authWarning,
+                {
+                  backgroundColor: theme === 'dark' ? 'rgba(217,119,6,.10)' : '#fffbeb',
+                  borderColor: theme === 'dark' ? 'rgba(217,119,6,.28)' : '#fde68a',
+                },
+              ]}
+            >
+              <AlertTriangle size={19} color='#d97706' />
+              <View style={styles.warningContent}>
+                <Text
+                  style={[
+                    styles.warningTitle,
+                    { color: theme === 'dark' ? '#fbbf24' : '#92400e' },
+                  ]}
+                >
+                  ফর্ম পূরণ করতে পারেন, জমা দেওয়ার আগে লগইন করতে হবে
+                </Text>
+                <Text
+                  style={[
+                    styles.warningText,
+                    { color: theme === 'dark' ? '#fcd34d' : '#a16207' },
+                  ]}
+                >
+                  আপনার আবেদনটি একটি Mouza Map Pro অ্যাকাউন্টের সাথে যুক্ত হবে।
+                </Text>
+                <View style={styles.authActions}>
                   <Button
-                    title='পাবলিক প্রোফাইল'
+                    title='লগইন'
+                    size='sm'
                     variant='outline'
-                    onPress={() =>
-                      router.push({
-                        pathname: '/surveyors/[slug]',
-                        params: { slug: profile.slug! },
-                      })
-                    }
+                    onPress={() => router.push('/(auth)/login')}
+                    icon={<LogIn size={12} color={colors.text} />}
                   />
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-        ) : districtsLoading || servicesLoading ? (
-          <View style={styles.loading}>
-            <ActivityIndicator color={colors.primary} />
-            <Text style={[styles.stateText, { color: colors.textMuted }]}> 
-              আবেদন ফর্ম প্রস্তুত হচ্ছে...
-            </Text>
-          </View>
-        ) : (
-          <>
-            {!isAuthenticated ? (
-              <View
-                style={[
-                  styles.authWarning,
-                  {
-                    backgroundColor: theme === 'dark' ? 'rgba(217,119,6,.10)' : '#fffbeb',
-                    borderColor: theme === 'dark' ? 'rgba(217,119,6,.28)' : '#fde68a',
-                  },
-                ]}
-              >
-                <AlertTriangle size={19} color='#d97706' />
-                <View style={styles.warningContent}>
-                  <Text
-                    style={[
-                      styles.warningTitle,
-                      { color: theme === 'dark' ? '#fbbf24' : '#92400e' },
-                    ]}
-                  >
-                    ফর্ম পূরণ করতে পারেন, জমা দেওয়ার আগে লগইন করতে হবে
-                  </Text>
-                  <Text
-                    style={[
-                      styles.warningText,
-                      { color: theme === 'dark' ? '#fcd34d' : '#a16207' },
-                    ]}
-                  >
-                    আপনার আবেদনটি একটি Mouza Map Pro অ্যাকাউন্টের সাথে যুক্ত হবে।
-                  </Text>
-                  <View style={styles.authActions}>
-                    <Button
-                      title='লগইন'
-                      size='sm'
-                      variant='outline'
-                      onPress={() => router.push('/(auth)/login')}
-                      icon={<LogIn size={12} color={colors.text} />}
-                    />
-                    <Button
-                      title='রেজিস্ট্রেশন'
-                      size='sm'
-                      onPress={() => router.push('/(auth)/register')}
-                      icon={<UserPlus size={12} color='#fff' />}
-                    />
-                  </View>
+                  <Button
+                    title='রেজিস্ট্রেশন'
+                    size='sm'
+                    onPress={() => router.push('/(auth)/register')}
+                    icon={<UserPlus size={12} color='#fff' />}
+                  />
                 </View>
               </View>
-            ) : (
-              <View
-                style={[
-                  styles.partnerBanner,
-                  { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}30` },
-                ]}
-              >
-                <Briefcase size={20} color={colors.primary} />
-                <Text style={[styles.partnerText, { color: colors.textMuted }]}> 
-                  পেশাদার তথ্য, সেবা, শুরুর মূল্য ও কাজের এলাকা দিন। অ্যাডমিন যাচাইয়ের
-                  পর আপনার পাবলিক সার্ভেয়ার প্রোফাইল চালু হবে।
-                </Text>
-              </View>
-            )}
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.partnerBanner,
+                { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}30` },
+              ]}
+            >
+              <Briefcase size={20} color={colors.primary} />
+              <Text style={[styles.partnerText, { color: colors.textMuted }]}>
+                পেশাদার তথ্য, সেবা, শুরুর মূল্য ও কাজের এলাকা দিন। অ্যাডমিন যাচাইয়ের
+                পর আপনার পাবলিক সার্ভেয়ার প্রোফাইল চালু হবে।
+              </Text>
+            </View>
+          )}
 
-            <SurveyorProfileForm
-              mode='apply'
-              districts={districts}
-              services={services}
-              pending={applyMutation.isPending}
-              onSubmit={submitApplication}
-            />
-          </>
-        )}
-      </ScrollView>
-    </SafeAreaView>
+          <SurveyorProfileForm
+            mode='apply'
+            districts={districts}
+            services={services}
+            pending={applyMutation.isPending}
+            onSubmit={submitApplication}
+          />
+        </>
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
   container: { flex: 1 },
   content: { padding: 14, paddingBottom: 38, gap: 14 },
   header: { gap: 3 },
