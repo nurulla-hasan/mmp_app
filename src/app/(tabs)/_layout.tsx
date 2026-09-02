@@ -8,7 +8,7 @@ export default function TabLayout() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         freezeOnBlur: true,
-        animation: 'fade',
+        animation: 'shift',
         header: ({ options, route }) => (
           <AppHeader
             title={options.title}
