@@ -150,12 +150,12 @@ export default function PricingScreen() {
             const isRecommended = plan.isPopular && !isActivePlan && !isDowngrade;
             const Icon = index === 0 ? Zap : index === 1 ? Sparkles : Crown;
 
-            const cta = isActivePlan
-              ? 'মেয়াদ বাড়ান (Renew)'
-              : isUpgrade
-                ? 'আপগ্রেড করুন (Upgrade)'
-                : isPendingPlan
-                  ? 'পেমেন্ট যাচাই চলছে'
+            const cta = isPendingPlan
+              ? 'পেমেন্ট যাচাই চলছে'
+              : isActivePlan
+                ? 'মেয়াদ বাড়ান (Renew)'
+                : isUpgrade
+                  ? 'আপগ্রেড করুন (Upgrade)'
                   : isRecommended
                     ? 'এখনই সাবস্ক্রাইব করুন'
                     : 'প্ল্যান নির্বাচন করুন';

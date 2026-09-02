@@ -13,7 +13,6 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { Check, Clock, Copy, Receipt, X } from 'lucide-react-native';
 import { Button } from '../ui/button';
-import { Badge } from '../ui/badge';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -299,7 +298,7 @@ function SummaryRow({
 }: {
   label: string;
   value: string;
-  colors: (typeof Colors)['light'];
+  colors: { text: string; textMuted: string; primary: string };
   accent?: boolean;
   warning?: boolean;
 }) {
