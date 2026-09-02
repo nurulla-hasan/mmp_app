@@ -9,6 +9,8 @@ import type { TCalculation } from '../../../../types/calculation';
 import { CalculationService } from '../../../../services/calculation-service';
 import { ErrorToast, SuccessToast } from '../../../../lib/utils';
 import { Fonts } from '../../../../constants/typography';
+import { useThemeStore } from '../../../../stores/theme-store';
+import { getLandMeasurementToolColors } from '../../utils/tool-theme';
 
 const PAGE_LIMIT = 6;
 
@@ -56,6 +58,8 @@ export function applyServerCalculation(calculation: ServerCalculation) {
 }
 
 export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }: Props) {
+  const { theme } = useThemeStore();
+  const colors = getLandMeasurementToolColors(theme);
   const plots = useMapStore((state) => state.plots);
   const scale = useMapStore((state) => state.scale);
   const mapImage = useMapStore((state) => state.mapImage);
@@ -174,31 +178,31 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
 
   return (
     <Modal visible={visible} transparent animationType='slide' onRequestClose={onClose}>
-      <View style={styles.backdrop}>
+      <View style={[styles.backdrop, { backgroundColor: colors.overlayStrong }]}>
         <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { backgroundColor: colors.panel, borderColor: colors.panelBorder }]}>
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>{mode === 'save' ? 'Save Measurement' : 'Saved Measurements'}</Text>
-              <Text style={styles.subtitle}>{mode === 'save' ? 'Save the current map and plots to your profile' : 'Load a previous measurement back onto the canvas'}</Text>
+              <Text style={[styles.title, { color: colors.textStrong }]}>{mode === 'save' ? 'Save Measurement' : 'Saved Measurements'}</Text>
+              <Text style={[styles.subtitle, { color: colors.textSoft }]}>{mode === 'save' ? 'Save the current map and plots to your profile' : 'Load a previous measurement back onto the canvas'}</Text>
             </View>
-            <TouchableOpacity style={styles.close} onPress={onClose}><X size={18} color='#94a3b8' /></TouchableOpacity>
+            <TouchableOpacity style={[styles.close, { backgroundColor: colors.panelRaised }]} onPress={onClose}><X size={18} color={colors.textSoft} /></TouchableOpacity>
           </View>
 
           {mode === 'save' ? <>
-            <View style={styles.summary}>
-              <Text style={styles.summaryLine}>Map: {mapImage?.name || 'Map file'}</Text>
-              <Text style={styles.summaryLine}>Plots: {plots.length}</Text>
-              <Text style={styles.total}>Total: {totalShotok.toFixed(2)} shotok ({totalKatha.toFixed(2)} katha)</Text>
+            <View style={[styles.summary, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
+              <Text style={[styles.summaryLine, { color: colors.textStrong }]}>Map: {mapImage?.name || 'Map file'}</Text>
+              <Text style={[styles.summaryLine, { color: colors.textStrong }]}>Plots: {plots.length}</Text>
+              <Text style={[styles.total, { borderTopColor: colors.panelBorder, color: colors.success }]}>Total: {totalShotok.toFixed(2)} shotok ({totalKatha.toFixed(2)} katha)</Text>
             </View>
-            <TextInput value={name} onChangeText={setName} placeholder='Measurement name' placeholderTextColor='#64748b' style={styles.input} />
+            <TextInput value={name} onChangeText={setName} placeholder='Measurement name' placeholderTextColor={colors.textSoft} style={[styles.input, { backgroundColor: colors.input, borderColor: colors.panelBorder, color: colors.textStrong }]} />
             <TouchableOpacity disabled={busy || !plots.length} style={[styles.primary, (busy || !plots.length) && styles.disabled]} onPress={save}>
               {busy ? <ActivityIndicator color='#fff' /> : <BookmarkCheck size={18} color='#fff' />}
               <Text style={styles.primaryText}>Save</Text>
             </TouchableOpacity>
           </> : <>
-            <View style={styles.searchBox}><Search size={17} color='#64748b' /><TextInput value={search} onChangeText={setSearch} placeholder='Search by measurement or map name' placeholderTextColor='#64748b' style={styles.searchInput} /></View>
-            {busy ? <ActivityIndicator style={styles.loader} color='#22c55e' /> : (
+            <View style={[styles.searchBox, { backgroundColor: colors.input, borderColor: colors.panelBorder }]}><Search size={17} color={colors.textSoft} /><TextInput value={search} onChangeText={setSearch} placeholder='Search by measurement or map name' placeholderTextColor={colors.textSoft} style={[styles.searchInput, { color: colors.textStrong }]} /></View>
+            {busy ? <ActivityIndicator style={styles.loader} color={colors.success} /> : (
               <FlatList
                 data={items}
                 keyExtractor={(item) => item.id}
@@ -206,21 +210,21 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
                 contentContainerStyle={items.length ? styles.listContent : styles.emptyContent}
                 onEndReached={() => void loadMore()}
                 onEndReachedThreshold={0.35}
-                ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.moreLoader} color='#22c55e' /> : null}
-                ListEmptyComponent={<View style={styles.empty}><FolderOpen size={30} color='#475569' /><Text style={styles.emptyText}>{search ? 'No results found' : 'No saved measurements yet'}</Text></View>}
+                ListFooterComponent={loadingMore ? <ActivityIndicator style={styles.moreLoader} color={colors.success} /> : null}
+                ListEmptyComponent={<View style={styles.empty}><FolderOpen size={30} color={colors.textSoft} /><Text style={[styles.emptyText, { color: colors.textSoft }]}>{search ? 'No results found' : 'No saved measurements yet'}</Text></View>}
                 renderItem={({ item }) => (
-                  <TouchableOpacity style={styles.item} onPress={() => select(item)}>
+                  <TouchableOpacity style={[styles.item, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]} onPress={() => select(item)}>
                     <View style={styles.itemBody}>
-                      <Text style={styles.itemTitle}>{item.name}</Text>
+                      <Text style={[styles.itemTitle, { color: colors.textStrong }]}>{item.name}</Text>
                       <View style={styles.meta}>
-                        <Layers size={12} color='#22c55e' />
-                        <Text style={styles.metaText}>{item.plots?.length || 0} plots</Text>
-                        <Calendar size={12} color='#64748b' />
-                        <Text style={styles.metaText}>{new Date(item.createdAt).toLocaleDateString('en-GB')}</Text>
+                        <Layers size={12} color={colors.success} />
+                        <Text style={[styles.metaText, { color: colors.textSoft }]}>{item.plots?.length || 0} plots</Text>
+                        <Calendar size={12} color={colors.textSoft} />
+                        <Text style={[styles.metaText, { color: colors.textSoft }]}>{new Date(item.createdAt).toLocaleDateString('en-GB')}</Text>
                       </View>
-                      <Text numberOfLines={1} style={styles.mapName}>🗺️ {item.mapName || 'Map file'}</Text>
+                      <Text numberOfLines={1} style={[styles.mapName, { color: colors.textSoft }]}>🗺️ {item.mapName || 'Map file'}</Text>
                     </View>
-                    <TouchableOpacity style={styles.delete} onPress={(event) => { event.stopPropagation(); remove(item); }}><Trash2 size={17} color='#f87171' /></TouchableOpacity>
+                    <TouchableOpacity style={styles.delete} onPress={(event) => { event.stopPropagation(); remove(item); }}><Trash2 size={17} color='#ef4444' /></TouchableOpacity>
                   </TouchableOpacity>
                 )}
               />
@@ -233,25 +237,33 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2,6,23,0.7)' },
-  sheet: { maxHeight: '82%', padding: 16, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: '#334155', backgroundColor: '#0f172a' },
+  backdrop: { flex: 1, justifyContent: 'flex-end' },
+  sheet: { maxHeight: '82%', padding: 16, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  title: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 17 },
-  subtitle: { color: '#94a3b8', fontFamily: Fonts.sansRegular, fontSize: 10 },
-  close: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#1e293b' },
-  summary: { gap: 5, padding: 13, borderRadius: 11, borderWidth: 1, borderColor: '#334155', backgroundColor: '#111827' },
-  summaryLine: { color: '#cbd5e1', fontFamily: Fonts.headingMedium, fontSize: 11 },
-  total: { marginTop: 3, paddingTop: 7, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#334155', color: '#22c55e', fontFamily: Fonts.headingBold, fontSize: 12 },
-  input: { height: 45, marginTop: 12, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#334155', color: '#fff', backgroundColor: '#111827', fontFamily: Fonts.headingMedium },
+  title: { fontFamily: Fonts.headingBold, fontSize: 17 },
+  subtitle: { fontFamily: Fonts.sansRegular, fontSize: 10 },
+  close: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
+  summary: { gap: 5, padding: 13, borderRadius: 11, borderWidth: 1 },
+  summaryLine: { fontFamily: Fonts.headingMedium, fontSize: 11 },
+  total: { marginTop: 3, paddingTop: 7, borderTopWidth: StyleSheet.hairlineWidth, fontFamily: Fonts.headingBold, fontSize: 12 },
+  input: { height: 45, marginTop: 12, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, fontFamily: Fonts.headingMedium },
   primary: { height: 45, marginTop: 12, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#16a34a' },
-  primaryText: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 12 }, disabled: { opacity: 0.4 },
-  searchBox: { height: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1, borderColor: '#334155', backgroundColor: '#111827' },
-  searchInput: { flex: 1, color: '#fff', fontFamily: Fonts.headingMedium, fontSize: 11 }, loader: { paddingVertical: 48 },
-  list: { marginTop: 10 }, listContent: { gap: 9, paddingBottom: 8 }, emptyContent: { flexGrow: 1 },
+  primaryText: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 12 },
+  disabled: { opacity: 0.4 },
+  searchBox: { height: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1 },
+  searchInput: { flex: 1, fontFamily: Fonts.headingMedium, fontSize: 11 },
+  loader: { paddingVertical: 48 },
+  list: { marginTop: 10 },
+  listContent: { gap: 9, paddingBottom: 8 },
+  emptyContent: { flexGrow: 1 },
   moreLoader: { paddingVertical: 14 },
-  empty: { alignItems: 'center', gap: 7, paddingVertical: 45 }, emptyText: { color: '#64748b', fontFamily: Fonts.headingMedium, fontSize: 11 },
-  item: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#334155', backgroundColor: '#111827' },
-  itemBody: { flex: 1 }, itemTitle: { color: '#f8fafc', fontFamily: Fonts.headingSemiBold, fontSize: 12 },
-  meta: { marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 }, metaText: { marginRight: 7, color: '#94a3b8', fontSize: 9 }, mapName: { marginTop: 3, color: '#64748b', fontSize: 9 },
-  delete: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'rgba(248,113,113,0.08)' },
+  empty: { alignItems: 'center', gap: 7, paddingVertical: 45 },
+  emptyText: { fontFamily: Fonts.headingMedium, fontSize: 11 },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
+  itemBody: { flex: 1 },
+  itemTitle: { fontFamily: Fonts.headingSemiBold, fontSize: 12 },
+  meta: { marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaText: { marginRight: 7, fontSize: 9 },
+  mapName: { marginTop: 3, fontSize: 9 },
+  delete: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'rgba(239,68,68,0.08)' },
 });
