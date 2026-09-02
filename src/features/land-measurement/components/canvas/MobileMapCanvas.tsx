@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, PanResponder, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Svg, { Circle, G, Image as SvgImage, Line, Polygon, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, G, Line, Polygon, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 import { LocateFixed, Minus, Plus } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { calculatePolygonData } from '../../utils/calculations';
@@ -13,12 +13,39 @@ import { getReadableRotation } from '../../utils/component-helpers';
 import type { Point } from '../../types/map';
 import { toBengaliDigits } from '../../../../lib/utils';
 import { Fonts } from '../../../../constants/typography';
+import { NativeTiledMap } from './NativeTiledMap';
 
 type Size = { width: number; height: number };
 
 const pointString = (points: Point[]) => points.map((point) => `${point.x},${point.y}`).join(' ');
 const midpoint = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
+
+type Transform = { scale: number; pos: Point };
+type LiveOverlayData = {
+  start: Point | null;
+  end: Point;
+  lengthText: string | null;
+  color: string;
+  snapped: boolean;
+};
+type LiveOverlayHandle = { update: (value: LiveOverlayData) => void };
+
+const LiveMeasurementOverlay = forwardRef<LiveOverlayHandle, { initial: LiveOverlayData }>(function LiveMeasurementOverlay({ initial }, ref) {
+  const [data, setData] = useState(initial);
+  useImperativeHandle(ref, () => ({ update: setData }), []);
+  if (!data.start) return null;
+
+  const mid = midpoint(data.start, data.end);
+  const angle = Math.atan2(data.end.y - data.start.y, data.end.x - data.start.x) * 180 / Math.PI;
+  return (
+    <G pointerEvents='none'>
+      <Line x1={data.start.x} y1={data.start.y} x2={data.end.x} y2={data.end.y} stroke={data.color} strokeWidth={2.5} strokeDasharray='8,5' />
+      {data.lengthText && <SvgOutlinedText x={mid.x} y={mid.y} text={data.lengthText} stageScale={1} color={data.color} rotation={angle} />}
+      {data.snapped && <Circle cx={data.end.x} cy={data.end.y} r={10} fill='none' stroke={data.color} strokeWidth={2} strokeDasharray='5,4' />}
+    </G>
+  );
+});
 
 type BadgeProps = {
   x: number;
@@ -94,6 +121,9 @@ export function MobileMapCanvas() {
   } = state;
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
   const contentGroupRef = useRef<React.ElementRef<typeof G> | null>(null);
+  const liveOverlayRef = useRef<LiveOverlayHandle | null>(null);
+  const liveRafRef = useRef<number | null>(null);
+  const pendingLiveTransformRef = useRef<Transform | null>(null);
   const fitScaleRef = useRef(1);
   const transformRef = useRef({ scale: stageScale, pos: stagePos });
   const panStartRef = useRef<Point>({ x: 0, y: 0 });
@@ -108,12 +138,70 @@ export function MobileMapCanvas() {
     height: Math.max(1, mapImage?.height ?? 900),
   }), [mapImage?.height, mapImage?.width]);
 
+  const getLiveOverlay = useCallback((transform: Transform): LiveOverlayData => {
+    const current = useMapStore.getState();
+    const raw = {
+      x: (viewport.width / 2 - transform.pos.x) / Math.max(transform.scale, 0.001),
+      y: (viewport.height / 2 - transform.pos.y) / Math.max(transform.scale, 0.001),
+    };
+    let target = getSnappedPoint(raw, current.plots.map((plot) => plot.points), 10 / Math.max(transform.scale, 0.01));
+    if (current.mode === 'drawing_plot' && current.plotPoints.length >= 3 && distance(target, current.plotPoints[0]) <= 20 / Math.max(transform.scale, 0.01)) {
+      target = current.plotPoints[0];
+    }
+    if (current.mode === 'drawing_plot' && current.plotPoints.length > 0) {
+      const containing = getDirectionalContainingPlot(
+        current.plots,
+        current.plotPoints[0],
+        current.plotPoints.length >= 2 ? current.plotPoints[1] : target,
+        transform.scale,
+      );
+      if (containing) target = clipLineToPolygon(current.plotPoints[current.plotPoints.length - 1], target, containing.points);
+    }
+
+    const calibrationPoints: Point[] = [];
+    for (let index = 0; index < current.calibrationLine.length; index += 2) {
+      calibrationPoints.push({ x: current.calibrationLine[index], y: current.calibrationLine[index + 1] });
+    }
+    const startCanvas = current.mode === 'drawing_plot'
+      ? current.plotPoints[current.plotPoints.length - 1] ?? null
+      : current.mode === 'calibrating'
+        ? calibrationPoints[0] ?? null
+        : null;
+    const toScreen = (point: Point): Point => ({
+      x: point.x * transform.scale + transform.pos.x,
+      y: point.y * transform.scale + transform.pos.y,
+    });
+    const lengthFt = startCanvas && current.scale ? distance(startCanvas, target) / current.scale : 0;
+    return {
+      start: startCanvas ? toScreen(startCanvas) : null,
+      end: toScreen(target),
+      lengthText: current.mode === 'drawing_plot' && lengthFt >= 1 ? formatFeetInches(lengthFt) : null,
+      color: current.mode === 'calibrating' ? '#f59e0b' : '#2563eb',
+      snapped: distance(raw, target) * transform.scale > 2,
+    };
+  }, [viewport.height, viewport.width]);
+
+  const scheduleLiveOverlay = useCallback((transform: Transform) => {
+    pendingLiveTransformRef.current = transform;
+    if (liveRafRef.current !== null) return;
+    liveRafRef.current = requestAnimationFrame(() => {
+      liveRafRef.current = null;
+      const pending = pendingLiveTransformRef.current;
+      if (pending) liveOverlayRef.current?.update(getLiveOverlay(pending));
+    });
+  }, [getLiveOverlay]);
+
+  useEffect(() => () => {
+    if (liveRafRef.current !== null) cancelAnimationFrame(liveRafRef.current);
+  }, []);
+
   const applyNativeTransform = useCallback((next: { scale: number; pos: Point }) => {
     transformRef.current = next;
     contentGroupRef.current?.setNativeProps({
       matrix: [next.scale, 0, 0, next.scale, next.pos.x, next.pos.y],
     });
-  }, []);
+    scheduleLiveOverlay(next);
+  }, [scheduleLiveOverlay]);
 
   const commitTransform = useCallback((next: { scale: number; pos: Point }) => {
     applyNativeTransform(next);
@@ -234,21 +322,6 @@ export function MobileMapCanvas() {
     useMapStore.getState().setStageSize({ width, height });
   };
 
-  const centerRaw = useMemo(() => ({
-    x: (viewport.width / 2 - stagePos.x) / Math.max(stageScale, 0.001),
-    y: (viewport.height / 2 - stagePos.y) / Math.max(stageScale, 0.001),
-  }), [stagePos.x, stagePos.y, stageScale, viewport.height, viewport.width]);
-
-  const liveTarget = useMemo(() => {
-    let target = getSnappedPoint(centerRaw, plots.map((plot) => plot.points), 10 / Math.max(stageScale, 0.01));
-    if (mode === 'drawing_plot' && plotPoints.length >= 3 && distance(target, plotPoints[0]) <= 20 / Math.max(stageScale, 0.01)) target = plotPoints[0];
-    if (mode === 'drawing_plot' && plotPoints.length > 0) {
-      const containing = getDirectionalContainingPlot(plots, plotPoints[0], plotPoints.length >= 2 ? plotPoints[1] : target, stageScale);
-      if (containing) target = clipLineToPolygon(plotPoints[plotPoints.length - 1], target, containing.points);
-    }
-    return target;
-  }, [centerRaw, mode, plotPoints, plots, stageScale]);
-
   const selectedPlot = plots.find((plot) => plot.id === manualDividePlotId) ?? null;
   const splitPreview = useMemo(() => {
     if (!selectedPlot || !manualCutLine || !scale) return null;
@@ -263,6 +336,10 @@ export function MobileMapCanvas() {
     return points;
   }, [calibrationLine]);
 
+  useEffect(() => {
+    scheduleLiveOverlay({ scale: stageScale, pos: stagePos });
+  }, [calibrationLine, mode, plotPoints, plots, scale, scheduleLiveOverlay, stagePos, stageScale]);
+
   const instruction = mode === 'calibrating'
     ? calibrationPoints.length === 0 ? 'ক্রসহেয়ার স্কেল বারের শুরুতে আনুন' : 'ক্রসহেয়ার স্কেল বারের শেষে আনুন'
     : mode === 'drawing_plot'
@@ -271,13 +348,58 @@ export function MobileMapCanvas() {
         ? selectedPlot ? 'লাল পয়েন্ট টেনে কাটিং লাইন ঠিক করুন' : 'যে প্লট ভাগ করবেন সেটিতে ট্যাপ করুন'
         : mapImage ? 'এক আঙুলে প্যান • দুই আঙুলে জুম' : 'শুরু করতে মৌজা ম্যাপ যোগ করুন';
 
+  const magnifier = useMemo(() => {
+    if (!mapImage || !isMagnifierEnabled || !viewport.width || (mode !== 'drawing_plot' && mode !== 'calibrating')) return null;
+    const radius = 55;
+    const lens = { x: viewport.width - radius - 14, y: radius + 66 };
+    const zoom = 2.5;
+    const centerCanvas = {
+      x: (viewport.width / 2 - stagePos.x) / Math.max(stageScale, 0.001),
+      y: (viewport.height / 2 - stagePos.y) / Math.max(stageScale, 0.001),
+    };
+    const magScale = stageScale * zoom;
+    const magPos = { x: lens.x - centerCanvas.x * magScale, y: lens.y - centerCanvas.y * magScale };
+    const tilePos = { x: radius - centerCanvas.x * magScale, y: radius - centerCanvas.y * magScale };
+
+    return (
+      <G pointerEvents='none'>
+        <Defs><ClipPath id='map-magnifier-clip'><Circle cx={lens.x} cy={lens.y} r={radius} /></ClipPath></Defs>
+        <Circle cx={lens.x} cy={lens.y} r={radius + 2} fill='#f8fafc' />
+        <G clipPath='url(#map-magnifier-clip)'>
+          <G transform={`translate(${magPos.x} ${magPos.y}) scale(${magScale})`}>
+            <NativeTiledMap
+              image={mapImage}
+              viewport={{ width: radius * 2, height: radius * 2 }}
+              stageScale={magScale}
+              stagePos={tilePos}
+              fitScale={fitScaleRef.current}
+            />
+            {plots.map((plot) => <Polygon key={`mag-${plot.id}`} points={pointString(plot.points)} fill={plot.color ?? '#0f766e'} fillOpacity={0.18} stroke={plot.color ?? '#0f766e'} strokeWidth={2 / magScale} />)}
+            {mode === 'drawing_plot' && plotPoints.length >= 2 && <Polyline points={pointString(plotPoints)} fill='none' stroke='#2563eb' strokeWidth={2.5 / magScale} />}
+          </G>
+        </G>
+        <Circle cx={lens.x} cy={lens.y} r={radius} fill='none' stroke='rgba(15,23,42,0.72)' strokeWidth={3} />
+        <Line x1={lens.x - 10} y1={lens.y} x2={lens.x + 10} y2={lens.y} stroke='#ef4444' strokeWidth={2} />
+        <Line x1={lens.x} y1={lens.y - 10} x2={lens.x} y2={lens.y + 10} stroke='#ef4444' strokeWidth={2} />
+      </G>
+    );
+  }, [isMagnifierEnabled, mapImage, mode, plotPoints, plots, stagePos.x, stagePos.y, stageScale, viewport.height, viewport.width]);
+
   return (
     <View style={styles.container} onLayout={onLayout} {...panResponder.panHandlers}>
       {viewport.width > 0 && viewport.height > 0 && (
         <Svg width={viewport.width} height={viewport.height}>
           <Rect width={viewport.width} height={viewport.height} fill='#090d16' />
           <G ref={contentGroupRef} transform={`translate(${stagePos.x} ${stagePos.y}) scale(${stageScale})`}>
-            {mapImage && <SvgImage href={{ uri: mapImage.uri }} x={0} y={0} width={contentSize.width} height={contentSize.height} preserveAspectRatio='none' />}
+            {mapImage && (
+              <NativeTiledMap
+                image={mapImage}
+                viewport={viewport}
+                stageScale={stageScale}
+                stagePos={stagePos}
+                fitScale={fitScaleRef.current}
+              />
+            )}
 
             {plots.map((plot) => {
               const hiddenForPreview = Boolean(splitPreview && plot.id === selectedPlot?.id);
@@ -319,10 +441,9 @@ export function MobileMapCanvas() {
             {plotPoints.length > 0 && mode === 'drawing_plot' && (
               <G>
                 {plotPoints.length >= 2 && <Polyline points={pointString(plotPoints)} fill='none' stroke='#2563eb' strokeWidth={3 / stageScale} />}
-                <Line x1={plotPoints[plotPoints.length - 1].x} y1={plotPoints[plotPoints.length - 1].y} x2={liveTarget.x} y2={liveTarget.y} stroke='#60a5fa' strokeWidth={2.5 / stageScale} strokeDasharray={`${8 / stageScale},${5 / stageScale}`} />
                 {plotPoints.map((point, index) => <Circle key={`point-${index}`} cx={point.x} cy={point.y} r={(index === 0 ? 7 : 5) / stageScale} fill={index === 0 ? '#f97316' : '#fff'} stroke='#2563eb' strokeWidth={2 / stageScale} />)}
-                {[...plotPoints, liveTarget].slice(0, -1).map((point, index) => {
-                  const next = [...plotPoints, liveTarget][index + 1];
+                {plotPoints.slice(0, -1).map((point, index) => {
+                  const next = plotPoints[index + 1];
                   const lengthFt = scale ? distance(point, next) / scale : 0;
                   if (lengthFt < 1) return null;
                   const angle = Math.atan2(next.y - point.y, next.x - point.x) * 180 / Math.PI;
@@ -333,7 +454,6 @@ export function MobileMapCanvas() {
 
             {mode === 'calibrating' && (
               <G>
-                {calibrationPoints.length === 1 && <Line x1={calibrationPoints[0].x} y1={calibrationPoints[0].y} x2={liveTarget.x} y2={liveTarget.y} stroke='#f59e0b' strokeWidth={2.5 / stageScale} strokeDasharray={`${7 / stageScale},${5 / stageScale}`} />}
                 {calibrationPoints.length === 2 && <Line x1={calibrationPoints[0].x} y1={calibrationPoints[0].y} x2={calibrationPoints[1].x} y2={calibrationPoints[1].y} stroke='#f59e0b' strokeWidth={3 / stageScale} />}
                 {calibrationPoints.map((point, index) => <Circle key={`cal-${index}`} cx={point.x} cy={point.y} r={6 / stageScale} fill='#f59e0b' stroke='#fff' strokeWidth={2 / stageScale} />)}
               </G>
@@ -342,9 +462,11 @@ export function MobileMapCanvas() {
             {manualCutLine && <G><Polyline points={pointString(manualCutLine)} fill='none' stroke='#ef4444' strokeWidth={3 / stageScale} strokeDasharray={`${8 / stageScale},${5 / stageScale}`} />{manualCutLine.map((point, index) => <Circle key={`cut-${index}`} cx={point.x} cy={point.y} r={7 / stageScale} fill={index === 0 || index === manualCutLine.length - 1 ? '#ef4444' : '#fff'} stroke='#7f1d1d' strokeWidth={2 / stageScale} />)}</G>}
           </G>
 
+          <LiveMeasurementOverlay ref={liveOverlayRef} initial={getLiveOverlay({ scale: stageScale, pos: stagePos })} />
+          {magnifier}
+
           {(mode === 'drawing_plot' || mode === 'calibrating') && (
             <G>
-              {isMagnifierEnabled && <Circle cx={viewport.width / 2} cy={viewport.height / 2} r={18} fill='rgba(255,255,255,0.08)' stroke='#ef4444' strokeOpacity={0.5} strokeWidth={1} />}
               <Line x1={viewport.width / 2 - 13} y1={viewport.height / 2} x2={viewport.width / 2 - 3} y2={viewport.height / 2} stroke='#ffffff' strokeWidth={3.5} strokeOpacity={0.8} />
               <Line x1={viewport.width / 2 + 3} y1={viewport.height / 2} x2={viewport.width / 2 + 13} y2={viewport.height / 2} stroke='#ffffff' strokeWidth={3.5} strokeOpacity={0.8} />
               <Line x1={viewport.width / 2} y1={viewport.height / 2 - 13} x2={viewport.width / 2} y2={viewport.height / 2 - 3} stroke='#ffffff' strokeWidth={3.5} strokeOpacity={0.8} />
