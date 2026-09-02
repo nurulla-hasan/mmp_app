@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   BookmarkCheck, Check, Crosshair, Eye, EyeOff, FolderOpen, HardDrive, HelpCircle,
   Image as ImageIcon, Minus, MoreHorizontal, MoveHorizontal, PenTool, Plus, Redo2,
@@ -57,6 +58,40 @@ function Action({ label, icon, onPress, active, disabled, primary, danger, compa
   );
 }
 
+/**
+ * React Native's JS responder is single-owner, so TouchableOpacity can miss a
+ * second-finger press while the canvas gesture is already active. Keep Point
+ * on a native RNGH Tap recognizer so finger #1 may continue panning while
+ * finger #2 commits the crosshair point independently.
+ */
+function PointAction({ label, icon, onPress, disabled }: ActionProps) {
+  const tapGesture = useMemo(
+    () => Gesture.Tap()
+      .enabled(!disabled)
+      .maxDistance(18)
+      .runOnJS(true)
+      .onEnd((_event, success) => {
+        if (success && !disabled) onPress();
+      }),
+    [disabled, onPress],
+  );
+
+  return (
+    <GestureDetector gesture={tapGesture}>
+      <View
+        style={[
+          styles.action,
+          styles.primary,
+          disabled && styles.disabled,
+        ]}
+      >
+        {icon}
+        <Text style={[styles.actionLabel, styles.white]}>{label}</Text>
+      </View>
+    </GestureDetector>
+  );
+}
+
 export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOpenSave, onOpenLoad }: Props) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const store = useMapStore();
@@ -95,7 +130,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
         <Action label='আনডু' disabled={count === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={store.undoCalibrationPoint} />
         <Action label='রিডু' disabled={calibrationLineFuture.length === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={store.redoCalibrationPoint} />
         <Action label='ম্যানুয়াল' icon={<Ruler size={18} color='#fbbf24' />} onPress={onOpenManualScale} />
-        <Action label={`পয়েন্ট ${toBengaliDigits(count)}/২`} primary disabled={count >= 2} icon={<Crosshair size={19} color='#fff' />} onPress={addCenterPoint} />
+        <PointAction label={`পয়েন্ট ${toBengaliDigits(count)}/২`} disabled={count >= 2} icon={<Crosshair size={19} color='#fff' />} onPress={addCenterPoint} />
       </View>
     );
   }
@@ -106,7 +141,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
         <Action label='বাতিল' danger icon={<X size={18} color='#ef4444' />} onPress={store.cancelActiveMode} />
         <Action label='আনডু' disabled={plotPoints.length === 0} icon={<Undo2 size={18} color='#cbd5e1' />} onPress={store.undoPlotAction} />
         <Action label='রিডু' disabled={plotPointsFuture.length === 0} icon={<Redo2 size={18} color='#cbd5e1' />} onPress={store.redoPlotAction} />
-        <Action label={`পয়েন্ট ${toBengaliDigits(plotPoints.length)}`} primary icon={<Crosshair size={19} color='#fff' />} onPress={addCenterPoint} />
+        <PointAction label={`পয়েন্ট ${toBengaliDigits(plotPoints.length)}`} icon={<Crosshair size={19} color='#fff' />} onPress={addCenterPoint} />
         <Action label='শেষ করুন' disabled={plotPoints.length < 3} icon={<Check size={19} color='#86efac' />} onPress={store.finishPlot} />
       </View>
     );
@@ -160,7 +195,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
     <View style={styles.wrapper}>
       <Action label='ম্যাপ' icon={<ImageIcon size={18} color='#94a3b8' />} onPress={onOpenImagePicker} />
       <Action label='সেভড' icon={<FolderOpen size={18} color='#94a3b8' />} onPress={onOpenLoad} />
-      <Action label='স্কেল' active={Boolean(scale)} icon={<Ruler size={18} color={scale ? '#fff' : '#fbbf24'} />} onPress={beginCalibration} />
+      <Action label='স্কেল' icon={<Ruler size={18} color={scale ? '#94a3b8' : '#fbbf24'} />} onPress={beginCalibration} />
       <Action label='আঁকুন' disabled={!mapImage || !scale} icon={<PenTool size={18} color='#94a3b8' />} onPress={store.startPlotDrawing} />
       <Action label='ভাগ' disabled={plots.length === 0} icon={<Scissors size={18} color='#94a3b8' />} onPress={store.startManualDivide} />
       <Action label='ম্যাগনিফাই' active={isMagnifierEnabled} icon={isMagnifierEnabled ? <SearchX size={18} color='#fff' /> : <Search size={18} color='#94a3b8' />} onPress={() => store.setIsMagnifierEnabled(!isMagnifierEnabled)} />
