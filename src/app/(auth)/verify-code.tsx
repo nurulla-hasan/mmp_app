@@ -19,10 +19,18 @@ import { SuccessToast, ErrorToast, toBengaliDigits } from '../../lib/utils';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
 
+function getSafeCallbackUrl(value?: string) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://')) {
+    return null;
+  }
+  return value;
+}
+
 export default function VerifyCodeScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ email?: string }>();
+  const params = useLocalSearchParams<{ email?: string; callbackUrl?: string }>();
   const email = params.email || '';
+  const callbackUrl = getSafeCallbackUrl(params.callbackUrl);
 
   const { theme } = useThemeStore();
   const isDark = theme === 'dark';
@@ -77,7 +85,7 @@ export default function VerifyCodeScreen() {
       if (res.success && res.data) {
         await setSession(res.data);
         SuccessToast('ইমেইল সফলভাবে যাচাই হয়েছে!');
-        router.replace('/(tabs)');
+        router.replace((callbackUrl || '/(tabs)') as never);
       } else {
         ErrorToast(res.message || 'ভুল বা মেয়াদোত্তীর্ণ কোড।');
       }
