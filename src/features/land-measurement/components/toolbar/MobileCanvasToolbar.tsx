@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector } from 'react-native-gesture-handler';
 import {
   BookmarkCheck, Check, Crosshair, Eye, EyeOff, FolderOpen, HardDrive, HelpCircle,
   Image as ImageIcon, Minus, MoreHorizontal, MoveHorizontal, PenTool, Plus, Redo2,
@@ -9,7 +9,7 @@ import {
 import { useMapStore } from '../../store/useMapStore';
 import { Fonts } from '../../../../constants/typography';
 import { toBengaliDigits } from '../../../../lib/utils';
-import { commitCenterPointFromRuntime } from '../canvas/canvas-runtime';
+import { canvasPointActionGesture, commitCenterPointFromRuntime } from '../canvas/canvas-runtime';
 
 type Props = {
   onOpenManualScale: () => void;
@@ -60,36 +60,27 @@ function Action({ label, icon, onPress, active, disabled, primary, danger, compa
 }
 
 /**
- * Keep Point on a native RNGH recognizer. The workspace also observes finger
- * #2 at the native gesture root, so this remains a reliable direct target for
- * normal taps while the root observer covers Android's active-pan edge case.
+ * Point uses the same native recognizer that the canvas Pan marks as external
+ * simultaneous. This is intentionally not a TouchableOpacity: Android may keep
+ * the React responder owned by finger #1, while RNGH can still recognize the
+ * second finger independently.
  */
-function PointAction({ label, icon, onPress, disabled }: ActionProps) {
-  const tapGesture = useMemo(
-    () => Gesture.Tap()
-      .enabled(!disabled)
-      .maxDistance(18)
-      .runOnJS(true)
-      .onEnd((_event, success) => {
-        if (success && !disabled) onPress();
-      }),
-    [disabled, onPress],
+function PointAction({ label, icon, disabled }: ActionProps) {
+  const content = (
+    <View
+      style={[
+        styles.action,
+        styles.primary,
+        disabled && styles.disabled,
+      ]}
+    >
+      {icon}
+      <Text numberOfLines={1} style={[styles.actionLabel, styles.white]}>{label}</Text>
+    </View>
   );
 
-  return (
-    <GestureDetector gesture={tapGesture}>
-      <View
-        style={[
-          styles.action,
-          styles.primary,
-          disabled && styles.disabled,
-        ]}
-      >
-        {icon}
-        <Text numberOfLines={1} style={[styles.actionLabel, styles.white]}>{label}</Text>
-      </View>
-    </GestureDetector>
-  );
+  if (disabled) return content;
+  return <GestureDetector gesture={canvasPointActionGesture}>{content}</GestureDetector>;
 }
 
 export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOpenSave, onOpenLoad }: Props) {
