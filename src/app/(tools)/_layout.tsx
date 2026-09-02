@@ -1,15 +1,24 @@
 import { Stack } from 'expo-router';
 import { ProAccessGate } from '../../components/subscription/pro-access-gate';
+import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
+import { useThemeStore } from '../../stores/theme-store';
 
 export default function ToolsLayout() {
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+
   return (
     <ProAccessGate>
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: '#ffffff' },
-          headerTitleStyle: { fontFamily: Fonts.headingBold, color: '#0f172a', fontSize: 15 },
-          headerTintColor: '#0f172a',
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+          headerStyle: { backgroundColor: colors.surface },
+          headerTitleStyle: { fontFamily: Fonts.headingBold, color: colors.text, fontSize: 15 },
+          headerTintColor: colors.text,
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: colors.background },
         }}
       >
         <Stack.Screen name='unit-converter' options={{ title: 'জমির একক রূপান্তর' }} />
