@@ -62,6 +62,10 @@ export const NativeTiledMap = memo(function NativeTiledMap({ image, viewport, st
     [image, shouldTile, stagePos.x, stagePos.y, stageScale, viewport.height, viewport.width],
   );
   const coordKey = coords.map((coord) => coord.key).join('|');
+  const hasCompleteTileSet = shouldTile
+    && coords.length > 0
+    && tiles.length === coords.length
+    && tiles.every((tile) => coords.some((coord) => coord.key === tile.key));
 
   useEffect(() => {
     const ticket = ++ticketRef.current;
@@ -84,11 +88,10 @@ export const NativeTiledMap = memo(function NativeTiledMap({ image, viewport, st
           context.reset().crop({ originX: coord.x, originY: coord.y, width: coord.width, height: coord.height });
           const rendered = await context.renderAsync();
           const saved = await rendered.saveAsync({ compress: 0.96, format: SaveFormat.JPEG });
-          const tile = { ...coord, uri: saved.uri };
-          tileCache.set(coord.key, tile);
-          if (ticket === ticketRef.current) {
-            setTiles(coords.map((item) => tileCache.get(item.key)).filter((item): item is Tile => Boolean(item)));
-          }
+          tileCache.set(coord.key, { ...coord, uri: saved.uri });
+        }
+        if (ticket === ticketRef.current) {
+          setTiles(coords.map((item) => tileCache.get(item.key)).filter((item): item is Tile => Boolean(item)));
         }
       } catch {
         // The original image remains visible if a device cannot create a crop.
@@ -100,7 +103,9 @@ export const NativeTiledMap = memo(function NativeTiledMap({ image, viewport, st
 
   return (
     <>
-      <SvgImage href={{ uri: image.uri }} x={0} y={0} width={image.width} height={image.height} preserveAspectRatio='none' />
+      {!hasCompleteTileSet && (
+        <SvgImage href={{ uri: image.uri }} x={0} y={0} width={image.width} height={image.height} preserveAspectRatio='none' />
+      )}
       {tiles.map((tile) => (
         <SvgImage
           key={tile.key}
