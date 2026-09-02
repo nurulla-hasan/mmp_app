@@ -1,11 +1,15 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system/legacy';
 import { Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import type { MapImage } from '../../store/useMapStore';
 import type { Point } from '../../types/map';
 
 const TILE_SIZE = 512;
 const TILE_MARGIN = 1;
+// 72 tiles covers a complete 4096px square map (64 tiles) plus a small LRU
+// buffer, while preventing long pan/zoom sessions from accumulating temp files.
+const MAX_TILE_CACHE = 72;
 
 type Size = { width: number; height: number };
 type Tile = { key: string; uri: string; x: number; y: number; width: number; height: number };
@@ -20,6 +24,43 @@ type Props = {
 };
 
 const tileCache = new Map<string, Tile>();
+
+function deleteTileFile(uri: string) {
+  void FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => undefined);
+}
+
+function getCachedTile(key: string): Tile | undefined {
+  const tile = tileCache.get(key);
+  if (!tile) return undefined;
+  // Refresh insertion order so Map acts as a tiny LRU cache.
+  tileCache.delete(key);
+  tileCache.set(key, tile);
+  return tile;
+}
+
+function cacheTile(tile: Tile) {
+  const previous = tileCache.get(tile.key);
+  if (previous && previous.uri !== tile.uri) deleteTileFile(previous.uri);
+  tileCache.delete(tile.key);
+  tileCache.set(tile.key, tile);
+
+  while (tileCache.size > MAX_TILE_CACHE) {
+    const oldestKey = tileCache.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    const oldest = tileCache.get(oldestKey);
+    tileCache.delete(oldestKey);
+    if (oldest) deleteTileFile(oldest.uri);
+  }
+}
+
+function clearOtherMapTiles(activeImageUri: string) {
+  const prefix = `${activeImageUri}:`;
+  for (const [key, tile] of tileCache) {
+    if (key.startsWith(prefix)) continue;
+    tileCache.delete(key);
+    deleteTileFile(tile.uri);
+  }
+}
 
 function getVisibleCoords(image: MapImage, viewport: Size, stageScale: number, stagePos: Point): Coord[] {
   const safeScale = Math.max(stageScale, 0.001);
@@ -93,13 +134,17 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
   const coordKey = coords.map((coord) => coord.key).join('|');
 
   useEffect(() => {
+    clearOtherMapTiles(image.uri);
+  }, [image.uri]);
+
+  useEffect(() => {
     const ticket = ++ticketRef.current;
     if (!shouldTile || coords.length === 0) {
       setTiles([]);
       return;
     }
 
-    const cached = coords.map((coord) => tileCache.get(coord.key)).filter((tile): tile is Tile => Boolean(tile));
+    const cached = coords.map((coord) => getCachedTile(coord.key)).filter((tile): tile is Tile => Boolean(tile));
     setTiles(cached);
 
     const missing = coords.filter((coord) => !tileCache.has(coord.key));
@@ -107,16 +152,19 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
 
     void (async () => {
       try {
+        // Reuse one native image-manipulator context and crop sequentially.
+        // Parallel 512px decodes are faster on desktop but create avoidable
+        // memory spikes on mid-range Android devices.
         const context = ImageManipulator.manipulate(image.uri);
         for (const coord of missing) {
           if (ticket !== ticketRef.current) return;
           context.reset().crop({ originX: coord.x, originY: coord.y, width: coord.width, height: coord.height });
           const rendered = await context.renderAsync();
           const saved = await rendered.saveAsync({ compress: 0.98, format: SaveFormat.JPEG });
-          tileCache.set(coord.key, { ...coord, uri: saved.uri });
+          cacheTile({ ...coord, uri: saved.uri });
         }
         if (ticket === ticketRef.current) {
-          setTiles(coords.map((coord) => tileCache.get(coord.key)).filter((tile): tile is Tile => Boolean(tile)));
+          setTiles(coords.map((coord) => getCachedTile(coord.key)).filter((tile): tile is Tile => Boolean(tile)));
         }
       } catch {
         // The original Skia image remains visible if a device cannot create crops.
