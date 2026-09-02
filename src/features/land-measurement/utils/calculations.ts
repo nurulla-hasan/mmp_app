@@ -81,6 +81,45 @@ export const pxToMapInch = (px: number, ppi: number) => {
 // 4. POLYGON DATA CALCULATION
 // ============================================================================
 
+export type PolygonAreaSummary = {
+  sqft: number;
+  shotok: number;
+  katha: number;
+};
+
+/**
+ * Lightweight area-only calculation for live previews.
+ * It deliberately uses the exact same normalization, shoelace area and unit
+ * conversion as calculatePolygonData, but skips edge lengths and diagonal
+ * triangulation. Final saved/divided plots still use calculatePolygonData.
+ */
+export const calculatePolygonAreaSummary = (
+  points: Point[],
+  scale: number | null,
+): PolygonAreaSummary | null => {
+  if (!Number.isFinite(scale) || !scale || scale <= 0) return null;
+
+  const normalizedPoints = normalizePolygonPoints(points);
+  if (normalizedPoints.length < 3) return null;
+
+  let area = 0;
+  for (let i = 0; i < normalizedPoints.length; i++) {
+    const p1 = normalizedPoints[i];
+    const p2 = normalizedPoints[(i + 1) % normalizedPoints.length];
+    area += (p1.x * p2.y - p2.x * p1.y);
+  }
+
+  const pixelArea = Math.abs(area / 2);
+  if (pixelArea <= MIN_POLYGON_AREA_PX) return null;
+
+  const sqft = pixelArea / (scale * scale);
+  return {
+    sqft,
+    shotok: sqft / SHOTOK_SQ_FT,
+    katha: sqft / KATHA_SQ_FT,
+  };
+};
+
 /**
  * Calculate Polygon Data using High Precision
  * No rounding in intermediate steps. Rounding is only applied to output values.
