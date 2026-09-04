@@ -9,7 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { LogOut, LogIn, UserPlus, UserCheck } from 'lucide-react-native';
 import { Button } from '../../components/ui/button';
-import { PageWrapper } from '../../components/common/page-layout';
+import { PAGE_LAYOUT, PageWrapper } from '../../components/common/page-layout';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../stores/auth-store';
@@ -64,7 +64,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <PageWrapper>
+    <PageWrapper bottomPadding={PAGE_LAYOUT.bottom + PAGE_LAYOUT.compactGap}>
       {isAuthenticated && user ? (
         <>
           <ProfileHeaderCard
