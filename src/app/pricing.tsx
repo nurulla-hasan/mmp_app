@@ -19,7 +19,12 @@ import {
 } from 'lucide-react-native';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
-import { PageWrapper, SectionWrapper } from '../components/common/page-layout';
+import {
+  PAGE_LAYOUT,
+  PageIntro,
+  PageSectionHeader,
+  PageWrapper,
+} from '../components/common/page-layout';
 import { ManualCheckoutModal } from '../components/subscription/manual-checkout-modal';
 import { LoadingSkeleton, useSkeletonPulse } from '../components/ui/loading-skeleton';
 import { Colors } from '../constants/colors';
@@ -155,25 +160,11 @@ export default function PricingScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />
       }
     >
-      <SectionWrapper
-        style={[
-          styles.hero,
-          {
-            backgroundColor: `${colors.primary}0A`,
-            borderColor: `${colors.primary}25`,
-          },
-        ]}
-      >
-        <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}14` }]}>
-          <Sparkles size={20} color={colors.primary} />
-        </View>
-        <View style={styles.heroCopy}>
-          <Text style={[styles.heading, { color: colors.text }]}>আপনার জন্য সঠিক প্ল্যান</Text>
-          <Text style={[styles.subheading, { color: colors.textMuted }]}>
-            প্রয়োজন অনুযায়ী প্ল্যান বেছে নিন। পেমেন্ট যাচাই শেষে Pro access স্বয়ংক্রিয়ভাবে সক্রিয় হবে।
-          </Text>
-        </View>
-      </SectionWrapper>
+      <PageIntro
+        icon={<Sparkles size={20} color={colors.primary} />}
+        title='আপনার জন্য সঠিক প্ল্যান'
+        description='প্রয়োজন অনুযায়ী প্ল্যান বেছে নিন। পেমেন্ট যাচাই শেষে Pro access স্বয়ংক্রিয়ভাবে সক্রিয় হবে।'
+      />
 
       {activeSub ? (
         <View
@@ -384,7 +375,7 @@ export default function PricingScreen() {
       )}
 
       <View style={styles.accessSection}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Free বনাম Pro</Text>
+        <PageSectionHeader title='Free বনাম Pro' />
         <View style={[styles.accessCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.accessHeader}>
             <Lock size={17} color={colors.textMuted} />
@@ -431,28 +422,13 @@ export default function PricingScreen() {
 
 const styles = StyleSheet.create({
   flexOne: { flex: 1 },
-  hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  heroIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroCopy: { flex: 1, gap: 2 },
-  heading: { fontSize: 16, lineHeight: 21, fontFamily: Fonts.headingBold },
-  subheading: { fontSize: 10.5, lineHeight: 16, fontFamily: Fonts.sansRegular },
   statusBanner: {
     borderWidth: 1,
-    borderRadius: 13,
-    padding: 11,
+    borderRadius: PAGE_LAYOUT.radius,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
+    gap: PAGE_LAYOUT.compactGap,
   },
   statusIcon: {
     width: 36,
@@ -465,10 +441,21 @@ const styles = StyleSheet.create({
   statusTitle: { fontSize: 11.5, fontFamily: Fonts.headingBold },
   statusText: { marginTop: 2, fontSize: 9.5, fontFamily: Fonts.sansRegular },
   stateText: { fontSize: 10.5, lineHeight: 16, fontFamily: Fonts.sansRegular, textAlign: 'center' },
-  errorCard: { borderWidth: 1, borderRadius: 14, padding: 22, alignItems: 'center', gap: 8 },
+  errorCard: {
+    borderWidth: 1,
+    borderRadius: PAGE_LAYOUT.radius,
+    padding: 22,
+    alignItems: 'center',
+    gap: PAGE_LAYOUT.compactGap,
+  },
   errorTitle: { fontSize: 14, fontFamily: Fonts.headingBold, textAlign: 'center' },
   planList: { gap: 11 },
-  planCard: { borderWidth: 1.2, borderRadius: 15, padding: 14, gap: 9 },
+  planCard: {
+    borderWidth: 1.2,
+    borderRadius: PAGE_LAYOUT.radius,
+    padding: PAGE_LAYOUT.sectionPadding,
+    gap: 9,
+  },
   planTopRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   planIcon: { width: 40, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   planNameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 },
@@ -501,9 +488,13 @@ const styles = StyleSheet.create({
   featureText: { flex: 1, fontSize: 10.5, lineHeight: 16, fontFamily: Fonts.sansRegular },
   downgradeBox: { gap: 4 },
   downgradeText: { textAlign: 'center', fontSize: 9, fontFamily: Fonts.sansRegular },
-  accessSection: { gap: 8, marginTop: 2 },
-  sectionTitle: { fontSize: 14, fontFamily: Fonts.headingBold },
-  accessCard: { borderWidth: 1, borderRadius: 13, padding: 11, gap: 7 },
+  accessSection: { gap: PAGE_LAYOUT.compactGap, marginTop: 2 },
+  accessCard: {
+    borderWidth: 1,
+    borderRadius: PAGE_LAYOUT.radius,
+    padding: 12,
+    gap: 7,
+  },
   accessHeader: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   accessTitle: { flex: 1, fontSize: 12.5, fontFamily: Fonts.headingBold },
   accessFeature: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
