@@ -75,7 +75,7 @@ export function getActivePlotDots(points: Point[], isPlotFinished = false): Nati
   });
 }
 
-/** Exact native equivalent of the web PlotEdgeLabels geometry and visibility rules. */
+/** Exact native equivalent of web PlotEdgeLabels geometry and visibility rules. */
 export function getPlotEdgeLabels(plot: PlotRecord, scale: number | null, stageScale: number): NativeEdgeLabel[] {
   if (!scale) return [];
   const layoutScale = Math.exp(Math.round(Math.log(Math.max(stageScale, 0.01)) * 32) / 32);
@@ -95,10 +95,24 @@ export function getPlotEdgeLabels(plot: PlotRecord, scale: number | null, stageS
     let widthPx = text.length * fontPx * 0.58;
     const maxWidthPx = edgeScreenPx * 0.74;
     if (widthPx > maxWidthPx) fontPx = Math.max(6.75, fontPx * (maxWidthPx / widthPx));
-    const inward = getInwardNormal(
-      { x: midX, y: midY }, midDx, midDy, plot.points, Math.max(1, totalDistPx * 0.03),
+
+    // Test far enough inside the polygon to avoid a boundary/rounding hit on
+    // shallow or traced edges. This makes the chosen normal deterministic.
+    const normalTestDistance = Math.max(
+      2 / layoutScale,
+      Math.min(totalDistPx * 0.08, 12 / layoutScale),
     );
-    const inset = Math.max(7, fontPx * 0.95) / layoutScale;
+    const inward = getInwardNormal(
+      { x: midX, y: midY },
+      midDx,
+      midDy,
+      plot.points,
+      normalTestDistance,
+    );
+
+    // Keep the glyph + white outline visibly clear of the polygon edge. The
+    // old 7px minimum could put the text itself directly on the stroke.
+    const inset = Math.max(11, fontPx * 1.35 + 1.5) / layoutScale;
     labels.push({
       id: `${plot.id}-${groupIndex}`,
       x: midX + inward.x * inset,
@@ -151,7 +165,7 @@ export function getActiveSegmentLabels(points: Point[], scale: number | null, st
     const towardCenter = { x: center.x - midX, y: center.y - midY };
     const facesCenter = normalA.x * towardCenter.x + normalA.y * towardCenter.y >= 0;
     const inward = facesCenter ? normalA : { x: -normalA.x, y: -normalA.y };
-    const inset = Math.max(7, fontPx * 0.95) / stageScale;
+    const inset = Math.max(11, fontPx * 1.35 + 1.5) / stageScale;
     return [{
       id: `active-${groupIndex}`,
       x: midX + inward.x * inset,

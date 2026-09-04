@@ -306,26 +306,31 @@ const SkiaOutlinedText = memo(function SkiaOutlinedText({
   );
 });
 
-/** Web Tag auto-sizes from the real shaped text. Do the same in Skia. */
+/**
+ * Keep the area badge in the plot's canvas position while cancelling the live
+ * parent zoom for its visual size. The paragraph is therefore measured once at
+ * screen-pixel size, and the background/text cannot drift apart during pinch.
+ */
 const SkiaAreaBadge = memo(function SkiaAreaBadge({
   x,
   y,
   text,
-  stageScale,
   color,
   rotation = 0,
 }: LabelProps) {
-  const safeScale = Math.max(stageScale, 0.01);
-  const fontSize = (UI_CONFIG.fontSize.small * AREA_LABEL_FONT_SCALE) / safeScale;
-  const padding = (UI_CONFIG.padding.small * AREA_LABEL_PADDING_FACTOR) / safeScale;
-  const radius = (UI_CONFIG.radius.small * AREA_LABEL_RADIUS_FACTOR) / safeScale;
+  const fontSize = UI_CONFIG.fontSize.small * AREA_LABEL_FONT_SCALE;
+  const padding = UI_CONFIG.padding.small * AREA_LABEL_PADDING_FACTOR;
+  const radius = UI_CONFIG.radius.small * AREA_LABEL_RADIUS_FACTOR;
   const measured = useMemo(
     () => makeMeasuredParagraph(text, '#ffffff', fontSize),
     [fontSize, text],
   );
   const width = measured.textWidth + padding * 2;
   const height = Math.max(fontSize * 1.08, measured.textHeight) + padding * 2;
-  const shadow = 1.1 / safeScale;
+  const shadow = 1.1;
+  const inverseRuntimeScale = useDerivedValue(() => [
+    { scale: 1 / Math.max(canvasRuntimeScale.value, 0.01) },
+  ]);
 
   return (
     <Group
@@ -336,28 +341,30 @@ const SkiaAreaBadge = memo(function SkiaAreaBadge({
         { rotate: getReadableRotation(rotation) * Math.PI / 180 },
       ]}
     >
-      <RoundedRect
-        x={-width / 2 + shadow}
-        y={-height / 2 + shadow}
-        width={width}
-        height={height}
-        r={radius}
-        color='rgba(0,0,0,0.22)'
-      />
-      <RoundedRect
-        x={-width / 2}
-        y={-height / 2}
-        width={width}
-        height={height}
-        r={radius}
-        color={color}
-      />
-      <Paragraph
-        paragraph={measured.paragraph}
-        x={-measured.textWidth / 2}
-        y={-measured.textHeight / 2}
-        width={measured.textWidth + 1}
-      />
+      <Group transform={inverseRuntimeScale as any}>
+        <RoundedRect
+          x={-width / 2 + shadow}
+          y={-height / 2 + shadow}
+          width={width}
+          height={height}
+          r={radius}
+          color='rgba(0,0,0,0.22)'
+        />
+        <RoundedRect
+          x={-width / 2}
+          y={-height / 2}
+          width={width}
+          height={height}
+          r={radius}
+          color={color}
+        />
+        <Paragraph
+          paragraph={measured.paragraph}
+          x={-measured.textWidth / 2}
+          y={-measured.textHeight / 2}
+          width={measured.textWidth + 1}
+        />
+      </Group>
     </Group>
   );
 });
@@ -686,7 +693,7 @@ export function SkiaMapCanvas() {
         const facesCenter = normalA.x * (plotCenter.x - mid.x)
           + normalA.y * (plotCenter.y - mid.y) >= 0;
         const normal = facesCenter ? normalA : { x: -normalA.x, y: -normalA.y };
-        const inset = Math.max(7, fontPx * 0.95) / transform.scale;
+        const inset = Math.max(11, fontPx * 1.35 + 1.5) / transform.scale;
         point = { x: mid.x + normal.x * inset, y: mid.y + normal.y * inset };
       }
       label = {
