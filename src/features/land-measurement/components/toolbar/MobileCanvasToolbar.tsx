@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import {
-  BookmarkCheck, Check, Crosshair, Eye, EyeOff, FolderOpen, HardDrive, HelpCircle,
+  BookmarkCheck, Check, Crosshair, FolderOpen, HardDrive, HelpCircle,
   Image as ImageIcon, Minus, MoreHorizontal, MoveHorizontal, PenTool, Plus, Redo2,
   RotateCcw, Ruler, Scissors, Search, SearchX, Undo2, X,
 } from 'lucide-react-native';
@@ -89,7 +89,6 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   const plotCount = useMapStore((state) => state.plots.length);
   const calibrationPointCount = useMapStore((state) => state.calibrationLine.length / 2);
   const calibrationFutureCount = useMapStore((state) => state.calibrationLineFuture.length / 2);
-  const isShowDiagonals = useMapStore((state) => state.isShowDiagonals);
   const isMagnifierEnabled = useMapStore((state) => state.isMagnifierEnabled);
   const manualDividePlotId = useMapStore((state) => state.manualDividePlotId);
   const manualCutPointCount = useMapStore((state) => state.manualCutLine?.length ?? 0);
@@ -114,6 +113,10 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   const setIsMagnifierEnabled = useMapStore((state) => state.setIsMagnifierEnabled);
   const startPlotDrawing = useMapStore((state) => state.startPlotDrawing);
   const startManualDivide = useMapStore((state) => state.startManualDivide);
+
+  useEffect(() => {
+    setIsShowDiagonals(false);
+  }, [setIsShowDiagonals]);
 
   const panelStyle = { backgroundColor: colors.overlay, borderColor: colors.panelBorder };
 
@@ -199,7 +202,6 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
     {isMoreOpen && <View style={[styles.morePanel, panelStyle]}>
       {plotCount > 0 && <Action label='Save' active icon={<BookmarkCheck size={18} color='#fff' />} onPress={() => { setIsMoreOpen(false); onOpenSave(); }} />}
       <Action label='Drive' icon={<HardDrive size={18} color={muted} />} onPress={() => void Linking.openURL('https://drive.google.com/drive/folders/1r0ryb1SyCeYV-41CM1WweokGDKT5t9RB')} />
-      <Action label='Diagonals' active={isShowDiagonals} icon={isShowDiagonals ? <Eye size={18} color='#fff' /> : <EyeOff size={18} color={muted} />} onPress={() => setIsShowDiagonals(!isShowDiagonals)} />
       <Action label='Help' icon={<HelpCircle size={18} color={muted} />} onPress={() => Alert.alert('How to use', 'Add map → set scale → move the crosshair to a corner → add points → finish the plot.')} />
       <Action label='Reset' danger disabled={!hasMapImage} icon={<RotateCcw size={18} color='#ef4444' />} onPress={resetMap} />
     </View>}
