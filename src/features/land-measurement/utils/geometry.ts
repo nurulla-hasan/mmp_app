@@ -215,70 +215,8 @@ export const groupPolygonSegments = (points: Point[]): PolygonSegmentData[][] =>
 };
 
 // ============================================================================
-// 4. POINT-IN-POLYGON & TRIANGULATION
+// 4. POINT-IN-POLYGON
 // ============================================================================
-
-const isPointInTriangle = (pt: Point, v1: Point, v2: Point, v3: Point) => {
-  const d1 = (pt.x - v2.x) * (v1.y - v2.y) - (v1.x - v2.x) * (pt.y - v2.y);
-  const d2 = (pt.x - v3.x) * (v2.y - v3.y) - (v2.x - v3.x) * (pt.y - v3.y);
-  const d3 = (pt.x - v1.x) * (v3.y - v1.y) - (v3.x - v1.x) * (pt.y - v1.y);
-  const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-  const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-  return !(hasNeg && hasPos);
-};
-
-/**
- * Ear-clipping triangulation of a simple polygon.
- * Returns an array of diagonal indices (pairs of vertex indices) that
- * triangulate the polygon.  Returns an empty array for triangles (≤ 3 pts).
- */
-export const triangulatePolygon = (vertices: Point[]): { p1Index: number; p2Index: number }[] => {
-  if (vertices.length <= 3) return [];
-
-  let area = 0;
-  for (let i = 0; i < vertices.length; i++) {
-    const p1 = vertices[i];
-    const p2 = vertices[(i + 1) % vertices.length];
-    area += (p1.x * p2.y - p2.x * p1.y);
-  }
-  const isCCW = area < 0;
-
-  const V = vertices.map((v, i) => ({ ...v, index: i }));
-  const diagonals: { p1Index: number; p2Index: number }[] = [];
-  const remaining = [...V];
-
-  let earFound = true;
-  while (remaining.length > 3 && earFound) {
-    earFound = false;
-    for (let i = 0; i < remaining.length; i++) {
-      const prev = remaining[(i - 1 + remaining.length) % remaining.length];
-      const curr = remaining[i];
-      const next = remaining[(i + 1) % remaining.length];
-
-      const crossProduct = (curr.x - prev.x) * (next.y - curr.y) - (curr.y - prev.y) * (next.x - curr.x);
-      const isConvex = isCCW ? crossProduct < 0 : crossProduct > 0;
-
-      if (isConvex) {
-        let isEar = true;
-        for (let j = 0; j < remaining.length; j++) {
-          if (j === (i - 1 + remaining.length) % remaining.length || j === i || j === (i + 1) % remaining.length) continue;
-          if (isPointInTriangle(remaining[j], prev, curr, next)) {
-            isEar = false;
-            break;
-          }
-        }
-
-        if (isEar) {
-          diagonals.push({ p1Index: prev.index, p2Index: next.index });
-          remaining.splice(i, 1);
-          earFound = true;
-          break;
-        }
-      }
-    }
-  }
-  return diagonals;
-};
 
 /**
  * Ray-casting algorithm to check if a point is inside a polygon,
