@@ -19,18 +19,6 @@ export const AREA_LABEL_PADDING_FACTOR = 0.55;
 export const AREA_LABEL_RADIUS_FACTOR = 0.75;
 
 /**
- * Minimum diagonal length (in pixels) required to render a diagonal line inside a plot.
- * Prevents drawing diagonals for tiny plots where it would clutter the UI.
- */
-export const MIN_DIAGONAL_DRAW_PX = 30;
-
-/**
- * Minimum real-world length (in feet) required to show edge/diagonal labels.
- * This hides tiny snap/intersection artifacts such as 0'-00" labels.
- */
-export const MIN_EDGE_LABEL_FT = 1;
-
-/**
  * Minimum on-canvas edge length (in source image pixels) required to show edge labels.
  * This prevents visually tiny corner artifacts from getting large-looking real-world labels in print.
  */
@@ -76,7 +64,7 @@ export const UI_CONFIG = {
     plotPrimary: "#0F766E",       // Teal color used for completely drawn, inactive plots
     measurePrimary: "#111827",    // Dark slate/black used for measurement line tools
     textWhite: "white",           // Standard white for text on dark backgrounds
-    gray: "#94A3B8",              // Subtle gray used for diagonals and inactive indicators
+    gray: "#94A3B8",              // Subtle gray used for inactive indicators
     snapHint: "#2563EB"           // Color of the circle that appears when snapping to a start point
   },
   fontSize: {
@@ -92,14 +80,14 @@ export const UI_CONFIG = {
   radius: {
     small: 4,                     // Small corner radii or measurement dots
     medium: 5,                    // Medium anchor dots
-    large: 6,                     // Large anchor dots
+    large: 6,                    // Large anchor dots
     xlarge: 8,                    // Edge snapping indicator radius
     xxlarge: 12                   // Snap-to-start hint circle radius
   },
   strokeWidth: {
     thin: 1,                      // Thin borders (tags, small lines)
     medium: 1.5,                  // Medium borders
-    thick: 2,                     // Moderately thick lines
+    thick: 2,                    // Moderately thick lines
     xthick: 2.5,                  // Thick highlight lines
     xxthick: 3                    // Very thick lines (active drawing paths)
   }
