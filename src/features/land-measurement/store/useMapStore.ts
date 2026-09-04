@@ -57,7 +57,6 @@ type MapStore = {
   stagePos: Point;
   stageSize: { width: number; height: number };
   isShowDiagonals: boolean;
-  isMagnifierEnabled: boolean;
   isPinching: boolean;
   snapHint: boolean;
   reportInfo: ReportInfo;
@@ -94,7 +93,6 @@ type MapStore = {
   redoPlotAction: () => void;
   clearPlots: () => void;
   setIsShowDiagonals: (show: boolean) => void;
-  setIsMagnifierEnabled: (enabled: boolean) => void;
   setIsPinching: (pinching: boolean) => void;
   setSnapHint: (hint: boolean) => void;
   setReportInfo: (info: ReportInfo | ((previous: ReportInfo) => ReportInfo)) => void;
@@ -194,7 +192,6 @@ export const useMapStore = create<MapStore>((set, get) => ({
   stagePos: { x: 0, y: 0 },
   stageSize: { width: 0, height: 0 },
   isShowDiagonals: false,
-  isMagnifierEnabled: false,
   isPinching: false,
   snapHint: false,
   reportInfo: { mouza: '', jlNo: '', dagNo: '', khatianNo: '', date: new Date().toLocaleDateString('en-GB'), surveyorName: '' },
@@ -575,8 +572,6 @@ export const useMapStore = create<MapStore>((set, get) => ({
   }),
 
   setIsShowDiagonals: (isShowDiagonals) => set({ isShowDiagonals }),
-
-  setIsMagnifierEnabled: (isMagnifierEnabled) => set({ isMagnifierEnabled }),
 
   setIsPinching: (isPinching) => set({ isPinching }),
 
