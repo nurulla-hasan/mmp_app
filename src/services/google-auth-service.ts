@@ -30,9 +30,9 @@ export const GoogleAuthService = {
       };
     }
 
-    // Expo Go cannot register this app's stable custom scheme. OAuth must be
-    // tested in a development build or the installable APK.
-    if (Constants.expoGoConfig) {
+    // `expoGoConfig` may also be embedded in standalone manifests. `appOwnership`
+    // remains `expo` specifically in Expo Go and is null in standalone APKs.
+    if (Constants.appOwnership === 'expo') {
       return {
         type: 'error',
         message: 'Google সাইন ইন Expo Go-তে নয়—APK বা development build-এ টেস্ট করুন।',
