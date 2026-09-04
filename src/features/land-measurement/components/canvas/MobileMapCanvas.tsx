@@ -7,8 +7,7 @@ import { calculatePolygonData } from '../../utils/calculations';
 import { clipLineToPolygon, getSnappedPoint } from '../../utils/geometry';
 import { getDirectionalContainingPlot } from '../../utils/directionalPlot';
 import { splitPolygonByPolyline } from '../../utils/polygonDivision';
-import { formatFeetInches, MIN_DIAGONAL_DRAW_PX, MIN_EDGE_LABEL_FT } from '../../utils/canvas';
-import { STAGE_MAX_ZOOM, STAGE_MIN_ZOOM, UI_CONFIG } from '../../utils/canvas';
+import { formatFeetInches, STAGE_MAX_ZOOM, STAGE_MIN_ZOOM, UI_CONFIG } from '../../utils/canvas';
 import { getPolygonAreaLabelLayout } from '../../utils/polygon-label';
 import { getReadableRotation } from '../../utils/component-helpers';
 import type { Point } from '../../types/map';
@@ -118,20 +117,6 @@ function SvgOutlinedText({ x, y, text, stageScale, color, rotation = 0, fontPx =
   );
 }
 
-function SvgDiagonalBadge({ x, y, text, stageScale, color }: Omit<BadgeProps, 'rotation'>) {
-  const safeScale = Math.max(stageScale, 0.01);
-  const fontSize = UI_CONFIG.fontSize.small / safeScale;
-  const padding = UI_CONFIG.padding.small / safeScale;
-  const width = text.length * fontSize * 0.6 + padding * 2;
-  const height = fontSize + padding * 2;
-  return (
-    <G transform={`translate(${x} ${y})`} opacity={0.8}>
-      <Rect x={-width / 2} y={-height / 2} width={width} height={height} rx={UI_CONFIG.padding.small / safeScale} fill='#ffffff' stroke={color} strokeWidth={1 / safeScale} />
-      <SvgText x={0} y={fontSize * 0.34} fill={color} fontFamily={Fonts.headingBold} fontWeight='700' fontSize={fontSize} textAnchor='middle'>{text}</SvgText>
-    </G>
-  );
-}
-
 type NativeMagnifierProps = {
   initial: Transform;
   image: NonNullable<ReturnType<typeof useMapStore.getState>['mapImage']>;
@@ -142,11 +127,10 @@ type NativeMagnifierProps = {
   plotPoints: Point[];
   calibrationPoints: Point[];
   scale: number | null;
-  isShowDiagonals: boolean;
 };
 
 const NativeMagnifier = forwardRef<MagnifierHandle, NativeMagnifierProps>(function NativeMagnifier(
-  { initial, image, viewport, fitScale, mode, plots, plotPoints, calibrationPoints, scale, isShowDiagonals },
+  { initial, image, viewport, fitScale, mode, plots, plotPoints, calibrationPoints, scale },
   ref,
 ) {
   const [transform, setTransform] = useState(initial);
@@ -188,12 +172,6 @@ const NativeMagnifier = forwardRef<MagnifierHandle, NativeMagnifierProps>(functi
             return <G key={`mag-${plot.id}`}>
               <Polygon points={pointString(plot.points)} fill={color} fillOpacity={0.1} stroke={color} strokeWidth={UI_CONFIG.strokeWidth.xxthick / transform.scale} />
               {getPlotEdgeLabels(plot, scale, transform.scale).map((edge) => <SvgOutlinedText key={`mag-${edge.id}`} x={edge.x} y={edge.y} text={edge.text} stageScale={transform.scale} color={edge.color} rotation={edge.rotation} fontPx={edge.fontPx} />)}
-              {isShowDiagonals && (plot.results.diagonals ?? []).map((diagonal, index) => {
-                const start = plot.points[diagonal.p1Index];
-                const end = plot.points[diagonal.p2Index];
-                if (!start || !end || distance(start, end) <= MIN_DIAGONAL_DRAW_PX / transform.scale) return null;
-                return <Line key={`mag-diag-${index}`} x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke={color} strokeWidth={1 / transform.scale} strokeDasharray={`${6 / transform.scale},${6 / transform.scale}`} opacity={0.4} />;
-              })}
               <SvgBadge x={area.center.x} y={area.center.y} text={`${toBengaliDigits(plot.results.shotok.toFixed(2))} শতক`} stageScale={transform.scale} color={color} rotation={area.rotation} compact />
             </G>;
           })}
@@ -222,7 +200,7 @@ export function MobileMapCanvas() {
   const state = useMapStore();
   const {
     mapImage, mode, scale, plotPoints, plots, calibrationLine, stageScale, stagePos,
-    isShowDiagonals, isMagnifierEnabled, manualDividePlotId, manualCutLine,
+    isMagnifierEnabled, manualDividePlotId, manualCutLine,
   } = state;
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
   const contentGroupRef = useRef<React.ElementRef<typeof G> | null>(null);
@@ -592,16 +570,6 @@ export function MobileMapCanvas() {
                 <G key={plot.id} opacity={hiddenForPreview ? 0.2 : 1}>
                   <Polygon points={pointString(plot.points)} fill={plot.color ?? '#0f766e'} fillOpacity={manualDividePlotId === plot.id ? 0.18 : 0.1} stroke={plot.color ?? '#0f766e'} strokeWidth={2.5 / stageScale} />
                   {edgeLabels.map((edge) => <SvgOutlinedText key={edge.id} x={edge.x} y={edge.y} text={edge.text} stageScale={stageScale} color={edge.color} rotation={edge.rotation} fontPx={edge.fontPx} />)}
-                  {isShowDiagonals && plot.results.diagonals?.map((diagonal, index) => {
-                    const start = plot.points[diagonal.p1Index];
-                    const end = plot.points[diagonal.p2Index];
-                    if (!start || !end) return null;
-                    if (distance(start, end) <= MIN_DIAGONAL_DRAW_PX / stageScale) return null;
-                    const mid = midpoint(start, end);
-                    const text = diagonal.lengthFt >= MIN_EDGE_LABEL_FT ? formatFeetInches(diagonal.lengthFt) : '';
-                    const color = plot.color ?? '#0f766e';
-                    return <G key={`${plot.id}-diag-${index}`}><Line x1={start.x} y1={start.y} x2={end.x} y2={end.y} stroke={color} strokeWidth={1 / stageScale} strokeDasharray={`${6 / stageScale},${6 / stageScale}`} opacity={0.4} />{text ? <SvgDiagonalBadge x={mid.x} y={mid.y} text={text} stageScale={stageScale} color={color} /> : null}</G>;
-                  })}
                   {mode !== 'manual_divide_plot' && <SvgBadge x={label.center.x} y={label.center.y} text={`${toBengaliDigits(plot.results.shotok.toFixed(2))} শতক`} stageScale={stageScale} color={plot.color ?? '#0f766e'} rotation={label.rotation} compact />}
                 </G>
               );
@@ -641,7 +609,7 @@ export function MobileMapCanvas() {
           </G>
 
           <LiveMeasurementOverlay ref={liveOverlayRef} initial={getLiveOverlay({ scale: stageScale, pos: stagePos })} />
-          {mapImage && isMagnifierEnabled && viewport.width > 0 && (mode === 'drawing_plot' || mode === 'calibrating') && <NativeMagnifier ref={magnifierRef} initial={{ scale: stageScale, pos: stagePos }} image={mapImage} viewport={viewport} fitScale={fitScaleRef.current} mode={mode} plots={plots} plotPoints={plotPoints} calibrationPoints={calibrationPoints} scale={scale} isShowDiagonals={isShowDiagonals} />}
+          {mapImage && isMagnifierEnabled && viewport.width > 0 && (mode === 'drawing_plot' || mode === 'calibrating') && <NativeMagnifier ref={magnifierRef} initial={{ scale: stageScale, pos: stagePos }} image={mapImage} viewport={viewport} fitScale={fitScaleRef.current} mode={mode} plots={plots} plotPoints={plotPoints} calibrationPoints={calibrationPoints} scale={scale} />}
 
           {(mode === 'drawing_plot' || mode === 'calibrating') && (
             <G>
