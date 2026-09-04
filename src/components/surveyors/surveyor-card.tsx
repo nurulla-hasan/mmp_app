@@ -11,6 +11,7 @@ import {
 } from 'lucide-react-native';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { ProAvatarRing } from '../ui/pro-avatar-ring';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -35,6 +36,7 @@ export function SurveyorCard({ surveyor, compact = false }: Props) {
   const whatsapp = getSurveyorWhatsApp(surveyor);
   const minPrice = getSurveyorMinimumPrice(surveyor);
   const verified = surveyor.isVerified ?? surveyor.verificationStatus === 'APPROVED';
+  const isPro = Boolean(surveyor.user?.isSubscribed || surveyor.isSubscribed);
   const rating = Number(surveyor.rating || 0);
   const reviews = Number(surveyor.totalReviews || 0);
   const services = surveyor.surveyorServices ?? [];
@@ -68,21 +70,23 @@ export function SurveyorCard({ surveyor, compact = false }: Props) {
       ]}
     >
       <View style={styles.headerRow}>
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.avatar} />
-        ) : (
-          <View
-            style={[
-              styles.avatar,
-              styles.avatarFallback,
-              { backgroundColor: `${colors.primary}18` },
-            ]}
-          >
-            <Text style={[styles.avatarText, { color: colors.primary }]}>
-              {name.charAt(0) || 'স'}
-            </Text>
-          </View>
-        )}
+        <ProAvatarRing size={48} isPro={isPro}>
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.avatar} />
+          ) : (
+            <View
+              style={[
+                styles.avatar,
+                styles.avatarFallback,
+                { backgroundColor: `${colors.primary}18` },
+              ]}
+            >
+              <Text style={[styles.avatarText, { color: colors.primary }]}>
+                {name.charAt(0) || 'স'}
+              </Text>
+            </View>
+          )}
+        </ProAvatarRing>
 
         <View style={styles.identity}>
           <View style={styles.nameRow}>
