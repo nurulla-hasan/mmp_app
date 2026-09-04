@@ -1,43 +1,34 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   TextInput,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import {
-  ArrowLeft,
-  Search,
-  X,
-  ArrowRight,
-  Calculator,
-} from 'lucide-react-native';
+import { ArrowLeft, Search, X, ArrowRight } from 'lucide-react-native';
 import { CalculationCard } from '../components/calculations/calculation-card';
 import { CalculationEmptyState } from '../components/calculations/calculation-empty-state';
+import { PageWrapper, PAGE_LAYOUT } from '../components/common/page-layout';
 import { CalculationListSkeleton } from '../components/common/page-loading-skeletons';
 import { useCalculations } from '../hooks/queries/use-calculations';
 import { Fonts } from '../constants/typography';
 import { Colors } from '../constants/colors';
 import { useThemeStore } from '../stores/theme-store';
-import { useAuthStore } from '../stores/auth-store';
 
 export default function CalculationsScreen() {
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const isDark = theme === 'dark';
-  const { isAuthenticated } = useAuthStore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
-  // Debounce search input 300ms
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm.trim());
@@ -45,7 +36,6 @@ export default function CalculationsScreen() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // ── TanStack Query: auto-cached, refetch on invalidation ─────────────────
   const {
     data: calculations = [],
     isLoading,
@@ -58,12 +48,8 @@ export default function CalculationsScreen() {
     setRefreshing(false);
   };
 
-  // handleDeleted: TanStack Query optimistic delete is done inside the card mutation
-  // We don't need local state — queryClient.invalidateQueries auto-syncs the list
-
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Top Navbar Header */}
       <View style={[styles.navbar, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -87,14 +73,11 @@ export default function CalculationsScreen() {
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <PageWrapper
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor='#16a34a' />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        {/* Search Box */}
         <View
           style={[
             styles.searchBox,
@@ -119,7 +102,6 @@ export default function CalculationsScreen() {
           ) : null}
         </View>
 
-        {/* Loading Skeleton */}
         {isLoading && calculations.length === 0 ? (
           <CalculationListSkeleton />
         ) : calculations.length === 0 ? (
@@ -127,15 +109,11 @@ export default function CalculationsScreen() {
         ) : (
           <View style={styles.listContainer}>
             {calculations.map((calc) => (
-              <CalculationCard
-                key={calc.id}
-                calculation={calc}
-              />
+              <CalculationCard key={calc.id} calculation={calc} />
             ))}
           </View>
         )}
 
-        {/* Bottom CTA Banner (Web Aligned) */}
         <TouchableOpacity
           activeOpacity={0.85}
           style={[
@@ -153,21 +131,19 @@ export default function CalculationsScreen() {
               নতুন জমি ক্যালকুলেশন ও প্লট ড্রয়িং শুরু করুন।
             </Text>
           </View>
-          <ArrowRight size={16} color='#16a34a' />
+          <ArrowRight size={16} color={colors.primary} />
         </TouchableOpacity>
-      </ScrollView>
+      </PageWrapper>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
+  safeArea: { flex: 1 },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: PAGE_LAYOUT.horizontal,
     paddingVertical: 12,
     borderBottomWidth: 1,
     gap: 12,
@@ -180,23 +156,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitleCol: {
-    flex: 1,
-    gap: 1,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontFamily: Fonts.headingBold,
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    fontFamily: Fonts.sansRegular,
-  },
-  scrollContent: {
-    padding: 16,
-    gap: 12,
-    paddingBottom: 32,
-  },
+  headerTitleCol: { flex: 1, gap: 1 },
+  headerTitle: { fontSize: 16, fontFamily: Fonts.headingBold },
+  headerSubtitle: { fontSize: 11, fontFamily: Fonts.sansRegular },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -212,40 +174,18 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontFamily: Fonts.sansMedium,
   },
-  clearSearchBtn: {
-    padding: 4,
-  },
-  loadingContainer: {
-    paddingVertical: 40,
-    alignItems: 'center',
-    gap: 10,
-  },
-  loadingText: {
-    fontSize: 12,
-    fontFamily: Fonts.sansMedium,
-  },
-  listContainer: {
-    gap: 10,
-  },
+  clearSearchBtn: { padding: 4 },
+  listContainer: { gap: 10 },
   bottomCtaBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 14,
-    borderRadius: 10,
+    padding: PAGE_LAYOUT.sectionPadding,
+    borderRadius: PAGE_LAYOUT.radius,
     borderWidth: 1,
-    marginTop: 8,
+    marginTop: 4,
   },
-  ctaTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  ctaTitle: {
-    fontSize: 13.5,
-    fontFamily: Fonts.headingBold,
-  },
-  ctaSubtitle: {
-    fontSize: 11,
-    fontFamily: Fonts.sansRegular,
-  },
+  ctaTextCol: { flex: 1, gap: 2 },
+  ctaTitle: { fontSize: 13.5, fontFamily: Fonts.headingBold },
+  ctaSubtitle: { fontSize: 11, fontFamily: Fonts.sansRegular },
 });
