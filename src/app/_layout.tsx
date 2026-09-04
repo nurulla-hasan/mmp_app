@@ -98,11 +98,11 @@ export default function RootLayout() {
               <Stack.Screen name='calculations' options={{ headerShown: false }} />
               <Stack.Screen
                 name='pricing'
-                options={{ headerShown: true, title: 'সাবস্ক্রিপশন প্ল্যানস' }}
+                options={{ headerShown: true, title: 'সাবস্ক্রিপশন' }}
               />
               <Stack.Screen
                 name='join-as-surveyor'
-                options={{ headerShown: true, title: 'সার্ভেয়ার হিসেবে যোগ দিন' }}
+                options={{ headerShown: true, title: 'সার্ভেয়ার আবেদন' }}
               />
               <Stack.Screen
                 name='surveyor-profile'
