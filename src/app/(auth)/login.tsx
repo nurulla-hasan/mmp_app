@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -404,7 +405,9 @@ export default function AuthScreen() {
               style={[styles.primaryActionBtn, isBusy && { opacity: 0.65 }]}
               onPress={activeTab === 'login' ? handleLogin : handleRegister}
               disabled={isBusy}
+              accessibilityState={{ busy: loading, disabled: isBusy }}
             >
+              {loading ? <ActivityIndicator size='small' color='#ffffff' /> : null}
               <Text style={styles.primaryActionBtnText}>
                 {loading
                   ? activeTab === 'login'
@@ -436,8 +439,13 @@ export default function AuthScreen() {
                 isBusy && { opacity: 0.65 },
               ]}
               onPress={handleGoogleLogin}
+              accessibilityState={{ busy: googleLoading, disabled: isBusy }}
             >
-              {!googleLoading ? <GoogleIcon /> : null}
+              {googleLoading ? (
+                <ActivityIndicator size='small' color='#16a34a' />
+              ) : (
+                <GoogleIcon />
+              )}
               <Text style={[styles.googleButtonText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
                 {googleLoading ? 'Google সাইন ইন হচ্ছে...' : 'Google দিয়ে চালিয়ে যান'}
               </Text>
@@ -595,8 +603,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a',
     height: 36,
     borderRadius: 6,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   primaryActionBtnText: {
     color: '#ffffff',

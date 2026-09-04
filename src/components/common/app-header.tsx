@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Search, Sun, Moon, LogIn } from 'lucide-react-native';
+import { Bell, Search, Sun, Moon, LogIn } from 'lucide-react-native';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
 import { useThemeStore } from '../../stores/theme-store';
 import { useAuthStore } from '../../stores/auth-store';
+import { useActiveBroadcasts } from '../../hooks/queries/use-broadcasts';
 import { Button } from '../ui/button';
 import { ProAvatarRing } from '../ui/pro-avatar-ring';
+import { BroadcastCenterModal } from '../broadcasts/broadcast-center-modal';
 
 interface AppHeaderProps {
   title?: string;
@@ -25,6 +27,9 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const { theme, toggleTheme } = useThemeStore();
   const { user, isAuthenticated } = useAuthStore();
   const colors = Colors[theme];
+  const broadcastsQuery = useActiveBroadcasts();
+  const broadcasts = broadcastsQuery.data ?? [];
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const displaySubtitle = subtitle || (title === 'মৌজা ম্যাপ প্রো' ? 'ডিজিটাল ল্যান্ড প্ল্যাটফর্ম' : 'মৌজা ম্যাপ প্রো');
 
@@ -33,9 +38,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       edges={['top']}
       style={[styles.safeArea, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
     >
-      {/* Main Top Bar */}
       <View style={styles.topBar}>
-        {/* Brand & Logo */}
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.brandRow}
@@ -51,9 +54,24 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </View>
         </TouchableOpacity>
 
-        {/* Right Actions (Theme Toggle, Auth / Avatar, Upgrade) */}
         <View style={styles.actionGroup}>
-          {/* Theme Toggle Button */}
+          <TouchableOpacity
+            activeOpacity={0.72}
+            accessibilityRole='button'
+            accessibilityLabel='নোটিফিকেশন দেখুন'
+            onPress={() => setNotificationsOpen(true)}
+            style={[styles.notificationButton, { backgroundColor: colors.iconBtnBg }]}
+          >
+            <Bell size={16} color={colors.textMuted} strokeWidth={2} />
+            {broadcasts.length > 0 ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {broadcasts.length > 9 ? '9+' : broadcasts.length}
+                </Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
+
           <Button
             variant='ghost'
             size='icon'
@@ -67,7 +85,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             }
           />
 
-          {/* User Avatar OR Login Button */}
           {isAuthenticated && user ? (
             <TouchableOpacity
               activeOpacity={0.8}
@@ -105,7 +122,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </View>
       </View>
 
-      {/* Optional Integrated Search Bar (shown on Home) */}
       {showSearch && (
         <View style={styles.searchContainer}>
           <View style={[styles.searchBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
@@ -119,6 +135,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </View>
         </View>
       )}
+
+      <BroadcastCenterModal
+        visible={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        broadcasts={broadcasts}
+        loading={broadcastsQuery.isLoading}
+      />
     </SafeAreaView>
   );
 };
@@ -170,7 +193,35 @@ const styles = StyleSheet.create({
   actionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
+  },
+  notificationButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -4,
+    minWidth: 15,
+    height: 15,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ef4444',
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+  },
+  notificationBadgeText: {
+    color: '#ffffff',
+    fontSize: 8,
+    lineHeight: 10,
+    fontFamily: Fonts.sansBold,
   },
   headerAvatarBtn: {
     width: 36,
@@ -189,15 +240,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 15,
     fontFamily: Fonts.headingBold,
-  },
-  notifDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#ef4444',
   },
   searchContainer: {
     paddingHorizontal: 14,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   Modal,
@@ -54,7 +55,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   const [districtPickerOpen, setDistrictPickerOpen] = useState(false);
   const [upazilaPickerOpen, setUpazilaPickerOpen] = useState(false);
 
-  // ── TanStack Query Hooks ─────────────────────────────────────────────────
   const { data: districts = [] } = useDistricts();
   const { mutate: updateProfile, isPending: loadingUpdate } = useUpdateProfile();
   const { mutate: uploadAvatar, isPending: loadingUpload } = useUploadAvatar();
@@ -83,7 +83,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
     }
   };
 
-  // Avatar upload via mutation hook (handles permission, picker, crop, upload)
   const handlePickAndCropImage = () => {
     uploadAvatar(undefined, {
       onSuccess: (res: any) => {
@@ -133,7 +132,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             },
           ]}
         >
-          {/* Header */}
           <View style={[styles.modalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>প্রোফাইল সম্পাদনা</Text>
@@ -146,13 +144,11 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Form Content */}
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.formScroll}
             keyboardShouldPersistTaps='handled'
           >
-            {/* 1. Avatar Preview & Image URL Row */}
             <View
               style={[
                 styles.avatarPreviewBox,
@@ -184,6 +180,11 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                         </Text>
                       </View>
                     )}
+                    {loadingUpload ? (
+                      <View style={styles.avatarLoadingOverlay}>
+                        <ActivityIndicator size='small' color='#ffffff' />
+                      </View>
+                    ) : null}
                   </View>
                 </ProAvatarRing>
                 <View style={styles.avatarCameraBadge}>
@@ -202,7 +203,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               </View>
             </View>
 
-            {/* 2. Full Name */}
             <Input
               label='পূর্ণ নাম'
               placeholder='আপনার নাম লিখুন'
@@ -211,7 +211,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               leftIcon={<User size={15} color={colors.textMuted} />}
             />
 
-            {/* 3. Phone */}
             <Input
               label='মোবাইল নম্বর'
               placeholder='01XXXXXXXXX'
@@ -221,7 +220,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               leftIcon={<Phone size={15} color={colors.textMuted} />}
             />
 
-            {/* 4. WhatsApp Number with Copy Action Header */}
             <View style={{ marginBottom: 10 }}>
               <View style={styles.whatsappHeaderRow}>
                 <Text style={[styles.inputLabelText, { color: colors.text }]}>
@@ -247,9 +245,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               />
             </View>
 
-            {/* 5. District & Upazila Pickers */}
             <View style={styles.pickerRow}>
-              {/* District Select */}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}>
                   জেলা
@@ -278,7 +274,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {/* Upazila Select */}
               <View style={{ flex: 1 }}>
                 <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}>
                   উপজেলা / থানা
@@ -313,7 +308,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               </View>
             </View>
 
-            {/* Action Buttons (Cancel / Save) */}
             <View style={[styles.modalActions, { borderTopColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
               <TouchableOpacity
                 style={[
@@ -334,8 +328,13 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                 style={[styles.saveBtn, loading && { opacity: 0.7 }]}
                 onPress={handleSave}
                 disabled={loading}
+                accessibilityState={{ busy: loading, disabled: loading }}
               >
-                <Check size={14} color='#ffffff' />
+                {loading ? (
+                  <ActivityIndicator size='small' color='#ffffff' />
+                ) : (
+                  <Check size={14} color='#ffffff' />
+                )}
                 <Text style={styles.saveBtnText}>
                   {loading ? 'সংরক্ষণ হচ্ছে...' : 'সংরক্ষণ করুন'}
                 </Text>
@@ -345,7 +344,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
         </View>
       </KeyboardAvoidingView>
 
-      {/* District Picker Submodal */}
       <Modal
         visible={districtPickerOpen}
         transparent
@@ -399,7 +397,6 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
         </View>
       </Modal>
 
-      {/* Upazila Picker Submodal */}
       <Modal
         visible={upazilaPickerOpen}
         transparent
@@ -531,6 +528,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  avatarLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,.48)',
+  },
   avatarFallback: {
     width: '100%',
     height: '100%',
@@ -647,4 +650,3 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sansMedium,
   },
 });
-

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -167,7 +168,9 @@ export default function ResetPasswordScreen() {
               style={[styles.primaryActionBtn, loading && { opacity: 0.7 }]}
               onPress={handleReset}
               disabled={loading}
+              accessibilityState={{ busy: loading, disabled: loading }}
             >
+              {loading ? <ActivityIndicator size='small' color='#ffffff' /> : null}
               <Text style={styles.primaryActionBtnText}>
                 {loading ? 'পরিবর্তন হচ্ছে...' : 'পাসওয়ার্ড পরিবর্তন করুন'}
               </Text>
@@ -234,8 +237,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a',
     height: 36,
     borderRadius: 6,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
     marginTop: 6,
   },
   primaryActionBtnText: {

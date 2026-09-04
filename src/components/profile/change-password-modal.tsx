@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   Modal,
@@ -168,8 +169,13 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
                 style={[styles.saveBtn, loading && { opacity: 0.7 }]}
                 onPress={handleSave}
                 disabled={loading}
+                accessibilityState={{ busy: loading, disabled: loading }}
               >
-                <ShieldCheck size={14} color='#ffffff' />
+                {loading ? (
+                  <ActivityIndicator size='small' color='#ffffff' />
+                ) : (
+                  <ShieldCheck size={14} color='#ffffff' />
+                )}
                 <Text style={styles.saveBtnText}>
                   {loading
                     ? (hasPassword ? 'পরিবর্তন হচ্ছে...' : 'সংরক্ষণ হচ্ছে...')
