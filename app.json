@@ -32,6 +32,7 @@
     },
     "plugins": [
       "expo-router",
+      "@config-plugins/react-native-blob-util",
       [
         "expo-splash-screen",
         {

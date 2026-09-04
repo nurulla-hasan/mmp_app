@@ -13,9 +13,120 @@ import { useThemeStore } from '../../../../stores/theme-store';
 import { getLandMeasurementToolColors } from '../../utils/tool-theme';
 import { buildWebPrintHtml } from '../print/buildWebPrintHtml';
 
-const PDF_DIRECTORY_KEY = 'mmp_pdf_download_directory';
+const PDF_DIRECTORY_KEY = 'mmp_pdf_documents_directory_v2';
+const LEGACY_PDF_DIRECTORY_KEY = 'mmp_pdf_download_directory';
+const PDF_DIRECTORY_NAME = 'MMP Documents';
 
 const formatMeasurement = (value: number) => value.toFixed(DECIMALS);
+
+const buildPdfFileName = (mapName: string | undefined, plotCount: number) => {
+  const sourceName = (mapName || 'mouza-map')
+    .replace(/\s*•\s*page\s+\d+\s*$/i, '')
+    .trim();
+  const withoutExtension = sourceName.replace(/\.[^.]+$/, '');
+  const safeName = withoutExtension
+    .replace(/[<>:"/\\|?*]+/g, '-')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 80);
+  return `${safeName || 'mouza-map'}_${plotCount}p.pdf`;
+};
+
+const getSafLeafName = (uri: string) => {
+  let decoded = uri;
+  try {
+    decoded = decodeURIComponent(uri);
+  } catch {
+    // Keep the original URI if the provider returned a non-standard escape sequence.
+  }
+  const clean = decoded.replace(/\/+$/, '');
+  return clean.slice(clean.lastIndexOf('/') + 1).split(':').pop() ?? '';
+};
+
+const findMmpDirectory = async (parentUri: string) => {
+  const children = await FileSystem.StorageAccessFramework.readDirectoryAsync(parentUri);
+  return children.find((uri) => getSafLeafName(uri) === PDF_DIRECTORY_NAME) ?? null;
+};
+
+const getSafPdfDirectory = async () => {
+  const cachedDirectoryUri = await AsyncStorage.getItem(PDF_DIRECTORY_KEY);
+  if (cachedDirectoryUri) {
+    try {
+      await FileSystem.StorageAccessFramework.readDirectoryAsync(cachedDirectoryUri);
+      return cachedDirectoryUri;
+    } catch {
+      await AsyncStorage.removeItem(PDF_DIRECTORY_KEY);
+    }
+  }
+
+  const initialUri = FileSystem.StorageAccessFramework.getUriForDirectoryInRoot('Download');
+  const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(initialUri);
+  if (!permission.granted) return null;
+
+  let directoryUri = permission.directoryUri;
+  if (getSafLeafName(directoryUri) !== PDF_DIRECTORY_NAME) {
+    let existingDirectory = await findMmpDirectory(directoryUri);
+    if (!existingDirectory) {
+      try {
+        existingDirectory = await FileSystem.StorageAccessFramework.makeDirectoryAsync(
+          directoryUri,
+          PDF_DIRECTORY_NAME,
+        );
+      } catch (error) {
+        // The folder can already exist if another export created it between the
+        // directory scan and create call. Re-scan before treating it as failure.
+        existingDirectory = await findMmpDirectory(directoryUri);
+        if (!existingDirectory) throw error;
+      }
+    }
+    directoryUri = existingDirectory;
+  }
+
+  await AsyncStorage.setItem(PDF_DIRECTORY_KEY, directoryUri);
+  await AsyncStorage.removeItem(LEGACY_PDF_DIRECTORY_KEY);
+  return directoryUri;
+};
+
+const savePdfWithMediaStore = async (sourceUri: string, fileName: string) => {
+  if (Platform.OS !== 'android' || Number(Platform.Version) < 29) return false;
+  try {
+    const module = await import('react-native-blob-util');
+    const ReactNativeBlobUtil = module.default;
+    const savedUri = await ReactNativeBlobUtil.MediaCollection.copyToMediaStore(
+      {
+        name: fileName,
+        parentFolder: PDF_DIRECTORY_NAME,
+        mimeType: 'application/pdf',
+      },
+      'Download',
+      sourceUri.replace(/^file:\/\//, ''),
+    );
+    return Boolean(savedUri);
+  } catch {
+    // Expo Go does not include this native module. Fall back to SAF below so
+    // PDF export still works while developing in Expo Go.
+    return false;
+  }
+};
+
+const savePdfWithSaf = async (sourceUri: string, fileName: string) => {
+  const directoryUri = await getSafPdfDirectory();
+  if (!directoryUri) return false;
+
+  const targetUri = await FileSystem.StorageAccessFramework.createFileAsync(
+    directoryUri,
+    fileName,
+    'application/pdf',
+  );
+  const pdfBase64 = await FileSystem.readAsStringAsync(sourceUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  await FileSystem.writeAsStringAsync(targetUri, pdfBase64, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return true;
+};
 
 export function MobileResultsBar() {
   const mode = useMapStore((state) => state.mode);
@@ -42,39 +153,39 @@ export function MobileResultsBar() {
     if (exporting) return;
     setExporting(true);
     try {
-      const html = buildWebPrintHtml(useMapStore.getState());
+      const state = useMapStore.getState();
+      const html = buildWebPrintHtml(state);
       if (!html) throw new Error('No plots to print');
       const result = await Print.printToFileAsync({ html });
-      const fileBaseName = `Mouza-Map-Pro-${Date.now()}`;
-      const displayFileName = `${fileBaseName}.pdf`;
+      const displayFileName = buildPdfFileName(state.mapImage?.name, state.plots.length);
 
       if (Platform.OS === 'android') {
-        let directoryUri = await AsyncStorage.getItem(PDF_DIRECTORY_KEY);
-        if (!directoryUri) {
-          const initialUri = FileSystem.StorageAccessFramework.getUriForDirectoryInRoot('Download');
-          const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(initialUri);
-          if (!permission.granted) {
-            Alert.alert('Download cancelled', 'Allow access to the Download folder to save PDF reports.');
-            return;
-          }
-          directoryUri = permission.directoryUri;
-          await AsyncStorage.setItem(PDF_DIRECTORY_KEY, directoryUri);
+        const savedDirectly = await savePdfWithMediaStore(result.uri, displayFileName);
+        if (savedDirectly) {
+          await AsyncStorage.removeItem(LEGACY_PDF_DIRECTORY_KEY);
+          Alert.alert(
+            'PDF downloaded',
+            `${displayFileName}\nSaved in Download/${PDF_DIRECTORY_NAME}.`,
+          );
+          return;
         }
 
-        const targetUri = await FileSystem.StorageAccessFramework.createFileAsync(
-          directoryUri,
-          fileBaseName,
-          'application/pdf',
-        );
-        const pdfBase64 = await FileSystem.readAsStringAsync(result.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        await FileSystem.writeAsStringAsync(targetUri, pdfBase64, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        Alert.alert('PDF downloaded', `${displayFileName}\nSaved in your Download folder.`);
+        const savedWithSaf = await savePdfWithSaf(result.uri, displayFileName);
+        if (!savedWithSaf) {
+          Alert.alert(
+            'Download cancelled',
+            `In Expo Go, open Download, create/select “${PDF_DIRECTORY_NAME}”, then tap “Use this folder”.`,
+          );
+          return;
+        }
+        Alert.alert('PDF downloaded', `${displayFileName}\nSaved in ${PDF_DIRECTORY_NAME}.`);
       } else if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(result.uri, {
+        let shareUri = result.uri;
+        if (FileSystem.cacheDirectory) {
+          shareUri = `${FileSystem.cacheDirectory}${displayFileName}`;
+          await FileSystem.copyAsync({ from: result.uri, to: shareUri });
+        }
+        await Sharing.shareAsync(shareUri, {
           mimeType: 'application/pdf',
           dialogTitle: 'Land Measurement Report',
         });
