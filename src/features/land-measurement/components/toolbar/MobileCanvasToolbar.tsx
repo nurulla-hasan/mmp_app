@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import {
@@ -109,14 +109,9 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   const removeManualCutPoint = useMapStore((state) => state.removeManualCutPoint);
   const executeManualDivide = useMapStore((state) => state.executeManualDivide);
   const clearMap = useMapStore((state) => state.clearMap);
-  const setIsShowDiagonals = useMapStore((state) => state.setIsShowDiagonals);
   const setIsMagnifierEnabled = useMapStore((state) => state.setIsMagnifierEnabled);
   const startPlotDrawing = useMapStore((state) => state.startPlotDrawing);
   const startManualDivide = useMapStore((state) => state.startManualDivide);
-
-  useEffect(() => {
-    setIsShowDiagonals(false);
-  }, [setIsShowDiagonals]);
 
   const panelStyle = { backgroundColor: colors.overlay, borderColor: colors.panelBorder };
 
