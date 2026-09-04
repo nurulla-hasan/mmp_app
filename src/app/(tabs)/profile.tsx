@@ -3,13 +3,13 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LogOut, LogIn, UserPlus, UserCheck } from 'lucide-react-native';
 import { Button } from '../../components/ui/button';
+import { PageWrapper } from '../../components/common/page-layout';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
 import { useAuthStore } from '../../stores/auth-store';
@@ -64,11 +64,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
+    <PageWrapper>
       {isAuthenticated && user ? (
         <>
           <ProfileHeaderCard
@@ -166,13 +162,11 @@ export default function ProfileScreen() {
           </View>
         </View>
       )}
-    </ScrollView>
+    </PageWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 14, gap: 12, paddingBottom: 32 },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 40, borderRadius: 8, borderWidth: 1, marginTop: 4 },
   logoutBtnText: { color: '#ef4444', fontSize: 13, fontFamily: Fonts.sansMedium },
   guestCard: { borderRadius: 14, borderWidth: 1, padding: 24, alignItems: 'center', gap: 10, marginTop: 20 },
