@@ -2,6 +2,7 @@ import React from 'react';
 import {
   ScrollView,
   StyleSheet,
+  Text,
   View,
   type ScrollViewProps,
   type StyleProp,
@@ -9,6 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
+import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
 
 /**
@@ -20,9 +22,23 @@ export const PAGE_LAYOUT = {
   top: 14,
   bottom: 28,
   gap: 12,
+  compactGap: 8,
   sectionGap: 12,
   sectionPadding: 14,
   radius: 14,
+  introIconSize: 40,
+  introIconRadius: 11,
+} as const;
+
+/**
+ * Use this for FlatList/FlashList screens that cannot render through PageWrapper.
+ * Keeping the list insets here prevents list pages from slowly drifting away from
+ * the same outer spacing used by ordinary ScrollView pages.
+ */
+export const PAGE_CONTENT_INSETS = {
+  paddingHorizontal: PAGE_LAYOUT.horizontal,
+  paddingTop: PAGE_LAYOUT.top,
+  paddingBottom: PAGE_LAYOUT.bottom,
 } as const;
 
 type PageWrapperProps = ScrollViewProps & {
@@ -100,6 +116,92 @@ export function SectionWrapper({
   );
 }
 
+type PageIntroProps = {
+  title: string;
+  description?: string;
+  icon?: React.ReactNode;
+  action?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+};
+
+/**
+ * Compact native page intro used below a Stack header. It deliberately avoids
+ * duplicating the navigation title and keeps icon/title/copy spacing identical
+ * across feature-entry screens.
+ */
+export function PageIntro({ title, description, icon, action, style }: PageIntroProps) {
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+
+  return (
+    <SectionWrapper
+      style={[
+        styles.intro,
+        {
+          backgroundColor: `${colors.primary}0A`,
+          borderColor: `${colors.primary}25`,
+        },
+        style,
+      ]}
+    >
+      {icon ? (
+        <View style={[styles.introIcon, { backgroundColor: `${colors.primary}14` }]}>
+          {icon}
+        </View>
+      ) : null}
+
+      <View style={styles.introCopy}>
+        <Text style={[styles.introTitle, { color: colors.text }]}>{title}</Text>
+        {description ? (
+          <Text style={[styles.introDescription, { color: colors.textMuted }]}>
+            {description}
+          </Text>
+        ) : null}
+      </View>
+
+      {action ? <View style={styles.introAction}>{action}</View> : null}
+    </SectionWrapper>
+  );
+}
+
+type PageSectionHeaderProps = {
+  title: string;
+  subtitle?: string;
+  icon?: React.ReactNode;
+  action?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+};
+
+/**
+ * Semantic section heading for content pages. The section itself owns no card
+ * padding; it only standardizes heading hierarchy and spacing between sections.
+ */
+export function PageSectionHeader({
+  title,
+  subtitle,
+  icon,
+  action,
+  style,
+}: PageSectionHeaderProps) {
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+
+  return (
+    <View style={[styles.sectionHeader, style]}>
+      <View style={styles.sectionHeadingCopy}>
+        <View style={styles.sectionTitleRow}>
+          {icon}
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+        </View>
+        {subtitle ? (
+          <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+        ) : null}
+      </View>
+      {action ? <View style={styles.sectionAction}>{action}</View> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   page: { flex: 1 },
   content: {
@@ -109,4 +211,53 @@ const styles = StyleSheet.create({
     borderRadius: PAGE_LAYOUT.radius,
     gap: PAGE_LAYOUT.sectionGap,
   },
+  intro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  introIcon: {
+    width: PAGE_LAYOUT.introIconSize,
+    height: PAGE_LAYOUT.introIconSize,
+    borderRadius: PAGE_LAYOUT.introIconRadius,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introCopy: { flex: 1, gap: 2 },
+  introTitle: {
+    fontSize: 16,
+    lineHeight: 21,
+    fontFamily: Fonts.headingBold,
+  },
+  introDescription: {
+    fontSize: 10.5,
+    lineHeight: 16,
+    fontFamily: Fonts.sansRegular,
+  },
+  introAction: { alignItems: 'flex-end', justifyContent: 'center' },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: PAGE_LAYOUT.compactGap,
+    paddingHorizontal: 2,
+  },
+  sectionHeadingCopy: { flex: 1, gap: 1 },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sectionTitle: {
+    flexShrink: 1,
+    fontSize: 14,
+    lineHeight: 19,
+    fontFamily: Fonts.headingBold,
+  },
+  sectionSubtitle: {
+    fontSize: 10.5,
+    lineHeight: 15,
+    fontFamily: Fonts.sansRegular,
+  },
+  sectionAction: { alignItems: 'flex-end', justifyContent: 'flex-end' },
 });

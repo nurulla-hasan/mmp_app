@@ -4,7 +4,11 @@ import { useRouter } from 'expo-router';
 import { Briefcase, Search, SlidersHorizontal, Users } from 'lucide-react-native';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
-import { PAGE_LAYOUT } from '../../components/common/page-layout';
+import {
+  PAGE_CONTENT_INSETS,
+  PAGE_LAYOUT,
+  PageSectionHeader,
+} from '../../components/common/page-layout';
 import { SurveyorCard } from '../../components/surveyors/surveyor-card';
 import { SurveyorFilterModal } from '../../components/surveyors/surveyor-filter-modal';
 import { SurveyorListSkeleton } from '../../components/common/page-loading-skeletons';
@@ -48,22 +52,20 @@ export default function SurveyorsScreen() {
 
   const header = (
     <View style={styles.headerArea}>
-      <View style={styles.titleRow}>
-        <View>
-          <Text style={[styles.title, { color: colors.text }]}>সার্ভেয়ার ডিরেক্টরি</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {meta ? `${meta.total} জন ভেরিফাইড সার্ভেয়ার` : 'এলাকাভিত্তিক অভিজ্ঞ ও ভেরিফাইড আমিন খুঁজুন'}
-          </Text>
-        </View>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => router.push('/join-as-surveyor')}
-          style={[styles.joinButton, { borderColor: colors.cardBorder, backgroundColor: colors.card }]}
-        >
-          <Briefcase size={14} color={colors.primary} />
-          <Text style={[styles.joinText, { color: colors.primary }]}>যোগ দিন</Text>
-        </TouchableOpacity>
-      </View>
+      <PageSectionHeader
+        title='সার্ভেয়ার ডিরেক্টরি'
+        subtitle={meta ? `${meta.total} জন ভেরিফাইড সার্ভেয়ার` : 'এলাকাভিত্তিক অভিজ্ঞ ও ভেরিফাইড আমিন খুঁজুন'}
+        action={
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => router.push('/join-as-surveyor')}
+            style={[styles.joinButton, { borderColor: colors.cardBorder, backgroundColor: colors.card }]}
+          >
+            <Briefcase size={14} color={colors.primary} />
+            <Text style={[styles.joinText, { color: colors.primary }]}>যোগ দিন</Text>
+          </TouchableOpacity>
+        }
+      />
 
       <View style={styles.searchRow}>
         <Input
@@ -160,22 +162,15 @@ export default function SurveyorsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: {
-    paddingHorizontal: PAGE_LAYOUT.horizontal,
-    paddingTop: PAGE_LAYOUT.top,
-    paddingBottom: PAGE_LAYOUT.bottom,
-  },
+  content: { ...PAGE_CONTENT_INSETS },
   headerArea: { gap: PAGE_LAYOUT.gap, marginBottom: PAGE_LAYOUT.gap },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  title: { fontSize: 17, fontFamily: Fonts.headingBold },
-  subtitle: { fontSize: 10.5, fontFamily: Fonts.sansRegular, marginTop: 1 },
   joinButton: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, height: 34 },
   joinText: { fontSize: 11, fontFamily: Fonts.sansMedium },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: PAGE_LAYOUT.compactGap },
   filterButton: { width: 40, height: 38, borderWidth: 1, borderRadius: 7, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   filterCount: { position: 'absolute', top: 1, right: 4, fontSize: 8, fontFamily: Fonts.headingBold },
   stateText: { fontSize: 11, fontFamily: Fonts.sansRegular, textAlign: 'center' },
-  emptyCard: { marginTop: 30, borderWidth: 1, borderStyle: 'dashed', borderRadius: 14, padding: 28, alignItems: 'center', gap: 8 },
+  emptyCard: { marginTop: 30, borderWidth: 1, borderStyle: 'dashed', borderRadius: PAGE_LAYOUT.radius, padding: 28, alignItems: 'center', gap: PAGE_LAYOUT.compactGap },
   emptyTitle: { fontSize: 13.5, fontFamily: Fonts.headingBold },
   footerLoader: { paddingVertical: 16, alignItems: 'center' },
 });

@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../components/ui/button';
-import { PageWrapper } from '../components/common/page-layout';
+import { PageSectionHeader, PageWrapper } from '../components/common/page-layout';
 import { SurveyorProfileForm } from '../components/surveyors/surveyor-profile-form';
 import { SurveyorProfileSkeleton } from '../components/common/page-loading-skeletons';
 import { Colors } from '../constants/colors';
@@ -47,10 +47,10 @@ export default function SurveyorProfileScreen() {
 
   return (
     <PageWrapper keyboardShouldPersistTaps='handled'>
-      <View style={styles.header}>
-        <Text style={[styles.title, styles.headerTitle, { color: colors.text }]}>সার্ভেয়ার প্রোফাইল ম্যানেজ করুন</Text>
-        <Text style={[styles.text, styles.headerText, { color: colors.textMuted }]}>সেবা, মূল্য, এলাকা ও পেশাদার তথ্য আপডেট করুন।</Text>
-      </View>
+      <PageSectionHeader
+        title='সার্ভেয়ার প্রোফাইল ম্যানেজ করুন'
+        subtitle='সেবা, মূল্য, এলাকা ও পেশাদার তথ্য আপডেট করুন।'
+      />
       <SurveyorProfileForm
         mode='edit'
         districts={districts}
@@ -65,9 +65,6 @@ export default function SurveyorProfileScreen() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 9 },
-  header: { gap: 2 },
   title: { fontSize: 17, fontFamily: Fonts.headingBold, textAlign: 'center' },
   text: { marginTop: 2, fontSize: 10.5, lineHeight: 16, fontFamily: Fonts.sansRegular, textAlign: 'center' },
-  headerTitle: { textAlign: 'left' },
-  headerText: { textAlign: 'left', marginTop: 0 },
 });
