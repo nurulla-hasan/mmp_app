@@ -168,18 +168,6 @@ export function MobileResultsBar() {
                       </View>
                     ))}
                   </View>
-                  {plot.results.diagonals && plot.results.diagonals.length > 0 && (
-                    <>
-                      <Text style={[styles.sideTitle, { color: colors.textSoft }]}>Diagonals</Text>
-                      <View style={styles.chips}>
-                        {plot.results.diagonals.map((diagonal, index) => (
-                          <View key={`${plot.id}-diagonal-${index}`} style={[styles.chip, { backgroundColor: colors.blueBg }]}>
-                            <Text style={[styles.chipText, { color: colors.blueText }]}>{index + 1}. {formatFeetInches(diagonal.lengthFt)}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </>
-                  )}
                 </View>
               ))}
             </ScrollView>
