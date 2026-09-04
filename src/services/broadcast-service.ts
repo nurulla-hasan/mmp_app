@@ -1,6 +1,6 @@
 import { apiFetch } from './api-client';
 import { API_ENDPOINTS } from './api-endpoints';
-import type { ApiResult } from '../types/auth';
+import type { ApiResult } from '../types/api';
 import type { TBroadcast } from '../types/broadcast';
 
 export const BroadcastService = {
@@ -10,6 +10,6 @@ export const BroadcastService = {
   getActive: (): Promise<ApiResult<TBroadcast[]>> =>
     apiFetch<TBroadcast[]>(API_ENDPOINTS.broadcasts.active, {
       method: 'GET',
-      auth: true,
+      auth: 'auth',
     }),
 };

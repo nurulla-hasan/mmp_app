@@ -4,12 +4,12 @@
 
 ```bash
 npm run start       # Start Expo development server
-npm run android     # Start on Android emulator / physical device via Expo Go
+npm run android     # Start on Android emulator / physical device
 npm run ios         # Start on iOS simulator
 npm run web         # Start Web preview
 ```
 
-**Stack:** Expo SDK 54, React Native 0.81, React 19, TypeScript 5 (strict mode), Expo Router, Zustand 5, React Native SVG, Lucide React Native, React Native Safe Area Context.
+**Stack:** Expo SDK 54, React Native 0.81, React 19, TypeScript 5 (strict mode), Expo Router, Zustand 5, TanStack Query 5, AsyncStorage, Expo SecureStore, React Native SVG, Lucide React Native, React Native Safe Area Context.
 
 ---
 
@@ -17,57 +17,66 @@ npm run web         # Start Web preview
 
 ```text
 src/
-├── app/                      # Expo Router (File-based navigation)
-│   ├── _layout.tsx           # Root Stack, SafeAreaProvider & StatusBar
-│   ├── index.tsx             # Entry redirect -> /(tabs)
-│   ├── pricing.tsx           # Modal for Subscription plans & bKash/Nagad checkout
-│   │
-│   ├── (tabs)/               # Bottom Tab Navigator (Height 60, Green/Dark theme)
-│   │   ├── _layout.tsx
-│   │   ├── index.tsx         # Dashboard Home (Hero card, quick tools, stats)
-│   │   ├── tools.tsx         # Tools Hub (All 7 tools & scale guide)
-│   │   ├── surveyors.tsx     # Surveyor Directory & WhatsApp connect
-│   │   └── profile.tsx       # User / Surveyor profile & membership badge
-│   │
-│   ├── (tools)/              # Standalone Tool Workspaces (Header Stack)
-│   │   ├── _layout.tsx
-│   │   ├── land-measurement.tsx  # Map plot measurement
-│   │   ├── pantagraph.tsx        # C.S/B.S Map comparison
-│   │   ├── tracer.tsx            # Digital vector tracer
-│   │   ├── unit-converter.tsx    # Land Unit Converter (Interactive Calculator)
-│   │   ├── inheritance.tsx       # Farayez calculation
-│   │   └── scale-guide.tsx       # 16" = 1 mile Scale tutorial
-│   │
-│   └── (auth)/               # Auth flows
-│       └── _layout.tsx
-│
+├── app/                      # Expo Router screens; composition/navigation only
 ├── components/
-│   ├── ui/                   # Design system primitives (Button, Card, Badge, Input)
-│   │   ├── button.tsx
-│   │   ├── card.tsx
-│   │   └── badge.tsx
-│   └── common/               # Shared cross-screen components
-│
-├── constants/
-│   ├── colors.ts             # Light & Dark theme color tokens (Bangla Green #16A34A)
-│   └── tools.ts              # Tool items metadata, icons, categories & routes
-│
-├── lib/
-│   ├── utils.ts              # cn() style merging utility
-│   └── calculations.ts       # Land calculations (Shotok, Katha, Bigha, Acre, SqFt)
-│
-├── stores/                   # Zustand global stores
+│   ├── ui/                   # Design-system primitives
+│   └── common/               # Shared cross-screen/layout components
+├── hooks/
+│   ├── queries/              # TanStack Query server-state reads
+│   └── mutations/            # TanStack Query writes + targeted invalidation
+├── services/
+│   ├── api-client.ts         # Generic mobile HTTP/auth boundary
+│   ├── api-endpoints.ts      # Central backend endpoint contract
+│   ├── session-storage.ts    # Token + cached identity persistence
+│   └── *-service.ts          # Domain API services
+├── stores/                   # Client/session/UI state only (Zustand)
+├── lib/                      # Shared framework-independent helpers
 ├── features/
-│   └── land-measurement/     # Native SVG map canvas, calibration, plotting & results
-└── types/                    # TypeScript interfaces
+│   └── land-measurement/     # Measurement workspace/domain feature
+└── types/                    # Domain and shared API contracts
 ```
 
 ---
 
-## 🎨 Design System & Theme Rules
+## 🔌 API & Server-State Rules
+
+Keep the same separation-of-responsibility philosophy as the MMP web frontend, adapted to React Native:
+
+```text
+Screen / Component
+      ↓
+Query or Mutation Hook
+      ↓
+Domain Service
+      ↓
+apiFetch
+      ↓
+Backend
+```
+
+- Screens/components must not scatter direct `fetch()` calls.
+- Backend paths live in `services/api-endpoints.ts`; services should not duplicate endpoint strings.
+- Every `apiFetch` call must explicitly declare `auth: 'auth' | 'none'`.
+- Shared API response types live in `types/api.ts`; auth types stay auth-domain focused.
+- Query hooks unwrap `ApiResult<T>` into domain data before giving it to UI code.
+- Mutation hooks must unwrap inside `mutationFn`. API failures therefore use TanStack Query's `onError` path rather than pretending to be successful mutations.
+- Invalidate only the query-key families affected by a mutation; do not use blanket refreshes as a default.
+- Preserve response metadata when pagination needs it; otherwise return clean domain data to screens.
+- TanStack Query owns remote/server state. Zustand is for session identity and true client/UI state, not duplicated API caches.
+- Auth token rotation belongs inside the mobile HTTP/session boundary. Parallel 401s share one refresh request and retry once.
+- Native access/refresh tokens belong in Expo SecureStore. Cached non-sensitive user identity and persisted query cache may use AsyncStorage.
+- Keep upload/download/native-file concerns specialized when their transport differs from normal JSON API calls.
+
+---
+
+## 🎨 Design System & Layout Rules
 
 - **Primary Color:** `#16A34A` (Emerald / Bangla Green)
 - **Neutral Dark:** `#0F172A` (Navy Slate)
 - **Background Light:** `#F8FAFC`
-- **Cards:** Rounded 16px, subtle 1px border (`#E2E8F0`), soft shadow
+- **Cards:** rounded surfaces, subtle border, consistent theme tokens
 - **Badges:** `PRO` (Emerald), `ফ্রি` (Blue), `সেরা অফার` (Orange/Amber)
+- Normal content screens should use shared layout primitives/tokens from `components/common/page-layout.tsx` rather than inventing page-specific outer spacing.
+- Consistency means the same visual rhythm and component family, not forcing every screen to use an identical numeric gap. Full-screen canvases, auth flows and modal workspaces may intentionally use specialized layouts.
+- Page-level spacing, section-level spacing and component-local spacing are separate responsibilities. Avoid solving one layer by adding arbitrary padding to another.
+- Reuse UI primitives for buttons, cards, inputs, badges and loading states before creating one-off visual variants.

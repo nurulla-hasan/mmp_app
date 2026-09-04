@@ -64,11 +64,13 @@ export function useSurveyorDistricts() {
 }
 
 export function useMySurveyorProfile() {
-  const { user, isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const role = useAuthStore((state) => state.user?.role);
+
   return useQuery({
     queryKey: queryKeys.surveyors.myProfile(),
     queryFn: async () => unwrapApiResult(await SurveyorService.getMyProfile()),
-    enabled: isAuthenticated && user?.role === 'SURVEYOR',
+    enabled: isAuthenticated && role === 'SURVEYOR',
     staleTime: STALE_TIME.FIVE_MINUTES,
   });
 }

@@ -1,14 +1,13 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { CalculationService } from '../../services/calculation-service';
+import { ApiRequestError, unwrapApiResult } from '../../lib/api-result';
 import { queryKeys, STALE_TIME } from '../../lib/query-keys';
-import { unwrapApiResult } from '../../lib/api-result';
 import { useAuthStore } from '../../stores/auth-store';
 
 const SAVED_PAGE_SIZE = 6;
 
-// List: GET /calculations?searchTerm=...
 export function useCalculations(searchTerm?: string) {
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: queryKeys.calculations.list(searchTerm),
@@ -20,7 +19,7 @@ export function useCalculations(searchTerm?: string) {
 }
 
 // Cached paginated list used by the Land Measurement Saved sheet.
-// Cached pages render immediately on reopen; stale data refreshes in the background.
+// This query keeps response meta because pagination needs totalPages.
 export function useSavedCalculations(searchTerm = '', enabled = true) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
@@ -35,7 +34,7 @@ export function useSavedCalculations(searchTerm = '', enabled = true) {
       );
 
       if (!result.success) {
-        throw new Error(result.message || 'Could not load saved measurements.');
+        throw new ApiRequestError(result.statusCode, result.message);
       }
 
       const nextPage = result.meta
@@ -55,9 +54,8 @@ export function useSavedCalculations(searchTerm = '', enabled = true) {
   });
 }
 
-// Detail: GET /calculations/:id
 export function useCalculationById(id: string) {
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: queryKeys.calculations.detail(id),
@@ -68,9 +66,8 @@ export function useCalculationById(id: string) {
   });
 }
 
-// Stats: GET /calculations/stats/me
 export function useMyMeasurementStats() {
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: queryKeys.profile.stats(),
