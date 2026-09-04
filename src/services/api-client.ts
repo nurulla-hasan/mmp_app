@@ -9,7 +9,7 @@ import { SessionStorage } from './session-storage';
 export { STORAGE_KEYS } from './session-storage';
 
 const configuredBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
-const developmentFallbackUrl = 'https://mmp-backend-xi.vercel.app/api/v1';
+const developmentFallbackUrl = 'https://apis.mouzamappro.com/api/v1';
 
 if (!configuredBaseUrl && typeof __DEV__ !== 'undefined' && __DEV__) {
   console.warn(
