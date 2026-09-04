@@ -48,26 +48,6 @@ export type ChangePasswordPayload = {
 
 export type AuthTokens = { accessToken: string; refreshToken: string };
 
-export type ApiMeta = {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-};
-
-export type ApiSuccess<T> = {
-  success: true;
-  statusCode: number;
-  message: string;
-  data: T;
-  meta?: ApiMeta;
-};
-
-export type ApiFailure = {
-  success: false;
-  statusCode: number;
-  message: string;
-};
-
-export type ApiResult<T> = ApiSuccess<T> | ApiFailure;
+// Compatibility re-export while callers migrate to the shared API contract.
+export type { ApiMeta, ApiSuccess, ApiFailure, ApiResult } from './api';
 export type { TSurveyorProfile } from './surveyor';
