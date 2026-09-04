@@ -23,6 +23,7 @@ import {
 } from 'lucide-react-native';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
+import { ProAvatarRing } from '../../components/ui/pro-avatar-ring';
 import { ReviewModal } from '../../components/surveyors/review-modal';
 import { SurveyorDetailSkeleton } from '../../components/common/page-loading-skeletons';
 import { Colors } from '../../constants/colors';
@@ -128,6 +129,7 @@ export default function SurveyorDetailScreen() {
   const whatsapp = getSurveyorWhatsApp(surveyor);
   const phone = surveyor.user?.phone || '';
   const verified = surveyor.isVerified ?? surveyor.verificationStatus === 'APPROVED';
+  const isPro = Boolean(surveyor.user?.isSubscribed || surveyor.isSubscribed);
   const imageUrl = surveyor.user?.imageUrl || surveyor.profilePhoto;
   const joined = surveyor.user?.createdAt || surveyor.createdAt || surveyor.joinedAt;
   const rating = Number(surveyor.rating || 0);
@@ -168,19 +170,21 @@ export default function SurveyorDetailScreen() {
     >
       <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
         <View style={styles.heroTop}>
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.avatar} />
-          ) : (
-            <View
-              style={[
-                styles.avatar,
-                styles.avatarFallback,
-                { backgroundColor: `${colors.primary}18` },
-              ]}
-            >
-              <Text style={[styles.avatarChar, { color: colors.primary }]}>{name.charAt(0)}</Text>
-            </View>
-          )}
+          <ProAvatarRing size={66} isPro={isPro}>
+            {imageUrl ? (
+              <Image source={{ uri: imageUrl }} style={styles.avatar} />
+            ) : (
+              <View
+                style={[
+                  styles.avatar,
+                  styles.avatarFallback,
+                  { backgroundColor: `${colors.primary}18` },
+                ]}
+              >
+                <Text style={[styles.avatarChar, { color: colors.primary }]}>{name.charAt(0)}</Text>
+              </View>
+            )}
+          </ProAvatarRing>
 
           <View style={styles.heroInfo}>
             <View style={styles.heroNameRow}>
