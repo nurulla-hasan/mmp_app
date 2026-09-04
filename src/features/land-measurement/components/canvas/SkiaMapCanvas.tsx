@@ -114,7 +114,7 @@ const getClosestPointOnSegmentWorklet = (px: number, py: number, p1: Point, p2: 
   const dy = p2.y - p1.y;
   const lengthSquared = dx * dx + dy * dy;
   if (lengthSquared <= 1e-12) return { x: p1.x, y: p1.y };
-  const rawT = ((px - p1.x) * dx + (py - p1.y)) / lengthSquared;
+  const rawT = ((px - p1.x) * dx + (py - p1.y) * dy) / lengthSquared;
   const t = Math.max(0, Math.min(1, rawT));
   return { x: p1.x + t * dx, y: p1.y + t * dy };
 };
