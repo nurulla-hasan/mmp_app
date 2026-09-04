@@ -4,7 +4,7 @@
     "slug": "mouza-map-pro",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/logo.png",
+    "icon": "./assets/app-icon.png",
     "scheme": "mouzamappro",
     "newArchEnabled": true,
     "userInterfaceStyle": "automatic",
@@ -20,11 +20,17 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/logo.png",
+        "foregroundImage": "./assets/android-icon-foreground-square.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.mouzamappro.app",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.DOWNLOAD_WITHOUT_NOTIFICATION",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -46,6 +52,12 @@
           }
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b79fbacb-ca63-4a53-96f0-38c5d0c5df99"
+      }
+    }
   }
 }
