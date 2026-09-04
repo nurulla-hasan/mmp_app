@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
 import { AuthService } from '../../services/auth-service';
 import { UserService } from '../../services/user-service';
+import { unwrapApiResult } from '../../lib/api-result';
 import { queryKeys } from '../../lib/query-keys';
 import { useAuthStore } from '../../stores/auth-store';
 import { SuccessToast, ErrorToast } from '../../lib/utils';
@@ -30,39 +31,37 @@ async function syncUserPatch(
   await setUser(mergedUser);
 }
 
-// Update Profile: PATCH /auth/me
 export function useUpdateProfile() {
   const queryClient = useQueryClient();
-  const { user, setUser, refreshUser } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
+  const refreshUser = useAuthStore((state) => state.refreshUser);
 
   return useMutation({
-    mutationFn: (payload: Parameters<typeof AuthService.updateMe>[0]) =>
-      AuthService.updateMe(payload),
-    onSuccess: async (res) => {
-      if (res.success && res.data?.user) {
-        await syncUserPatch(
-          queryClient,
-          res.data.user,
-          user,
-          setUser,
-          refreshUser
-        );
-        void queryClient.invalidateQueries({ queryKey: queryKeys.profile.me() });
-        SuccessToast('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
-      } else {
-        ErrorToast(res.message || 'প্রোফাইল আপডেট করা যায়নি।');
-      }
+    mutationFn: async (payload: Parameters<typeof AuthService.updateMe>[0]) =>
+      unwrapApiResult(await AuthService.updateMe(payload)),
+    onSuccess: async (data) => {
+      await syncUserPatch(
+        queryClient,
+        data.user,
+        user,
+        setUser,
+        refreshUser
+      );
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile.me() });
+      SuccessToast('প্রোফাইল সফলভাবে আপডেট হয়েছে!');
     },
-    onError: (err: any) => {
-      ErrorToast(err?.message || 'সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    onError: (error: Error) => {
+      ErrorToast(error.message || 'সমস্যা হয়েছে। আবার চেষ্টা করুন।');
     },
   });
 }
 
-// Upload Avatar: PATCH /users/profile-image
 export function useUploadAvatar() {
   const queryClient = useQueryClient();
-  const { user, setUser, refreshUser } = useAuthStore();
+  const user = useAuthStore((state) => state.user);
+  const setUser = useAuthStore((state) => state.setUser);
+  const refreshUser = useAuthStore((state) => state.refreshUser);
 
   return useMutation({
     mutationFn: async () => {
@@ -94,43 +93,35 @@ export function useUploadAvatar() {
         type: asset.mimeType || 'image/jpeg',
       } as any);
 
-      return UserService.uploadProfileImage(formData);
+      return unwrapApiResult(await UserService.uploadProfileImage(formData));
     },
-    onSuccess: async (res) => {
-      if (res.success && res.data) {
-        await syncUserPatch(queryClient, res.data, user, setUser, refreshUser);
-        void queryClient.invalidateQueries({ queryKey: queryKeys.profile.me() });
-        SuccessToast('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
-      } else {
-        ErrorToast(res.message || 'ছবি আপলোড করা যায়নি।');
-      }
+    onSuccess: async (data) => {
+      await syncUserPatch(queryClient, data, user, setUser, refreshUser);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile.me() });
+      SuccessToast('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
     },
-    onError: (err: any) => {
-      if (err?.message === 'CANCELLED' || err?.message === 'PERMISSION_DENIED') return;
-      ErrorToast(err?.message || 'ছবি আপলোড করতে সমস্যা হয়েছে।');
+    onError: (error: Error) => {
+      if (error.message === 'CANCELLED' || error.message === 'PERMISSION_DENIED') return;
+      ErrorToast(error.message || 'ছবি আপলোড করতে সমস্যা হয়েছে।');
     },
   });
 }
 
-// Change Password: POST /auth/change-password
 export function useChangePassword() {
   const queryClient = useQueryClient();
-  const { refreshUser } = useAuthStore();
+  const refreshUser = useAuthStore((state) => state.refreshUser);
 
   return useMutation({
-    mutationFn: (payload: ChangePasswordPayload) => AuthService.changePassword(payload),
-    onSuccess: async (res) => {
-      if (res.success) {
-        // Important for Google-only accounts: hasPassword changes false -> true.
-        await refreshUser();
-        void queryClient.invalidateQueries({ queryKey: queryKeys.profile.me() });
-        SuccessToast('পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে।');
-      } else {
-        ErrorToast(res.message || 'পাসওয়ার্ড পরিবর্তন করা যায়নি।');
-      }
+    mutationFn: async (payload: ChangePasswordPayload) =>
+      unwrapApiResult(await AuthService.changePassword(payload)),
+    onSuccess: async () => {
+      // Important for Google-only accounts: hasPassword changes false -> true.
+      await refreshUser();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile.me() });
+      SuccessToast('পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে।');
     },
-    onError: (err: any) => {
-      ErrorToast(err?.message || 'সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    onError: (error: Error) => {
+      ErrorToast(error.message || 'সমস্যা হয়েছে। আবার চেষ্টা করুন।');
     },
   });
 }
