@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -20,6 +19,7 @@ import {
 } from 'lucide-react-native';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { PageWrapper, SectionWrapper } from '../components/common/page-layout';
 import { ManualCheckoutModal } from '../components/subscription/manual-checkout-modal';
 import { LoadingSkeleton, useSkeletonPulse } from '../components/ui/loading-skeleton';
 import { Colors } from '../constants/colors';
@@ -150,15 +150,12 @@ export default function PricingScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+    <PageWrapper
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />
       }
     >
-      <View
+      <SectionWrapper
         style={[
           styles.hero,
           {
@@ -176,7 +173,7 @@ export default function PricingScreen() {
             প্রয়োজন অনুযায়ী প্ল্যান বেছে নিন। পেমেন্ট যাচাই শেষে Pro access স্বয়ংক্রিয়ভাবে সক্রিয় হবে।
           </Text>
         </View>
-      </View>
+      </SectionWrapper>
 
       {activeSub ? (
         <View
@@ -428,20 +425,15 @@ export default function PricingScreen() {
         pendingSubscription={pendingSub}
         onClose={() => setCheckoutOpen(false)}
       />
-    </ScrollView>
+    </PageWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 12, paddingTop: 10, paddingBottom: 28, gap: 11 },
   flexOne: { flex: 1 },
   hero: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 12,
     gap: 10,
   },
   heroIcon: {
