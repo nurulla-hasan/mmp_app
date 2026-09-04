@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Map,
@@ -11,12 +11,11 @@ import {
   Calculator,
   Ruler,
   ChevronRight,
-  Sparkles,
   ArrowRight,
-  Wrench,
 } from 'lucide-react-native';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
+import { PageWrapper } from '../../components/common/page-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -111,12 +110,7 @@ export default function ToolsHubScreen() {
   const colors = Colors[theme];
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* ─── 1. Featured Core Tool Banner ─── */}
+    <PageWrapper>
       <TouchableOpacity
         activeOpacity={0.88}
         onPress={() => router.push(FEATURED_TOOL.route as any)}
@@ -140,7 +134,6 @@ export default function ToolsHubScreen() {
             </View>
           </View>
 
-          {/* Feature Pills */}
           <View style={[styles.featurePillsRow, { borderTopColor: colors.border }]}>
             {FEATURED_TOOL.features?.map((pill) => (
               <View
@@ -166,7 +159,6 @@ export default function ToolsHubScreen() {
         </View>
       </TouchableOpacity>
 
-      {/* ─── 2. Specialized Land Tools ─── */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>বিশেষায়িত ল্যান্ড টুলস</Text>
         <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
@@ -204,7 +196,6 @@ export default function ToolsHubScreen() {
         })}
       </View>
 
-      {/* ─── 3. Calculation & Utility Tools ─── */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.text }]}>ভূমি হিসাব ও ইউটিলিটি টুলস</Text>
         <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
@@ -241,19 +232,11 @@ export default function ToolsHubScreen() {
           );
         })}
       </View>
-    </ScrollView>
+    </PageWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    padding: 14,
-    gap: 14,
-    paddingBottom: 28,
-  },
   featuredCard: {
     borderRadius: 14,
     padding: 15,
