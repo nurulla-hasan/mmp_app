@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Briefcase, Search, SlidersHorizontal, Users } from 'lucide-react-native';
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
+import { PAGE_LAYOUT } from '../../components/common/page-layout';
 import { SurveyorCard } from '../../components/surveyors/surveyor-card';
 import { SurveyorFilterModal } from '../../components/surveyors/surveyor-filter-modal';
 import { SurveyorListSkeleton } from '../../components/common/page-loading-skeletons';
@@ -159,8 +160,12 @@ export default function SurveyorsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 14, paddingBottom: 28 },
-  headerArea: { gap: 12, marginBottom: 13 },
+  content: {
+    paddingHorizontal: PAGE_LAYOUT.horizontal,
+    paddingTop: PAGE_LAYOUT.top,
+    paddingBottom: PAGE_LAYOUT.bottom,
+  },
+  headerArea: { gap: PAGE_LAYOUT.gap, marginBottom: PAGE_LAYOUT.gap },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   title: { fontSize: 17, fontFamily: Fonts.headingBold },
   subtitle: { fontSize: 10.5, fontFamily: Fonts.sansRegular, marginTop: 1 },

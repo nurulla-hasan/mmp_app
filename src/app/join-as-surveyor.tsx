@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   AlertTriangle,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react-native';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { PageWrapper, SectionWrapper } from '../components/common/page-layout';
 import { LoadingSkeleton, useSkeletonPulse } from '../components/ui/loading-skeleton';
 import { SurveyorProfileForm } from '../components/surveyors/surveyor-profile-form';
 import { Colors } from '../constants/colors';
@@ -71,13 +72,8 @@ export default function JoinAsSurveyorScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps='handled'
-    >
-      <View
+    <PageWrapper keyboardShouldPersistTaps='handled'>
+      <SectionWrapper
         style={[
           styles.hero,
           {
@@ -95,7 +91,7 @@ export default function JoinAsSurveyorScreen() {
             আপনার সেবা, অভিজ্ঞতা ও কাজের এলাকা যোগ করুন। যাচাই শেষে ক্লায়েন্টরা আপনাকে সহজে খুঁজে পাবে।
           </Text>
         </View>
-      </View>
+      </SectionWrapper>
 
       {profile ? (
         <View
@@ -227,19 +223,14 @@ export default function JoinAsSurveyorScreen() {
           />
         </>
       )}
-    </ScrollView>
+    </PageWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 12, paddingTop: 10, paddingBottom: 28, gap: 11 },
   hero: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 12,
     gap: 10,
   },
   heroIcon: {
