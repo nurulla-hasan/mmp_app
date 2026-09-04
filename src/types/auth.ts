@@ -4,6 +4,7 @@ export type LoginPayload = { email: string; password: string };
 export type RegisterPayload = { name: string; email: string; password: string };
 export type VerifyEmailPayload = { email: string; otp: string };
 export type ResendOtpPayload = { email: string };
+export type GoogleMobileExchangePayload = { code: string; codeVerifier: string };
 export type ResetPasswordPayload = {
   email: string;
   otp: string;

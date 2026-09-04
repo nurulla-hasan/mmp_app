@@ -11,6 +11,7 @@ import type {
   ResetPasswordPayload,
   ChangePasswordPayload,
   UpdateProfilePayload,
+  GoogleMobileExchangePayload,
   AuthTokens,
   TAuthUser,
 } from '../types/auth';
@@ -18,6 +19,15 @@ import type {
 export const AuthService = {
   login: (payload: LoginPayload): Promise<ApiResult<AuthTokens>> =>
     apiFetch<AuthTokens>(API_ENDPOINTS.auth.login, {
+      method: 'POST',
+      body: payload,
+      auth: 'none',
+    }),
+
+  exchangeGoogleMobileCode: (
+    payload: GoogleMobileExchangePayload
+  ): Promise<ApiResult<AuthTokens>> =>
+    apiFetch<AuthTokens>(API_ENDPOINTS.auth.googleMobileExchange, {
       method: 'POST',
       body: payload,
       auth: 'none',

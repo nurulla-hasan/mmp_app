@@ -8,7 +8,20 @@ import { SessionStorage } from './session-storage';
 // session-storage directly for token/user persistence responsibilities.
 export { STORAGE_KEYS } from './session-storage';
 
-const API_BASE_URL = 'https://apis.mouzamappro.com/api/v1';
+const configuredBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+const developmentFallbackUrl = 'https://apis.mouzamappro.com/api/v1';
+
+if (!configuredBaseUrl && typeof __DEV__ !== 'undefined' && __DEV__) {
+  console.warn(
+    '[MMP] EXPO_PUBLIC_API_URL is not configured. Using the development fallback API URL.'
+  );
+}
+
+if (!configuredBaseUrl && typeof __DEV__ !== 'undefined' && !__DEV__) {
+  throw new Error('EXPO_PUBLIC_API_URL must be configured for production builds.');
+}
+
+export const API_BASE_URL = (configuredBaseUrl || developmentFallbackUrl).replace(/\/+$/, '');
 
 const configuredTimeout = Number(process.env.EXPO_PUBLIC_API_TIMEOUT_MS);
 const REQUEST_TIMEOUT_MS =

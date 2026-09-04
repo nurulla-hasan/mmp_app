@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,22 +11,40 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import {
-  Mail,
-  Lock,
-  User,
-  ArrowLeft,
-  ShieldCheck,
-  Sparkles,
-  CheckCircle2,
-} from 'lucide-react-native';
+import { Mail, Lock, User, ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
+
 import { Input } from '../../components/ui/input';
-import { Button } from '../../components/ui/button';
 import { AuthService } from '../../services/auth-service';
+import { GoogleAuthService } from '../../services/google-auth-service';
 import { useAuthStore } from '../../stores/auth-store';
 import { SuccessToast, ErrorToast } from '../../lib/utils';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
+import type { AuthTokens } from '../../types/auth';
+
+function GoogleIcon() {
+  return (
+    <Svg width={18} height={18} viewBox='0 0 24 24' accessibilityLabel='Google'>
+      <Path
+        fill='#4285F4'
+        d='M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'
+      />
+      <Path
+        fill='#34A853'
+        d='M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'
+      />
+      <Path
+        fill='#FBBC05'
+        d='M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z'
+      />
+      <Path
+        fill='#EA4335'
+        d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
+      />
+    </Svg>
+  );
+}
 
 function getSafeCallbackUrl(value?: string) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('://')) {
@@ -47,12 +65,11 @@ export default function AuthScreen() {
   const { setSession } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
-
-  // Form Fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
 
   useEffect(() => {
@@ -62,6 +79,22 @@ export default function AuthScreen() {
       setActiveTab('login');
     }
   }, [params.tab]);
+
+  const navigateAfterAuth = () => {
+    if (callbackUrl) {
+      router.replace(callbackUrl as never);
+    } else if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(tabs)');
+    }
+  };
+
+  const finishSession = async (tokens: AuthTokens, message: string) => {
+    await setSession(tokens);
+    SuccessToast(message);
+    navigateAfterAuth();
+  };
 
   const validate = () => {
     const errs: { name?: string; email?: string; password?: string } = {};
@@ -98,15 +131,7 @@ export default function AuthScreen() {
       const res = await AuthService.login({ email: email.trim(), password });
 
       if (res.success && res.data) {
-        await setSession(res.data);
-        SuccessToast('লগইন সফল হয়েছে!');
-        if (callbackUrl) {
-          router.replace(callbackUrl as never);
-        } else if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace('/(tabs)');
-        }
+        await finishSession(res.data, 'লগইন সফল হয়েছে!');
       } else {
         if (res.message?.includes('ভেরিফাই') || res.message?.toLowerCase().includes('verify')) {
           ErrorToast(res.message);
@@ -121,8 +146,8 @@ export default function AuthScreen() {
         }
         ErrorToast(res.message || 'লগইন করা যায়নি। সঠিক তথ্য দিন।');
       }
-    } catch (err: any) {
-      ErrorToast(err?.message || 'লগইন করার সময় সমস্যা হয়েছে।');
+    } catch (err: unknown) {
+      ErrorToast(err instanceof Error ? err.message : 'লগইন করার সময় সমস্যা হয়েছে।');
     } finally {
       setLoading(false);
     }
@@ -151,12 +176,36 @@ export default function AuthScreen() {
       } else {
         ErrorToast(res.message || 'অ্যাকাউন্ট তৈরি করা যায়নি। আবার চেষ্টা করুন।');
       }
-    } catch (err: any) {
-      ErrorToast(err?.message || 'নিবন্ধন করার সময় সমস্যা হয়েছে।');
+    } catch (err: unknown) {
+      ErrorToast(err instanceof Error ? err.message : 'নিবন্ধন করার সময় সমস্যা হয়েছে।');
     } finally {
       setLoading(false);
     }
   };
+
+  const handleGoogleLogin = async () => {
+    try {
+      setGoogleLoading(true);
+      const result = await GoogleAuthService.signIn();
+
+      if (result.type === 'cancel') return;
+
+      if (result.type === 'error') {
+        ErrorToast(result.message);
+        return;
+      }
+
+      await finishSession(result.tokens, 'Google দিয়ে সাইন ইন সফল হয়েছে!');
+    } catch (err: unknown) {
+      ErrorToast(
+        err instanceof Error ? err.message : 'Google দিয়ে সাইন ইন করার সময় সমস্যা হয়েছে।'
+      );
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const isBusy = loading || googleLoading;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: isDark ? '#090d16' : '#f8fafc' }]}>
@@ -169,7 +218,6 @@ export default function AuthScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps='handled'
         >
-          {/* Top Bar Floating Back Button */}
           <View style={styles.navRow}>
             <TouchableOpacity
               style={[
@@ -190,14 +238,10 @@ export default function AuthScreen() {
             </View>
           </View>
 
-          {/* Premium Hero Section */}
           <View style={styles.heroSection}>
             <View style={styles.logoBadgeContainer}>
               <View style={styles.logoGlow} />
-              <Image
-                source={require('../../../assets/logo.png')}
-                style={styles.heroLogo}
-              />
+              <Image source={require('../../../assets/logo.png')} style={styles.heroLogo} />
             </View>
 
             <Text style={[styles.brandTitle, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
@@ -208,17 +252,15 @@ export default function AuthScreen() {
             </Text>
           </View>
 
-          {/* Segmented Pill Selector (Sign In vs Register) */}
           <View
             style={[
               styles.segmentContainer,
-              {
-                backgroundColor: isDark ? '#131b2e' : '#e2e8f0',
-              },
+              { backgroundColor: isDark ? '#131b2e' : '#e2e8f0' },
             ]}
           >
             <TouchableOpacity
               activeOpacity={0.85}
+              disabled={isBusy}
               style={[
                 styles.segmentTab,
                 activeTab === 'login' && {
@@ -239,9 +281,14 @@ export default function AuthScreen() {
                 style={[
                   styles.segmentTabText,
                   {
-                    color: activeTab === 'login'
-                      ? (isDark ? '#ffffff' : '#0f172a')
-                      : (isDark ? '#94a3b8' : '#64748b'),
+                    color:
+                      activeTab === 'login'
+                        ? isDark
+                          ? '#ffffff'
+                          : '#0f172a'
+                        : isDark
+                          ? '#94a3b8'
+                          : '#64748b',
                     fontFamily: activeTab === 'login' ? Fonts.headingBold : Fonts.sansMedium,
                   },
                 ]}
@@ -252,6 +299,7 @@ export default function AuthScreen() {
 
             <TouchableOpacity
               activeOpacity={0.85}
+              disabled={isBusy}
               style={[
                 styles.segmentTab,
                 activeTab === 'register' && {
@@ -272,9 +320,14 @@ export default function AuthScreen() {
                 style={[
                   styles.segmentTabText,
                   {
-                    color: activeTab === 'register'
-                      ? (isDark ? '#ffffff' : '#0f172a')
-                      : (isDark ? '#94a3b8' : '#64748b'),
+                    color:
+                      activeTab === 'register'
+                        ? isDark
+                          ? '#ffffff'
+                          : '#0f172a'
+                        : isDark
+                          ? '#94a3b8'
+                          : '#64748b',
                     fontFamily: activeTab === 'register' ? Fonts.headingBold : Fonts.sansMedium,
                   },
                 ]}
@@ -284,7 +337,6 @@ export default function AuthScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Form Card */}
           <View
             style={[
               styles.formCard,
@@ -318,7 +370,11 @@ export default function AuthScreen() {
 
             <Input
               label='পাসওয়ার্ড'
-              placeholder={activeTab === 'register' ? 'কমপক্ষে ৮ অক্ষরের পাসওয়ার্ড' : 'আপনার পাসওয়ার্ড দিন'}
+              placeholder={
+                activeTab === 'register'
+                  ? 'কমপক্ষে ৮ অক্ষরের পাসওয়ার্ড'
+                  : 'আপনার পাসওয়ার্ড দিন'
+              }
               isPassword
               value={password}
               onChangeText={setPassword}
@@ -329,6 +385,7 @@ export default function AuthScreen() {
             {activeTab === 'login' ? (
               <TouchableOpacity
                 style={styles.forgotBtn}
+                disabled={isBusy}
                 onPress={() => router.push('/(auth)/forgot-password')}
               >
                 <Text style={styles.forgotText}>পাসওয়ার্ড ভুলে গেছেন?</Text>
@@ -342,26 +399,56 @@ export default function AuthScreen() {
               </View>
             )}
 
-            {/* Primary Action Button */}
             <TouchableOpacity
               activeOpacity={0.88}
-              style={[styles.primaryActionBtn, loading && { opacity: 0.7 }]}
+              style={[styles.primaryActionBtn, isBusy && { opacity: 0.65 }]}
               onPress={activeTab === 'login' ? handleLogin : handleRegister}
-              disabled={loading}
+              disabled={isBusy}
             >
               <Text style={styles.primaryActionBtnText}>
                 {loading
-                  ? (activeTab === 'login' ? 'সাইন ইন হচ্ছে...' : 'অ্যাকাউন্ট তৈরি হচ্ছে...')
-                  : (activeTab === 'login' ? 'সাইন ইন করুন' : 'নিবন্ধন সম্পন্ন করুন')}
+                  ? activeTab === 'login'
+                    ? 'সাইন ইন হচ্ছে...'
+                    : 'অ্যাকাউন্ট তৈরি হচ্ছে...'
+                  : activeTab === 'login'
+                    ? 'সাইন ইন করুন'
+                    : 'নিবন্ধন সম্পন্ন করুন'}
               </Text>
             </TouchableOpacity>
 
-            {/* Switch Helper */}
+            <View style={styles.oauthDividerRow}>
+              <View style={[styles.oauthDividerLine, { backgroundColor: isDark ? '#293449' : '#e2e8f0' }]} />
+              <Text style={[styles.oauthDividerText, { color: isDark ? '#64748b' : '#94a3b8' }]}>
+                অথবা
+              </Text>
+              <View style={[styles.oauthDividerLine, { backgroundColor: isDark ? '#293449' : '#e2e8f0' }]} />
+            </View>
+
+            <TouchableOpacity
+              activeOpacity={0.82}
+              disabled={isBusy}
+              style={[
+                styles.googleButton,
+                {
+                  backgroundColor: isDark ? '#131b2e' : '#ffffff',
+                  borderColor: isDark ? '#293449' : '#dbe3ec',
+                },
+                isBusy && { opacity: 0.65 },
+              ]}
+              onPress={handleGoogleLogin}
+            >
+              {!googleLoading ? <GoogleIcon /> : null}
+              <Text style={[styles.googleButtonText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
+                {googleLoading ? 'Google সাইন ইন হচ্ছে...' : 'Google দিয়ে চালিয়ে যান'}
+              </Text>
+            </TouchableOpacity>
+
             <View style={styles.switchHelpRow}>
               <Text style={[styles.switchHelpText, { color: isDark ? '#94a3b8' : '#64748b' }]}>
                 {activeTab === 'login' ? 'অ্যাকাউন্ট নেই?' : 'ইতিমধ্যে অ্যাকাউন্ট আছে?'}
               </Text>
               <TouchableOpacity
+                disabled={isBusy}
                 onPress={() => {
                   setActiveTab(activeTab === 'login' ? 'register' : 'login');
                   setErrors({});
@@ -374,7 +461,6 @@ export default function AuthScreen() {
             </View>
           </View>
 
-          {/* Footer Security Badges */}
           <View style={styles.securityFooter}>
             <Text style={[styles.securityFooterText, { color: isDark ? '#64748b' : '#94a3b8' }]}>
               বাংলাদেশ ভূমি সংস্কার ও মৌজা পরিমাপ স্ট্যান্ডার্ড অনুযায়ী তৈরি
@@ -515,6 +601,33 @@ const styles = StyleSheet.create({
   primaryActionBtnText: {
     color: '#ffffff',
     fontSize: 12.5,
+    fontFamily: Fonts.sansMedium,
+  },
+  oauthDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginVertical: 11,
+  },
+  oauthDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  oauthDividerText: {
+    fontSize: 10.5,
+    fontFamily: Fonts.sansRegular,
+  },
+  googleButton: {
+    height: 38,
+    borderWidth: 1,
+    borderRadius: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+  },
+  googleButtonText: {
+    fontSize: 12,
     fontFamily: Fonts.sansMedium,
   },
   switchHelpRow: {
