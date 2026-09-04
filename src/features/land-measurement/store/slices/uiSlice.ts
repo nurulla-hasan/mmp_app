@@ -11,7 +11,6 @@ export interface UIState {
   pendingAction: { type: 'clearMap' | 'clearPlot'; callback?: () => void } | null;
   snapHint: boolean;
   isMagnifierEnabled: boolean;
-  isShowDiagonals: boolean;
   reportInfo: { mouza: string; jlNo: string; dagNo: string; khatianNo: string; date: string; surveyorName: string };
   reportImage: string | null;
   currentProjectId: string | null;
@@ -30,7 +29,6 @@ export interface UIActions {
   setPendingAction: (action: { type: 'clearMap' | 'clearPlot'; callback?: () => void } | null) => void;
   setSnapHint: (hint: boolean) => void;
   setIsMagnifierEnabled: (enabled: boolean) => void;
-  setIsShowDiagonals: (enabled: boolean) => void;
   setReportInfo: (info: { mouza: string; jlNo: string; dagNo: string; khatianNo: string; date: string; surveyorName: string } | ((prev: { mouza: string; jlNo: string; dagNo: string; khatianNo: string; date: string; surveyorName: string }) => { mouza: string; jlNo: string; dagNo: string; khatianNo: string; date: string; surveyorName: string })) => void;
   setReportImage: (image: string | null) => void;
   setCurrentProjectId: (id: string | null) => void;
@@ -54,7 +52,6 @@ export const createUISlice: StateCreator<UISlice, [], [], UISlice> = (set, get, 
   pendingAction: null,
   snapHint: false,
   isMagnifierEnabled: false,
-  isShowDiagonals: false,
   reportInfo: { mouza: '', jlNo: '', dagNo: '', khatianNo: '', date: new Date().toLocaleDateString('en-GB'), surveyorName: '' },
   reportImage: null,
   currentProjectId: null,
@@ -78,7 +75,6 @@ export const createUISlice: StateCreator<UISlice, [], [], UISlice> = (set, get, 
   setPendingAction: (action) => set({ pendingAction: action }),
   setSnapHint: (snapHint) => set({ snapHint }),
   setIsMagnifierEnabled: (enabled) => set({ isMagnifierEnabled: enabled }),
-  setIsShowDiagonals: (enabled) => set({ isShowDiagonals: enabled }),
   setReportInfo: (info) =>
     set((state) => ({
       reportInfo: typeof info === 'function' ? info(state.reportInfo) : info,
