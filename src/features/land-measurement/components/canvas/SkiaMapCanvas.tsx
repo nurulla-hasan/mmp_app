@@ -803,7 +803,7 @@ export function SkiaMapCanvas() {
       const currentLine = state.manualCutLine;
       if (!currentLine || pending.index < 0 || pending.index >= currentLine.length) return;
       const nextLine = [...currentLine];
-      nextLine[pending.index] = { x, y };
+      nextLine[pending.index] = { x: pending.x, y: pending.y };
       state.setManualCutLine(nextLine);
     });
   }, []);
