@@ -14,9 +14,9 @@ import { useThemeStore } from '../../../../stores/theme-store';
 import { getLandMeasurementToolColors } from '../../utils/tool-theme';
 import { buildWebPrintHtml } from '../print/buildWebPrintHtml';
 
-const PDF_DIRECTORY_KEY = 'mmp_pdf_documents_directory_v2';
+const PDF_DIRECTORY_KEY = 'mmp_pdf_download_root_v3';
 const LEGACY_PDF_DIRECTORY_KEY = 'mmp_pdf_download_directory';
-const PDF_DIRECTORY_NAME = 'MMP Documents';
+const OLD_MMP_DIRECTORY_KEY = 'mmp_pdf_documents_directory_v2';
 
 const formatMeasurement = (value: number) => value.toFixed(DECIMALS);
 
@@ -34,20 +34,9 @@ const buildPdfFileName = (mapName: string | undefined, plotCount: number) => {
   return `${safeName || 'mouza-map'}_${plotCount}p.pdf`;
 };
 
-const getSafLeafName = (uri: string) => {
-  let decoded = uri;
-  try {
-    decoded = decodeURIComponent(uri);
-  } catch {
-    // Keep the original URI if the provider returned a non-standard escape sequence.
-  }
-  const clean = decoded.replace(/\/+$/, '');
-  return clean.slice(clean.lastIndexOf('/') + 1).split(':').pop() ?? '';
-};
-
-const findMmpDirectory = async (parentUri: string) => {
-  const children = await FileSystem.StorageAccessFramework.readDirectoryAsync(parentUri);
-  return children.find((uri) => getSafLeafName(uri) === PDF_DIRECTORY_NAME) ?? null;
+const clearOldPdfDirectoryCache = async () => {
+  await AsyncStorage.removeItem(LEGACY_PDF_DIRECTORY_KEY);
+  await AsyncStorage.removeItem(OLD_MMP_DIRECTORY_KEY);
 };
 
 const getSafPdfDirectory = async () => {
@@ -65,26 +54,9 @@ const getSafPdfDirectory = async () => {
   const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync(initialUri);
   if (!permission.granted) return null;
 
-  let directoryUri = permission.directoryUri;
-  if (getSafLeafName(directoryUri) !== PDF_DIRECTORY_NAME) {
-    let existingDirectory = await findMmpDirectory(directoryUri);
-    if (!existingDirectory) {
-      try {
-        existingDirectory = await FileSystem.StorageAccessFramework.makeDirectoryAsync(
-          directoryUri,
-          PDF_DIRECTORY_NAME,
-        );
-      } catch (error) {
-        existingDirectory = await findMmpDirectory(directoryUri);
-        if (!existingDirectory) throw error;
-      }
-    }
-    directoryUri = existingDirectory;
-  }
-
-  await AsyncStorage.setItem(PDF_DIRECTORY_KEY, directoryUri);
-  await AsyncStorage.removeItem(LEGACY_PDF_DIRECTORY_KEY);
-  return directoryUri;
+  await AsyncStorage.setItem(PDF_DIRECTORY_KEY, permission.directoryUri);
+  await clearOldPdfDirectoryCache();
+  return permission.directoryUri;
 };
 
 const savePdfWithMediaStore = async (sourceUri: string, fileName: string) => {
@@ -96,7 +68,7 @@ const savePdfWithMediaStore = async (sourceUri: string, fileName: string) => {
     const savedUri = await ReactNativeBlobUtil.MediaCollection.copyToMediaStore(
       {
         name: fileName,
-        parentFolder: PDF_DIRECTORY_NAME,
+        parentFolder: '',
         mimeType: 'application/pdf',
       },
       'Download',
@@ -160,11 +132,8 @@ export function MobileResultsBar() {
       if (Platform.OS === 'android') {
         const savedDirectly = await savePdfWithMediaStore(result.uri, displayFileName);
         if (savedDirectly) {
-          await AsyncStorage.removeItem(LEGACY_PDF_DIRECTORY_KEY);
-          Alert.alert(
-            'PDF downloaded',
-            `${displayFileName}\nSaved in Download/${PDF_DIRECTORY_NAME}.`,
-          );
+          await clearOldPdfDirectoryCache();
+          Alert.alert('PDF downloaded', `${displayFileName}\nSaved in Download.`);
           return;
         }
 
@@ -172,11 +141,11 @@ export function MobileResultsBar() {
         if (!savedWithSaf) {
           Alert.alert(
             'Download cancelled',
-            `In Expo Go, open Download, create/select “${PDF_DIRECTORY_NAME}”, then tap “Use this folder”.`,
+            'In Expo Go, select the Download folder and tap “Use this folder”.',
           );
           return;
         }
-        Alert.alert('PDF downloaded', `${displayFileName}\nSaved in ${PDF_DIRECTORY_NAME}.`);
+        Alert.alert('PDF downloaded', `${displayFileName}\nSaved in Download.`);
       } else if (await Sharing.isAvailableAsync()) {
         let shareUri = result.uri;
         if (FileSystem.cacheDirectory) {
