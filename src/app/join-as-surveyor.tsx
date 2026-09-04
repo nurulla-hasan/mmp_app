@@ -1,7 +1,14 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AlertTriangle, BadgeCheck, Briefcase, Clock, LogIn, UserPlus } from 'lucide-react-native';
+import {
+  AlertTriangle,
+  BadgeCheck,
+  Briefcase,
+  Clock,
+  LogIn,
+  UserPlus,
+} from 'lucide-react-native';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { LoadingSkeleton, useSkeletonPulse } from '../components/ui/loading-skeleton';
@@ -22,14 +29,6 @@ function ApplicationFormSkeleton({ colors }: { colors: JoinColors }) {
 
   return (
     <View style={styles.formSkeleton}>
-      <View style={[styles.skeletonBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <LoadingSkeleton opacity={opacity} color={colors.skeleton} style={styles.skeletonBannerIcon} />
-        <View style={styles.skeletonGrow}>
-          <LoadingSkeleton opacity={opacity} color={colors.skeleton} style={styles.skeletonBannerTitle} />
-          <LoadingSkeleton opacity={opacity} color={colors.skeletonSoft} style={styles.skeletonBannerText} />
-        </View>
-      </View>
-
       {[0, 1, 2].map((section) => (
         <View
           key={`join-section-${section}`}
@@ -74,15 +73,28 @@ export default function JoinAsSurveyorScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={[styles.content, { paddingTop: 14 }]}
+      contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps='handled'
     >
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>সার্ভেয়ার হিসেবে যোগ দিন</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          আপনার পেশাদার ভূমি জরিপ সেবা নতুন ক্লায়েন্টদের কাছে পৌঁছে দিন।
-        </Text>
+      <View
+        style={[
+          styles.hero,
+          {
+            backgroundColor: `${colors.primary}0A`,
+            borderColor: `${colors.primary}25`,
+          },
+        ]}
+      >
+        <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}14` }]}>
+          <Briefcase size={20} color={colors.primary} />
+        </View>
+        <View style={styles.heroCopy}>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>পেশাদার প্রোফাইল তৈরি করুন</Text>
+          <Text style={[styles.heroSubtitle, { color: colors.textMuted }]}>
+            আপনার সেবা, অভিজ্ঞতা ও কাজের এলাকা যোগ করুন। যাচাই শেষে ক্লায়েন্টরা আপনাকে সহজে খুঁজে পাবে।
+          </Text>
+        </View>
       </View>
 
       {profile ? (
@@ -92,13 +104,27 @@ export default function JoinAsSurveyorScreen() {
             { backgroundColor: colors.card, borderColor: colors.border },
           ]}
         >
-          {profile.verificationStatus === 'APPROVED' ? (
-            <BadgeCheck size={38} color={colors.primary} />
-          ) : profile.verificationStatus === 'REJECTED' ? (
-            <AlertTriangle size={38} color='#ef4444' />
-          ) : (
-            <Clock size={38} color='#d97706' />
-          )}
+          <View
+            style={[
+              styles.stateIcon,
+              {
+                backgroundColor:
+                  profile.verificationStatus === 'APPROVED'
+                    ? `${colors.primary}12`
+                    : profile.verificationStatus === 'REJECTED'
+                      ? 'rgba(239,68,68,.10)'
+                      : 'rgba(217,119,6,.10)',
+              },
+            ]}
+          >
+            {profile.verificationStatus === 'APPROVED' ? (
+              <BadgeCheck size={25} color={colors.primary} />
+            ) : profile.verificationStatus === 'REJECTED' ? (
+              <AlertTriangle size={25} color='#ef4444' />
+            ) : (
+              <Clock size={25} color='#d97706' />
+            )}
+          </View>
 
           <Text style={[styles.stateTitle, { color: colors.text }]}>আপনার সার্ভেয়ার আবেদন</Text>
           <Badge
@@ -155,7 +181,7 @@ export default function JoinAsSurveyorScreen() {
                 },
               ]}
             >
-              <AlertTriangle size={19} color='#d97706' />
+              <AlertTriangle size={18} color='#d97706' />
               <View style={styles.warningContent}>
                 <Text
                   style={[
@@ -163,7 +189,7 @@ export default function JoinAsSurveyorScreen() {
                     { color: theme === 'dark' ? '#fbbf24' : '#92400e' },
                   ]}
                 >
-                  ফর্ম পূরণ করতে পারেন, জমা দেওয়ার আগে লগইন করতে হবে
+                  আবেদন জমা দিতে লগইন প্রয়োজন
                 </Text>
                 <Text
                   style={[
@@ -171,7 +197,7 @@ export default function JoinAsSurveyorScreen() {
                     { color: theme === 'dark' ? '#fcd34d' : '#a16207' },
                   ]}
                 >
-                  আপনার আবেদনটি একটি Mouza Map Pro অ্যাকাউন্টের সাথে যুক্ত হবে।
+                  এখন ফর্ম পূরণ করতে পারেন। জমা দেওয়ার সময় আপনার Mouza Map Pro অ্যাকাউন্টে লগইন করুন।
                 </Text>
                 <View style={styles.authActions}>
                   <Button
@@ -190,20 +216,7 @@ export default function JoinAsSurveyorScreen() {
                 </View>
               </View>
             </View>
-          ) : (
-            <View
-              style={[
-                styles.partnerBanner,
-                { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}30` },
-              ]}
-            >
-              <Briefcase size={20} color={colors.primary} />
-              <Text style={[styles.partnerText, { color: colors.textMuted }]}>
-                পেশাদার তথ্য, সেবা, শুরুর মূল্য ও কাজের এলাকা দিন। অ্যাডমিন যাচাইয়ের
-                পর আপনার পাবলিক সার্ভেয়ার প্রোফাইল চালু হবে।
-              </Text>
-            </View>
-          )}
+          ) : null}
 
           <SurveyorProfileForm
             mode='apply'
@@ -220,16 +233,38 @@ export default function JoinAsSurveyorScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 14, paddingBottom: 38, gap: 14 },
-  header: { gap: 3 },
-  title: { fontSize: 18, fontFamily: Fonts.headingBold },
-  subtitle: { fontSize: 11, lineHeight: 16, fontFamily: Fonts.sansRegular },
+  content: { padding: 12, paddingTop: 10, paddingBottom: 112, gap: 11 },
+  hero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+  },
+  heroIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroCopy: { flex: 1, gap: 2 },
+  heroTitle: { fontSize: 16, lineHeight: 21, fontFamily: Fonts.headingBold },
+  heroSubtitle: { fontSize: 10.5, lineHeight: 16, fontFamily: Fonts.sansRegular },
   stateCard: {
     borderWidth: 1,
     borderRadius: 15,
-    padding: 26,
+    padding: 20,
     alignItems: 'center',
-    gap: 9,
+    gap: 8,
+  },
+  stateIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   stateTitle: { fontSize: 15, fontFamily: Fonts.headingBold, textAlign: 'center' },
   stateText: {
@@ -248,31 +283,17 @@ const styles = StyleSheet.create({
   authWarning: {
     borderWidth: 1,
     borderRadius: 12,
-    padding: 12,
+    padding: 11,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 9,
+    gap: 8,
   },
   warningContent: { flex: 1, gap: 3 },
   warningTitle: { fontSize: 11.5, fontFamily: Fonts.headingSemiBold },
   warningText: { fontSize: 10, lineHeight: 15, fontFamily: Fonts.sansRegular },
   authActions: { flexDirection: 'row', gap: 7, marginTop: 6 },
-  partnerBanner: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  partnerText: { flex: 1, fontSize: 10.5, lineHeight: 16, fontFamily: Fonts.sansRegular },
-  formSkeleton: { gap: 14 },
-  skeletonBanner: { minHeight: 72, borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  skeletonBannerIcon: { width: 34, height: 34, borderRadius: 9 },
-  skeletonGrow: { flex: 1, gap: 8 },
-  skeletonBannerTitle: { width: '54%', height: 12 },
-  skeletonBannerText: { width: '86%', height: 9 },
-  skeletonSection: { borderWidth: 1, borderRadius: 15, padding: 14, gap: 11 },
+  formSkeleton: { gap: 12 },
+  skeletonSection: { borderWidth: 1, borderRadius: 14, padding: 13, gap: 10 },
   skeletonSectionTitle: { width: '38%', height: 14 },
   skeletonInput: { width: '100%', height: 46, borderRadius: 10 },
   skeletonChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
