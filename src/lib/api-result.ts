@@ -1,4 +1,4 @@
-import type { ApiResult } from '../types/auth';
+import type { ApiResult } from '../types/api';
 
 export class ApiRequestError extends Error {
   statusCode: number;
