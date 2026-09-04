@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { AuthService } from '../../services/auth-service';
+import { CatalogService } from '../../services/catalog-service';
 import { queryKeys, STALE_TIME } from '../../lib/query-keys';
 import { unwrapApiResult } from '../../lib/api-result';
 import { useAuthStore } from '../../stores/auth-store';
 
-// Profile: GET /auth/me
 export function useProfile() {
-  const { isAuthenticated, user } = useAuthStore();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
 
   return useQuery({
     queryKey: queryKeys.profile.me(),
@@ -20,11 +21,10 @@ export function useProfile() {
   });
 }
 
-// District catalog: GET /districts
 export function useDistricts() {
   return useQuery({
     queryKey: queryKeys.districts.list(),
-    queryFn: async () => unwrapApiResult(await AuthService.getDistricts()),
+    queryFn: async () => unwrapApiResult(await CatalogService.getDistricts()),
     staleTime: STALE_TIME.DAY,
     gcTime: STALE_TIME.DAY * 2,
   });
