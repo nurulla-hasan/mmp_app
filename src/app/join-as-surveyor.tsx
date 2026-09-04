@@ -11,7 +11,11 @@ import {
 } from 'lucide-react-native';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { PageWrapper, SectionWrapper } from '../components/common/page-layout';
+import {
+  PAGE_LAYOUT,
+  PageIntro,
+  PageWrapper,
+} from '../components/common/page-layout';
 import { LoadingSkeleton, useSkeletonPulse } from '../components/ui/loading-skeleton';
 import { SurveyorProfileForm } from '../components/surveyors/surveyor-profile-form';
 import { Colors } from '../constants/colors';
@@ -73,25 +77,11 @@ export default function JoinAsSurveyorScreen() {
 
   return (
     <PageWrapper keyboardShouldPersistTaps='handled'>
-      <SectionWrapper
-        style={[
-          styles.hero,
-          {
-            backgroundColor: `${colors.primary}0A`,
-            borderColor: `${colors.primary}25`,
-          },
-        ]}
-      >
-        <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}14` }]}>
-          <Briefcase size={20} color={colors.primary} />
-        </View>
-        <View style={styles.heroCopy}>
-          <Text style={[styles.heroTitle, { color: colors.text }]}>পেশাদার প্রোফাইল তৈরি করুন</Text>
-          <Text style={[styles.heroSubtitle, { color: colors.textMuted }]}>
-            আপনার সেবা, অভিজ্ঞতা ও কাজের এলাকা যোগ করুন। যাচাই শেষে ক্লায়েন্টরা আপনাকে সহজে খুঁজে পাবে।
-          </Text>
-        </View>
-      </SectionWrapper>
+      <PageIntro
+        icon={<Briefcase size={20} color={colors.primary} />}
+        title='পেশাদার প্রোফাইল তৈরি করুন'
+        description='আপনার সেবা, অভিজ্ঞতা ও কাজের এলাকা যোগ করুন। যাচাই শেষে ক্লায়েন্টরা আপনাকে সহজে খুঁজে পাবে।'
+      />
 
       {profile ? (
         <View
@@ -228,27 +218,12 @@ export default function JoinAsSurveyorScreen() {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  heroIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroCopy: { flex: 1, gap: 2 },
-  heroTitle: { fontSize: 16, lineHeight: 21, fontFamily: Fonts.headingBold },
-  heroSubtitle: { fontSize: 10.5, lineHeight: 16, fontFamily: Fonts.sansRegular },
   stateCard: {
     borderWidth: 1,
-    borderRadius: 15,
+    borderRadius: PAGE_LAYOUT.radius,
     padding: 20,
     alignItems: 'center',
-    gap: 8,
+    gap: PAGE_LAYOUT.compactGap,
   },
   stateIcon: {
     width: 48,
@@ -267,24 +242,29 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: PAGE_LAYOUT.compactGap,
     justifyContent: 'center',
     marginTop: 4,
   },
   authWarning: {
     borderWidth: 1,
-    borderRadius: 12,
-    padding: 11,
+    borderRadius: PAGE_LAYOUT.radius,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 8,
+    gap: PAGE_LAYOUT.compactGap,
   },
   warningContent: { flex: 1, gap: 3 },
   warningTitle: { fontSize: 11.5, fontFamily: Fonts.headingSemiBold },
   warningText: { fontSize: 10, lineHeight: 15, fontFamily: Fonts.sansRegular },
   authActions: { flexDirection: 'row', gap: 7, marginTop: 6 },
-  formSkeleton: { gap: 12 },
-  skeletonSection: { borderWidth: 1, borderRadius: 14, padding: 13, gap: 10 },
+  formSkeleton: { gap: PAGE_LAYOUT.gap },
+  skeletonSection: {
+    borderWidth: 1,
+    borderRadius: PAGE_LAYOUT.radius,
+    padding: PAGE_LAYOUT.sectionPadding,
+    gap: 10,
+  },
   skeletonSectionTitle: { width: '38%', height: 14 },
   skeletonInput: { width: '100%', height: 46, borderRadius: 10 },
   skeletonChipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
