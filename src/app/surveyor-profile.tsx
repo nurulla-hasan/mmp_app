@@ -1,7 +1,8 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../components/ui/button';
+import { PageWrapper } from '../components/common/page-layout';
 import { SurveyorProfileForm } from '../components/surveyors/surveyor-profile-form';
 import { SurveyorProfileSkeleton } from '../components/common/page-loading-skeletons';
 import { Colors } from '../constants/colors';
@@ -36,14 +37,19 @@ export default function SurveyorProfileScreen() {
   }
 
   if (!profileQuery.data) {
-    return <View style={[styles.center, { backgroundColor: colors.background }]}><Text style={[styles.title, { color: colors.text }]}>প্রোফাইল লোড করা যায়নি</Text><Button title='আবার চেষ্টা করুন' onPress={() => profileQuery.refetch()} /></View>;
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.title, { color: colors.text }]}>প্রোফাইল লোড করা যায়নি</Text>
+        <Button title='আবার চেষ্টা করুন' onPress={() => profileQuery.refetch()} />
+      </View>
+    );
   }
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps='handled'>
-      <View>
-        <Text style={[styles.title, { color: colors.text }]}>সার্ভেয়ার প্রোফাইল ম্যানেজ করুন</Text>
-        <Text style={[styles.text, { color: colors.textMuted }]}>সেবা, মূল্য, এলাকা ও পেশাদার তথ্য আপডেট করুন।</Text>
+    <PageWrapper keyboardShouldPersistTaps='handled'>
+      <View style={styles.header}>
+        <Text style={[styles.title, styles.headerTitle, { color: colors.text }]}>সার্ভেয়ার প্রোফাইল ম্যানেজ করুন</Text>
+        <Text style={[styles.text, styles.headerText, { color: colors.textMuted }]}>সেবা, মূল্য, এলাকা ও পেশাদার তথ্য আপডেট করুন।</Text>
       </View>
       <SurveyorProfileForm
         mode='edit'
@@ -53,14 +59,15 @@ export default function SurveyorProfileScreen() {
         pending={updateMutation.isPending}
         onSubmit={(payload) => updateMutation.mutate(payload)}
       />
-    </ScrollView>
+    </PageWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 14, paddingBottom: 38, gap: 13 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 9 },
+  header: { gap: 2 },
   title: { fontSize: 17, fontFamily: Fonts.headingBold, textAlign: 'center' },
   text: { marginTop: 2, fontSize: 10.5, lineHeight: 16, fontFamily: Fonts.sansRegular, textAlign: 'center' },
+  headerTitle: { textAlign: 'left' },
+  headerText: { textAlign: 'left', marginTop: 0 },
 });
