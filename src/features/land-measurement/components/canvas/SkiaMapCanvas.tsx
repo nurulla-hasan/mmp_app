@@ -13,13 +13,11 @@ import {
   DashPathEffect,
   Fill,
   Group,
-  Image as SkiaImage,
   Paragraph,
   Path,
   RoundedRect,
   Skia,
   TextAlign,
-  useImage,
 } from '@shopify/react-native-skia';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS, useDerivedValue, useSharedValue } from 'react-native-reanimated';
@@ -116,7 +114,7 @@ const getClosestPointOnSegmentWorklet = (px: number, py: number, p1: Point, p2: 
   const dy = p2.y - p1.y;
   const lengthSquared = dx * dx + dy * dy;
   if (lengthSquared <= 1e-12) return { x: p1.x, y: p1.y };
-  const rawT = ((px - p1.x) * dx + (py - p1.y) * dy) / lengthSquared;
+  const rawT = ((px - p1.x) * dx + (py - p1.y)) / lengthSquared;
   const t = Math.max(0, Math.min(1, rawT));
   return { x: p1.x + t * dx, y: p1.y + t * dy };
 };
@@ -467,22 +465,6 @@ const SkiaDiagonalBadge = memo(function SkiaDiagonalBadge({
   );
 });
 
-function SkiaSimpleImage({ uri, width, height }: { uri: string; width: number; height: number }) {
-  const image = useImage(uri);
-  if (!image) return null;
-  return (
-    <SkiaImage
-      image={image}
-      x={0}
-      y={0}
-      width={width}
-      height={height}
-      fit='fill'
-      sampling={{ B: 0, C: 0.5 }}
-    />
-  );
-}
-
 function PlotShape({
   plot,
   stageScale,
@@ -557,7 +539,6 @@ export function SkiaMapCanvas() {
   const stageScale = useMapStore((state) => state.stageScale);
   const stagePos = useMapStore((state) => state.stagePos);
   const isShowDiagonals = useMapStore((state) => state.isShowDiagonals);
-  const isMagnifierEnabled = useMapStore((state) => state.isMagnifierEnabled);
   const manualDividePlotId = useMapStore((state) => state.manualDividePlotId);
   const manualCutLine = useMapStore((state) => state.manualCutLine);
 
@@ -570,7 +551,6 @@ export function SkiaMapCanvas() {
     color: UI_CONFIG.colors.drawPrimary,
     snapped: false,
   });
-  const [magnifierTransform, setMagnifierTransform] = useState<Transform>({ scale: stageScale, pos: stagePos });
 
   const liveRafRef = useRef<number | null>(null);
   const pendingLiveTransformRef = useRef<Transform | null>(null);
@@ -804,7 +784,6 @@ export function SkiaMapCanvas() {
         return;
       }
       setLiveOverlay(getLiveOverlay(pending));
-      if (snapshot.isMagnifierEnabled) setMagnifierTransform(pending);
     });
   }, [clearLiveOverlay, getLiveOverlay]);
 
@@ -1290,26 +1269,6 @@ export function SkiaMapCanvas() {
         ? selectedPlot ? 'Drag the red points to adjust the cut line' : 'Tap the plot you want to divide'
         : mapImage ? 'One finger to pan • Two fingers to zoom' : 'Add a mouza map to begin';
 
-  const magnifier = useMemo(() => {
-    if (!mapImage || !isMagnifierEnabled || viewport.width <= 0 || (mode !== 'drawing_plot' && mode !== 'calibrating')) return null;
-    const radius = 55;
-    const lens = { x: viewport.width - radius - 16, y: radius + 16 };
-    const centerCanvas = {
-      x: (viewport.width / 2 - magnifierTransform.pos.x) / Math.max(magnifierTransform.scale, 0.001),
-      y: (viewport.height / 2 - magnifierTransform.pos.y) / Math.max(magnifierTransform.scale, 0.001),
-    };
-    const magnifiedScale = magnifierTransform.scale * 2.5;
-    const magnifiedPos = {
-      x: lens.x - centerCanvas.x * magnifiedScale,
-      y: lens.y - centerCanvas.y * magnifiedScale,
-    };
-    const clip = Skia.Path.MakeFromSVGString(
-      `M ${lens.x - radius} ${lens.y} A ${radius} ${radius} 0 1 0 ${lens.x + radius} ${lens.y} A ${radius} ${radius} 0 1 0 ${lens.x - radius} ${lens.y} Z`,
-    );
-    if (!clip) return null;
-    return { radius, lens, magnifiedScale, magnifiedPos, clip };
-  }, [isMagnifierEnabled, magnifierTransform, mapImage, mode, viewport.height, viewport.width]);
-
   return (
     <View style={[styles.container, { backgroundColor: colors.workspace }]} onLayout={onLayout}>
       <GestureDetector gesture={gesture}>
@@ -1539,40 +1498,6 @@ export function SkiaMapCanvas() {
                       <DashPathEffect intervals={[5, 4]} />
                     </Circle>
                   )}
-                </Group>
-              )}
-
-              {magnifier && mapImage && (
-                <Group>
-                  <Circle cx={magnifier.lens.x} cy={magnifier.lens.y} r={magnifier.radius + 2} color={colors.surface} />
-                  <Group clip={magnifier.clip}>
-                    <Group transform={[
-                      { translateX: magnifier.magnifiedPos.x },
-                      { translateY: magnifier.magnifiedPos.y },
-                      { scale: magnifier.magnifiedScale },
-                    ]}>
-                      <SkiaSimpleImage uri={mapImage.uri} width={mapImage.width} height={mapImage.height} />
-                      {plots.map((plot) => <PlotShape key={`mag-${plot.id}`} plot={plot} stageScale={magnifier.magnifiedScale} />)}
-                      {plotPoints.length > 0 && mode === 'drawing_plot' && (
-                        <Path
-                          path={pathFromPoints(plotPoints)}
-                          color={UI_CONFIG.colors.drawPrimary}
-                          style='stroke'
-                          strokeWidth={UI_CONFIG.strokeWidth.xxthick / Math.max(magnifier.magnifiedScale, 0.01)}
-                        />
-                      )}
-                    </Group>
-                  </Group>
-                  <Circle
-                    cx={magnifier.lens.x}
-                    cy={magnifier.lens.y}
-                    r={magnifier.radius}
-                    color={theme === 'dark' ? 'rgba(15,23,42,0.72)' : 'rgba(15,23,42,0.42)'}
-                    style='stroke'
-                    strokeWidth={3}
-                  />
-                  <Path path={`M ${magnifier.lens.x - 10} ${magnifier.lens.y} L ${magnifier.lens.x + 10} ${magnifier.lens.y}`} color='#ef4444' style='stroke' strokeWidth={2} />
-                  <Path path={`M ${magnifier.lens.x} ${magnifier.lens.y - 10} L ${magnifier.lens.x} ${magnifier.lens.y + 10}`} color='#ef4444' style='stroke' strokeWidth={2} />
                 </Group>
               )}
 
