@@ -1,0 +1,23 @@
+{
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://apis.mouzamappro.com/api/v1",
+        "EXPO_PUBLIC_API_TIMEOUT_MS": "20000"
+      }
+    },
+    "production": {
+      "environment": "production",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://apis.mouzamappro.com/api/v1",
+        "EXPO_PUBLIC_API_TIMEOUT_MS": "20000"
+      }
+    }
+  }
+}
