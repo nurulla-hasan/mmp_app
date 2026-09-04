@@ -15,7 +15,7 @@ import {
 } from 'lucide-react-native';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { PageWrapper } from '../../components/common/page-layout';
+import { PageSectionHeader, PageWrapper } from '../../components/common/page-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -159,12 +159,10 @@ export default function ToolsHubScreen() {
         </View>
       </TouchableOpacity>
 
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>বিশেষায়িত ল্যান্ড টুলস</Text>
-        <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-          ম্যাপ এলাইনমেন্ট, ট্রেসিং, প্যান্টাগ্রাফ ও জিওরেফারেন্স
-        </Text>
-      </View>
+      <PageSectionHeader
+        title='বিশেষায়িত ল্যান্ড টুলস'
+        subtitle='ম্যাপ এলাইনমেন্ট, ট্রেসিং, প্যান্টাগ্রাফ ও জিওরেফারেন্স'
+      />
 
       <View style={styles.toolsList}>
         {SPECIALIZED_TOOLS.map((tool) => {
@@ -196,12 +194,10 @@ export default function ToolsHubScreen() {
         })}
       </View>
 
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>ভূমি হিসাব ও ইউটিলিটি টুলস</Text>
-        <Text style={[styles.sectionSubtitle, { color: colors.textMuted }]}>
-          একক রূপান্তর, ফারায়েজ হিস্যা বণ্টন ও স্কেল গাইড
-        </Text>
-      </View>
+      <PageSectionHeader
+        title='ভূমি হিসাব ও ইউটিলিটি টুলস'
+        subtitle='একক রূপান্তর, ফারায়েজ হিস্যা বণ্টন ও স্কেল গাইড'
+      />
 
       <View style={styles.toolsList}>
         {CALCULATION_TOOLS.map((tool) => {
@@ -295,19 +291,6 @@ const styles = StyleSheet.create({
   featurePillText: {
     fontSize: 10,
     fontFamily: Fonts.sansMedium,
-  },
-  sectionHeader: {
-    marginTop: 2,
-    gap: 1,
-    paddingHorizontal: 2,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontFamily: Fonts.headingBold,
-  },
-  sectionSubtitle: {
-    fontSize: 10.5,
-    fontFamily: Fonts.sansRegular,
   },
   toolsList: {
     gap: 9,
