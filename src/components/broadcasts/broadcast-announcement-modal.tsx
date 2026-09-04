@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Linking,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -113,7 +112,6 @@ export function BroadcastAnnouncementModal() {
         );
         if (!cancelled) setQueue(unseen);
       } catch {
-        // Storage failure must not make a non-critical announcement crash the app.
         if (!cancelled) setQueue(items);
       }
     }
@@ -164,11 +162,9 @@ export function BroadcastAnnouncementModal() {
       transparent
       animationType='fade'
       statusBarTranslucent
-      onRequestClose={() => void dismissCurrent()}
+      onRequestClose={() => {}}
     >
       <View style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => void dismissCurrent()} />
-
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
