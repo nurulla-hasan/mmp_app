@@ -17,7 +17,7 @@ import { useThemeStore } from '../../stores/theme-store';
  */
 export const PAGE_LAYOUT = {
   horizontal: 14,
-  top: 10,
+  top: 14,
   bottom: 28,
   gap: 12,
   sectionGap: 12,
