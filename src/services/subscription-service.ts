@@ -1,6 +1,6 @@
 import { apiFetch } from './api-client';
 import { API_ENDPOINTS } from './api-endpoints';
-import type { ApiResult } from '../types/auth';
+import type { ApiResult } from '../types/api';
 import type {
   ManualCheckoutPayload,
   MySubscriptionResponse,
@@ -12,13 +12,13 @@ export const SubscriptionService = {
   getPaymentNumbers: (): Promise<ApiResult<PaymentNumbersResponse>> =>
     apiFetch<PaymentNumbersResponse>(API_ENDPOINTS.subscriptions.paymentNumbers, {
       method: 'GET',
-      auth: false,
+      auth: 'none',
     }),
 
   getMine: (): Promise<ApiResult<MySubscriptionResponse>> =>
     apiFetch<MySubscriptionResponse>(API_ENDPOINTS.subscriptions.mySubscription, {
       method: 'GET',
-      auth: true,
+      auth: 'auth',
     }),
 
   submitManualCheckout: (
@@ -27,6 +27,6 @@ export const SubscriptionService = {
     apiFetch<TSubscription>(API_ENDPOINTS.subscriptions.manualCheckout, {
       method: 'POST',
       body: payload,
-      auth: true,
+      auth: 'auth',
     }),
 };
