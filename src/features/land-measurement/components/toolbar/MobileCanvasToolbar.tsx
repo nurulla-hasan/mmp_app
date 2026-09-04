@@ -4,7 +4,7 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import {
   BookmarkCheck, Check, Crosshair, FolderOpen, HardDrive, HelpCircle,
   Image as ImageIcon, Minus, MoreHorizontal, MoveHorizontal, PenTool, Plus, Redo2,
-  RotateCcw, Ruler, Scissors, Search, SearchX, Undo2, X,
+  RotateCcw, Ruler, Scissors, Undo2, X,
 } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { Fonts } from '../../../../constants/typography';
@@ -89,7 +89,6 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   const plotCount = useMapStore((state) => state.plots.length);
   const calibrationPointCount = useMapStore((state) => state.calibrationLine.length / 2);
   const calibrationFutureCount = useMapStore((state) => state.calibrationLineFuture.length / 2);
-  const isMagnifierEnabled = useMapStore((state) => state.isMagnifierEnabled);
   const manualDividePlotId = useMapStore((state) => state.manualDividePlotId);
   const manualCutPointCount = useMapStore((state) => state.manualCutLine?.length ?? 0);
   const nudgeTarget = useMapStore((state) => state.nudgeTarget);
@@ -109,7 +108,6 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   const removeManualCutPoint = useMapStore((state) => state.removeManualCutPoint);
   const executeManualDivide = useMapStore((state) => state.executeManualDivide);
   const clearMap = useMapStore((state) => state.clearMap);
-  const setIsMagnifierEnabled = useMapStore((state) => state.setIsMagnifierEnabled);
   const startPlotDrawing = useMapStore((state) => state.startPlotDrawing);
   const startManualDivide = useMapStore((state) => state.startManualDivide);
 
@@ -206,7 +204,6 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
       <Action label='Scale' icon={<Ruler size={18} color={hasScale ? muted : '#d97706'} />} onPress={beginCalibration} />
       <Action label='Draw' disabled={!hasMapImage || !hasScale} icon={<PenTool size={18} color={muted} />} onPress={startPlotDrawing} />
       <Action label='Divide' disabled={plotCount === 0} icon={<Scissors size={18} color={muted} />} onPress={startManualDivide} />
-      <Action label='Magnify' active={isMagnifierEnabled} icon={isMagnifierEnabled ? <SearchX size={18} color='#fff' /> : <Search size={18} color={muted} />} onPress={() => setIsMagnifierEnabled(!isMagnifierEnabled)} />
       <Action label='More' active={isMoreOpen} icon={<MoreHorizontal size={18} color={isMoreOpen ? '#fff' : muted} />} onPress={() => setIsMoreOpen((open) => !open)} />
     </View>
   </>;
