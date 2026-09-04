@@ -233,7 +233,7 @@ export default function JoinAsSurveyorScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 12, paddingTop: 10, paddingBottom: 112, gap: 11 },
+  content: { padding: 12, paddingTop: 10, paddingBottom: 28, gap: 11 },
   hero: {
     flexDirection: 'row',
     alignItems: 'center',
