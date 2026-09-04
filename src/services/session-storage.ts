@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import type { AuthTokens, TAuthUser } from '../types/auth';
 
-// Secrets live in the platform-backed encrypted store. Non-sensitive cached
-// identity data remains in AsyncStorage so normal app hydration stays simple.
+// Native secrets live in the platform-backed encrypted store. Non-sensitive
+// cached identity data remains in AsyncStorage. The Expo web preview keeps its
+// tokens in AsyncStorage because SecureStore is a native-only facility.
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'mmp_access_token',
   REFRESH_TOKEN: 'mmp_refresh_token',
@@ -20,52 +22,73 @@ export type StoredTokens = {
   refreshToken: string | null;
 };
 
-async function migrateLegacyTokens(): Promise<StoredTokens> {
+const isWeb = Platform.OS === 'web';
+
+async function getNativeTokens(): Promise<StoredTokens> {
+  const [accessToken, refreshToken] = await Promise.all([
+    SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN),
+    SecureStore.getItemAsync(STORAGE_KEYS.REFRESH_TOKEN),
+  ]);
+
+  return { accessToken, refreshToken };
+}
+
+async function getWebTokens(): Promise<StoredTokens> {
   const [accessToken, refreshToken] = await Promise.all([
     AsyncStorage.getItem(LEGACY_TOKEN_KEYS.ACCESS_TOKEN),
     AsyncStorage.getItem(LEGACY_TOKEN_KEYS.REFRESH_TOKEN),
   ]);
 
-  if (accessToken) {
-    await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+  return { accessToken, refreshToken };
+}
+
+async function migrateLegacyNativeTokens(): Promise<StoredTokens> {
+  const tokens = await getWebTokens();
+
+  if (tokens.accessToken) {
+    await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken);
   }
-  if (refreshToken) {
-    await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+  if (tokens.refreshToken) {
+    await SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken);
   }
 
-  if (accessToken || refreshToken) {
+  if (tokens.accessToken || tokens.refreshToken) {
     await AsyncStorage.multiRemove([
       LEGACY_TOKEN_KEYS.ACCESS_TOKEN,
       LEGACY_TOKEN_KEYS.REFRESH_TOKEN,
     ]);
   }
 
-  return { accessToken, refreshToken };
+  return tokens;
 }
 
 export const SessionStorage = {
   async getTokens(): Promise<StoredTokens> {
-    const [accessToken, refreshToken] = await Promise.all([
-      SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN),
-      SecureStore.getItemAsync(STORAGE_KEYS.REFRESH_TOKEN),
-    ]);
+    if (isWeb) return getWebTokens();
 
-    if (accessToken || refreshToken) {
-      return { accessToken, refreshToken };
-    }
+    const tokens = await getNativeTokens();
+    if (tokens.accessToken || tokens.refreshToken) return tokens;
 
-    // Existing installs previously stored tokens in AsyncStorage. Migrate once
-    // without forcing those users to sign in again.
-    return migrateLegacyTokens();
+    // Existing native installs previously stored tokens in AsyncStorage.
+    // Migrate once without forcing those users to sign in again.
+    return migrateLegacyNativeTokens();
   },
 
   async setTokens(tokens: AuthTokens): Promise<void> {
+    if (isWeb) {
+      await Promise.all([
+        AsyncStorage.setItem(LEGACY_TOKEN_KEYS.ACCESS_TOKEN, tokens.accessToken),
+        AsyncStorage.setItem(LEGACY_TOKEN_KEYS.REFRESH_TOKEN, tokens.refreshToken),
+      ]);
+      return;
+    }
+
     await Promise.all([
       SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, tokens.accessToken),
       SecureStore.setItemAsync(STORAGE_KEYS.REFRESH_TOKEN, tokens.refreshToken),
     ]);
 
-    // Keep legacy plaintext keys absent after any successful session write.
+    // Keep legacy plaintext keys absent after any successful native session write.
     await AsyncStorage.multiRemove([
       LEGACY_TOKEN_KEYS.ACCESS_TOKEN,
       LEGACY_TOKEN_KEYS.REFRESH_TOKEN,
@@ -94,9 +117,15 @@ export const SessionStorage = {
   },
 
   async clear(): Promise<void> {
+    const nativeClear = isWeb
+      ? Promise.resolve()
+      : Promise.all([
+          SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN),
+          SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN),
+        ]).then(() => undefined);
+
     await Promise.all([
-      SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN),
-      SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN),
+      nativeClear,
       AsyncStorage.removeItem(STORAGE_KEYS.USER),
       AsyncStorage.removeItem(LEGACY_TOKEN_KEYS.ACCESS_TOKEN),
       AsyncStorage.removeItem(LEGACY_TOKEN_KEYS.REFRESH_TOKEN),
