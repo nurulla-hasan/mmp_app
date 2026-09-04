@@ -39,8 +39,6 @@ import {
   AREA_LABEL_PADDING_FACTOR,
   AREA_LABEL_RADIUS_FACTOR,
   MANUAL_DIVIDE_CORNER_SNAP_PX,
-  MIN_DIAGONAL_DRAW_PX,
-  MIN_EDGE_LABEL_FT,
   STAGE_MAX_ZOOM,
   STAGE_MIN_ZOOM,
   UI_CONFIG,
@@ -432,41 +430,6 @@ const SkiaAreaBadge = memo(function SkiaAreaBadge({
   );
 });
 
-const SkiaDiagonalBadge = memo(function SkiaDiagonalBadge({
-  x,
-  y,
-  text,
-  stageScale,
-  color,
-}: LabelProps) {
-  const safeScale = Math.max(stageScale, 0.01);
-  const fontSize = UI_CONFIG.fontSize.small / safeScale;
-  const padding = UI_CONFIG.padding.small / safeScale;
-  const width = Math.max(24 / safeScale, text.length * fontSize * 0.6 + padding * 2);
-  const height = fontSize + padding * 2;
-  const paragraph = useMemo(
-    () => makeParagraph(text, color, fontSize, width),
-    [color, fontSize, text, width],
-  );
-
-  return (
-    <Group transform={[{ translateX: x }, { translateY: y }]} opacity={0.8}>
-      <RoundedRect x={-width / 2} y={-height / 2} width={width} height={height} r={padding} color='#ffffff' />
-      <RoundedRect
-        x={-width / 2}
-        y={-height / 2}
-        width={width}
-        height={height}
-        r={padding}
-        color={color}
-        style='stroke'
-        strokeWidth={UI_CONFIG.strokeWidth.thin / safeScale}
-      />
-      <Paragraph paragraph={paragraph} x={-width / 2} y={-height * 0.48} width={width} />
-    </Group>
-  );
-});
-
 function SkiaSimpleImage({ uri, width, height }: { uri: string; width: number; height: number }) {
   const image = useImage(uri);
   if (!image) return null;
@@ -556,7 +519,6 @@ export function SkiaMapCanvas() {
   const calibrationLine = useMapStore((state) => state.calibrationLine);
   const stageScale = useMapStore((state) => state.stageScale);
   const stagePos = useMapStore((state) => state.stagePos);
-  const isShowDiagonals = useMapStore((state) => state.isShowDiagonals);
   const isMagnifierEnabled = useMapStore((state) => state.isMagnifierEnabled);
   const manualDividePlotId = useMapStore((state) => state.manualDividePlotId);
   const manualCutLine = useMapStore((state) => state.manualCutLine);
@@ -826,7 +788,7 @@ export function SkiaMapCanvas() {
    * Red anchors and the dashed line are UI-thread driven. Split fill/area
    * preview is JS geometry, so coalesce the 120Hz touch stream to one update
    * per available JS animation frame. The preview calculation itself is now
-   * area-only, matching the final formula while skipping lengths/diagonals.
+   * area-only, matching the final area formula while skipping edge-length work.
    */
   const scheduleManualAnchorMove = useCallback((index: number, x: number, y: number) => {
     pendingManualDragRef.current = { index, x, y };
@@ -841,7 +803,7 @@ export function SkiaMapCanvas() {
       const currentLine = state.manualCutLine;
       if (!currentLine || pending.index < 0 || pending.index >= currentLine.length) return;
       const nextLine = [...currentLine];
-      nextLine[pending.index] = { x: pending.x, y: pending.y };
+      nextLine[pending.index] = { x, y };
       state.setManualCutLine(nextLine);
     });
   }, []);
@@ -1350,27 +1312,6 @@ export function SkiaMapCanvas() {
                           fontPx={edge.fontPx}
                         />
                       ))}
-                      {isShowDiagonals && (plot.results.diagonals ?? []).map((diagonal, index) => {
-                        const start = plot.points[diagonal.p1Index];
-                        const end = plot.points[diagonal.p2Index];
-                        if (!start || !end || distance(start, end) <= MIN_DIAGONAL_DRAW_PX / Math.max(stageScale, 0.01)) return null;
-                        const mid = midpoint(start, end);
-                        const text = diagonal.lengthFt >= MIN_EDGE_LABEL_FT ? formatFeetInches(diagonal.lengthFt) : '';
-                        return (
-                          <Group key={`${plot.id}-diag-${index}`}>
-                            <Path
-                              path={linePath(start, end)}
-                              color={color}
-                              style='stroke'
-                              strokeWidth={UI_CONFIG.strokeWidth.thin / Math.max(stageScale, 0.01)}
-                              opacity={0.4}
-                            >
-                              <DashPathEffect intervals={[6 / Math.max(stageScale, 0.01), 6 / Math.max(stageScale, 0.01)]} />
-                            </Path>
-                            {text ? <SkiaDiagonalBadge x={mid.x} y={mid.y} text={text} stageScale={stageScale} color={color} /> : null}
-                          </Group>
-                        );
-                      })}
                       {mode !== 'manual_divide_plot' && (
                         <SkiaAreaBadge
                           x={label.center.x}
