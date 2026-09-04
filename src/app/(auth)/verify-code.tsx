@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -12,7 +13,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ShieldCheck, ArrowLeft, Mail, RefreshCw } from 'lucide-react-native';
-import { Button } from '../../components/ui/button';
 import { AuthService } from '../../services/auth-service';
 import { useAuthStore } from '../../stores/auth-store';
 import { SuccessToast, ErrorToast, toBengaliDigits } from '../../lib/utils';
@@ -129,7 +129,6 @@ export default function VerifyCodeScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps='handled'
         >
-          {/* Top Bar Back Button */}
           <TouchableOpacity
             style={[
               styles.backBtn,
@@ -143,7 +142,6 @@ export default function VerifyCodeScreen() {
             <ArrowLeft size={18} color={isDark ? '#f8fafc' : '#0f172a'} />
           </TouchableOpacity>
 
-          {/* Hero Icon Header */}
           <View style={styles.header}>
             <View style={styles.iconCircle}>
               <ShieldCheck size={24} color='#16a34a' />
@@ -162,7 +160,6 @@ export default function VerifyCodeScreen() {
             </Text>
           </View>
 
-          {/* Card with 6-digit modern boxes */}
           <View
             style={[
               styles.card,
@@ -172,7 +169,6 @@ export default function VerifyCodeScreen() {
               },
             ]}
           >
-            {/* 6 Square PIN Digits Container */}
             <TouchableOpacity
               activeOpacity={1}
               style={styles.pinBoxesRow}
@@ -193,8 +189,12 @@ export default function VerifyCodeScreen() {
                         borderColor: isCurrent
                           ? '#16a34a'
                           : isFilled
-                          ? (isDark ? '#334155' : '#cbd5e1')
-                          : (isDark ? '#1f2937' : '#e2e8f0'),
+                            ? isDark
+                              ? '#334155'
+                              : '#cbd5e1'
+                            : isDark
+                              ? '#1f2937'
+                              : '#e2e8f0',
                       },
                       isCurrent && styles.pinBoxActive,
                     ]}
@@ -206,7 +206,6 @@ export default function VerifyCodeScreen() {
                 );
               })}
 
-              {/* Hidden Real Native Input */}
               <TextInput
                 ref={textInputRef}
                 value={otp}
@@ -221,19 +220,19 @@ export default function VerifyCodeScreen() {
               />
             </TouchableOpacity>
 
-            {/* Verify CTA Button */}
             <TouchableOpacity
               activeOpacity={0.88}
               style={[styles.verifyBtn, (loading || otp.length !== 6) && { opacity: 0.6 }]}
               onPress={handleVerify}
               disabled={loading || otp.length !== 6}
+              accessibilityState={{ busy: loading, disabled: loading || otp.length !== 6 }}
             >
+              {loading ? <ActivityIndicator size='small' color='#ffffff' /> : null}
               <Text style={styles.verifyBtnText}>
                 {loading ? 'যাচাই করা হচ্ছে...' : 'কোড যাচাই করুন'}
               </Text>
             </TouchableOpacity>
 
-            {/* Resend Row */}
             <View style={styles.resendRow}>
               {countdown > 0 ? (
                 <View style={styles.timerBadge}>
@@ -249,8 +248,13 @@ export default function VerifyCodeScreen() {
                   style={styles.resendBtn}
                   onPress={handleResend}
                   disabled={resending}
+                  accessibilityState={{ busy: resending, disabled: resending }}
                 >
-                  <RefreshCw size={14} color='#16a34a' />
+                  {resending ? (
+                    <ActivityIndicator size='small' color='#16a34a' />
+                  ) : (
+                    <RefreshCw size={14} color='#16a34a' />
+                  )}
                   <Text style={styles.resendLink}>
                     {resending ? 'পাঠানো হচ্ছে...' : 'কোড পাননি? আবার পাঠান'}
                   </Text>
@@ -362,8 +366,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a',
     height: 36,
     borderRadius: 6,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   verifyBtnText: {
     color: '#ffffff',
@@ -385,7 +391,7 @@ const styles = StyleSheet.create({
   resendBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   resendLink: {
     color: '#16a34a',
