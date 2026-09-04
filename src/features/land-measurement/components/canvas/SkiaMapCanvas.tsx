@@ -306,6 +306,69 @@ const SkiaOutlinedText = memo(function SkiaOutlinedText({
   );
 });
 
+type CanvasEdgeLabelProps = {
+  midX: number;
+  midY: number;
+  inwardX: number;
+  inwardY: number;
+  screenInsetPx: number;
+  text: string;
+  color: string;
+  rotation: number;
+  fontPx: number;
+  opacity?: number;
+};
+
+/**
+ * Anchor edge text at the real side midpoint, then apply both the inward offset
+ * and inverse text scale from the UI-thread runtime zoom. The parent plot group
+ * still follows the map, while the label keeps a constant screen-pixel gap and
+ * constant visual size throughout a pinch instead of waiting for Zustand to
+ * receive the committed stageScale at gesture end.
+ */
+const SkiaCanvasEdgeLabel = memo(function SkiaCanvasEdgeLabel({
+  midX,
+  midY,
+  inwardX,
+  inwardY,
+  screenInsetPx,
+  text,
+  color,
+  rotation,
+  fontPx,
+  opacity = 1,
+}: CanvasEdgeLabelProps) {
+  const liveOffset = useDerivedValue(() => {
+    const safeScale = Math.max(canvasRuntimeScale.value, 0.01);
+    return [
+      { translateX: inwardX * screenInsetPx / safeScale },
+      { translateY: inwardY * screenInsetPx / safeScale },
+    ];
+  });
+  const inverseRuntimeScale = useDerivedValue(() => [
+    { scale: 1 / Math.max(canvasRuntimeScale.value, 0.01) },
+  ]);
+
+  return (
+    <Group transform={[{ translateX: midX }, { translateY: midY }]}>
+      <Group transform={liveOffset as any}>
+        <Group transform={inverseRuntimeScale as any}>
+          <SkiaOutlinedText
+            x={0}
+            y={0}
+            text={text}
+            stageScale={1}
+            color={color}
+            rotation={rotation}
+            fontPx={fontPx}
+            opacity={opacity}
+          />
+        </Group>
+      </Group>
+    </Group>
+  );
+});
+
 /**
  * Keep the area badge in the plot's canvas position while cancelling the live
  * parent zoom for its visual size. The paragraph is therefore measured once at
@@ -1274,12 +1337,14 @@ export function SkiaMapCanvas() {
                     <Group key={plot.id}>
                       <PlotShape plot={plot} stageScale={stageScale} fillOpacity={selectedForDivide ? 0.18 : 0.1} />
                       {edgeLabels.map((edge) => (
-                        <SkiaOutlinedText
+                        <SkiaCanvasEdgeLabel
                           key={edge.id}
-                          x={edge.x}
-                          y={edge.y}
+                          midX={edge.midX}
+                          midY={edge.midY}
+                          inwardX={edge.inwardX}
+                          inwardY={edge.inwardY}
+                          screenInsetPx={edge.screenInsetPx}
                           text={edge.text}
-                          stageScale={edge.layoutScale}
                           color={edge.color}
                           rotation={edge.rotation}
                           fontPx={edge.fontPx}
@@ -1366,12 +1431,14 @@ export function SkiaMapCanvas() {
                       </Group>
                     ) : null)}
                     {getActiveSegmentLabels(plotPoints, scale, stageScale).map((edge) => (
-                      <SkiaOutlinedText
+                      <SkiaCanvasEdgeLabel
                         key={edge.id}
-                        x={edge.x}
-                        y={edge.y}
+                        midX={edge.midX}
+                        midY={edge.midY}
+                        inwardX={edge.inwardX}
+                        inwardY={edge.inwardY}
+                        screenInsetPx={edge.screenInsetPx}
                         text={edge.text}
-                        stageScale={edge.layoutScale}
                         color={edge.color}
                         rotation={edge.rotation}
                         fontPx={edge.fontPx}

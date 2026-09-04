@@ -5,10 +5,10 @@ import { GROUP_ANGLE_THRESHOLD_DEG, getVisualCenter, groupPolygonSegments, isPoi
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-// SkiaOutlinedText renders a 1.1px white outline around a text box whose
+// Skia edge labels use a 1.1px white outline around a text box whose
 // screen-height is max(fontPx * 1.08, 7). Offset the LABEL CENTER by half of
-// that visual height + outline + one fixed gap. This keeps the visible gap from
-// the polygon side constant even when short edges use a smaller font.
+// that visual height + outline + one fixed gap. The canvas renderer keeps this
+// inset in screen pixels during live zoom.
 const EDGE_LABEL_OUTLINE_PX = 1.1;
 const EDGE_LABEL_CLEARANCE_PX = 4;
 const getEdgeLabelCenterInsetPx = (fontPx: number) => {
@@ -53,8 +53,17 @@ function getInwardNormal(midpoint: Point, dx: number, dy: number, points: Point[
 
 export type NativeEdgeLabel = {
   id: string;
+  /** Committed canvas-space label center, kept for non-live consumers. */
   x: number;
   y: number;
+  /** Canvas-space edge midpoint used as the live zoom anchor. */
+  midX: number;
+  midY: number;
+  /** Unit vector pointing from the edge toward the polygon interior. */
+  inwardX: number;
+  inwardY: number;
+  /** Edge-to-label-center distance that must remain fixed in screen pixels. */
+  screenInsetPx: number;
   text: string;
   rotation: number;
   fontPx: number;
@@ -89,9 +98,6 @@ export function getActivePlotDots(points: Point[], isPlotFinished = false): Nati
 /** Exact native equivalent of web PlotEdgeLabels geometry and visibility rules. */
 export function getPlotEdgeLabels(plot: PlotRecord, scale: number | null, stageScale: number): NativeEdgeLabel[] {
   if (!scale) return [];
-  // Use the real committed scale for geometry. The old logarithmic bucket made
-  // the label offset and its inverse text scale come from a slightly different
-  // zoom value than the polygon itself, which showed up as uneven clearance.
   const layoutScale = Math.max(stageScale, 0.01);
   const labels: NativeEdgeLabel[] = [];
 
@@ -124,13 +130,17 @@ export function getPlotEdgeLabels(plot: PlotRecord, scale: number | null, stageS
       normalTestDistance,
     );
 
-    // Center distance changes with font height, but the VISIBLE gap between the
-    // white text outline and the boundary stays at EDGE_LABEL_CLEARANCE_PX.
-    const inset = getEdgeLabelCenterInsetPx(fontPx) / layoutScale;
+    const screenInsetPx = getEdgeLabelCenterInsetPx(fontPx);
+    const inset = screenInsetPx / layoutScale;
     labels.push({
       id: `${plot.id}-${groupIndex}`,
       x: midX + inward.x * inset,
       y: midY + inward.y * inset,
+      midX,
+      midY,
+      inwardX: inward.x,
+      inwardY: inward.y,
+      screenInsetPx,
       text,
       rotation: getReadableRotation(Math.atan2(midDy, midDx) * 180 / Math.PI),
       fontPx,
@@ -180,11 +190,17 @@ export function getActiveSegmentLabels(points: Point[], scale: number | null, st
     const towardCenter = { x: center.x - midX, y: center.y - midY };
     const facesCenter = normalA.x * towardCenter.x + normalA.y * towardCenter.y >= 0;
     const inward = facesCenter ? normalA : { x: -normalA.x, y: -normalA.y };
-    const inset = getEdgeLabelCenterInsetPx(fontPx) / safeStageScale;
+    const screenInsetPx = getEdgeLabelCenterInsetPx(fontPx);
+    const inset = screenInsetPx / safeStageScale;
     return [{
       id: `active-${groupIndex}`,
       x: midX + inward.x * inset,
       y: midY + inward.y * inset,
+      midX,
+      midY,
+      inwardX: inward.x,
+      inwardY: inward.y,
+      screenInsetPx,
       text,
       rotation: getReadableRotation(Math.atan2(midDy, midDx) * 180 / Math.PI),
       fontPx,
