@@ -2,8 +2,6 @@ import { useMapStore } from '../../store/useMapStore';
 import {
   AREA_LABEL_FONT_SCALE,
   AREA_LABEL_PADDING_FACTOR,
-  MIN_EDGE_LABEL_FT,
-  formatFeetInches,
 } from '../../utils/canvas';
 import { computePrintLabels } from './PrintLabelEngine';
 
@@ -24,7 +22,7 @@ const toBengaliNumber = (value: unknown) => {
 };
 
 export const buildWebPrintHtml = (state: ReturnType<typeof useMapStore.getState>) => {
-  const { plots, results, isShowDiagonals, reportInfo } = state;
+  const { plots, results, reportInfo } = state;
   if (plots.length === 0) return '';
 
   const sumShotok = plots.reduce((sum, plot) => sum + (plot.results?.shotok || 0), 0) || (results?.shotok || 0);
@@ -77,26 +75,6 @@ export const buildWebPrintHtml = (state: ReturnType<typeof useMapStore.getState>
     const color = plot.color || '#0F766E';
     return `<polygon points="${pointsStr}" fill="${color}" fill-opacity="0.1" stroke="${color}" stroke-width="${strokeW}" stroke-linejoin="round" />`;
   }).join('');
-
-  const diagonalsSvg = isShowDiagonals
-    ? plots.flatMap((plot) => (plot.results.diagonals ?? []).map((diagonal, index) => {
-        const p1 = plot.points[diagonal.p1Index];
-        const p2 = plot.points[diagonal.p2Index];
-        if (!p1 || !p2) return '';
-        const distPx = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-        if (distPx < baseScale * 0.05) return '';
-        const color = plot.color || '#0F766E';
-        const midX = (p1.x + p2.x) / 2;
-        const midY = (p1.y + p2.y) / 2;
-        const labelText = diagonal.lengthFt >= MIN_EDGE_LABEL_FT
-          ? toBengaliNumber(formatFeetInches(diagonal.lengthFt))
-          : '';
-        const label = labelText
-          ? `<text x="${midX}" y="${midY}" font-size="${reportLabelFontSize * 0.85}" font-weight="700" fill="#0F766E" text-anchor="middle" dominant-baseline="central">${escapeHtml(labelText)}</text>`
-          : '';
-        return `<g data-diagonal="${plot.id}-${index}"><line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${color}" stroke-width="${strokeW * 0.4}" stroke-dasharray="${baseScale * 0.005}, ${baseScale * 0.005}" opacity="0.5" />${label}</g>`;
-      })).join('')
-    : '';
 
   const edgeLabelsSvg = allLabels.map((label) => (
     `<g transform="translate(${label.lx}, ${label.ly}) rotate(${label.rotation})"><text x="0" y="0" font-size="${label.fontSize}" font-weight="700" fill="#0F766E" stroke="rgba(255,255,255,0.96)" stroke-width="${baseScale * 0.0022}" stroke-linejoin="round" paint-order="stroke" text-anchor="middle" dominant-baseline="central">${escapeHtml(toBengaliNumber(label.labelText))}</text></g>`
@@ -237,7 +215,6 @@ export const buildWebPrintHtml = (state: ReturnType<typeof useMapStore.getState>
           <div class="scale-badge">📐 ডিজিটাল স্কেল নকশা</div>
           <svg class="map-svg" preserveAspectRatio="xMidYMid meet" viewBox="${viewBoxMinX} ${viewBoxMinY} ${viewBoxWidth} ${viewBoxHeight}">
             ${polygonsSvg}
-            ${diagonalsSvg}
             ${edgeLabelsSvg}
             ${areaLabelsSvg}
           </svg>
