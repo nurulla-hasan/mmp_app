@@ -1,4 +1,5 @@
-import type { ApiResult, AuthTokens } from '../types/auth';
+import type { ApiResult } from '../types/api';
+import type { AuthTokens } from '../types/auth';
 import { API_ENDPOINTS } from './api-endpoints';
 import { emitSessionExpired, emitTokensRefreshed } from './auth-events';
 import { SessionStorage } from './session-storage';
@@ -26,10 +27,12 @@ const configuredTimeout = Number(process.env.EXPO_PUBLIC_API_TIMEOUT_MS);
 const REQUEST_TIMEOUT_MS =
   Number.isFinite(configuredTimeout) && configuredTimeout > 0 ? configuredTimeout : 20_000;
 
+type AuthMode = 'auth' | 'none';
+
 type FetchOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
-  auth?: boolean;
+  auth: AuthMode;
   headers?: Record<string, string>;
 };
 
@@ -167,7 +170,7 @@ async function refreshSessionTokens(): Promise<AuthTokens | null> {
       {
         method: 'POST',
         body: { refreshToken },
-        auth: false,
+        auth: 'none',
       },
       null
     );
@@ -199,19 +202,24 @@ async function refreshSessionTokens(): Promise<AuthTokens | null> {
 }
 
 // Pure mobile HTTP client. TanStack Query owns server-state caching.
+// Every caller states its auth contract explicitly, mirroring the web service layer.
 // Authenticated requests automatically rotate tokens and retry once after 401.
 export async function apiFetch<T>(
   endpoint: string,
-  options: FetchOptions = {}
+  options: FetchOptions
 ): Promise<ApiResult<T>> {
-  const { auth = true } = options;
-  const { accessToken } = auth
+  const requiresAuth = options.auth === 'auth';
+  const { accessToken } = requiresAuth
     ? await SessionStorage.getTokens()
     : { accessToken: null };
 
   const firstResult = await requestOnce<T>(endpoint, options, accessToken);
 
-  if (!auth || firstResult.statusCode !== 401 || endpoint === API_ENDPOINTS.auth.refreshToken) {
+  if (
+    !requiresAuth ||
+    firstResult.statusCode !== 401 ||
+    endpoint === API_ENDPOINTS.auth.refreshToken
+  ) {
     return firstResult;
   }
 
