@@ -1,7 +1,7 @@
 import { apiFetch } from './api-client';
 import { API_ENDPOINTS } from './api-endpoints';
 import { buildQueryString } from '../lib/build-query-string';
-import type { ApiResult } from '../types/auth';
+import type { ApiResult } from '../types/api';
 import type {
   SurveyorApplicationPayload,
   SurveyorQuery,
@@ -12,34 +12,36 @@ import type {
 export const SurveyorService = {
   getSurveyors: (query: SurveyorQuery = {}): Promise<ApiResult<TSurveyorProfile[]>> =>
     apiFetch<TSurveyorProfile[]>(
-      `${API_ENDPOINTS.surveyors.root}${buildQueryString(query as Record<string, string | number | undefined>)}`,
-      { method: 'GET', auth: false }
+      `${API_ENDPOINTS.surveyors.root}${buildQueryString(
+        query as Record<string, string | number | undefined>
+      )}`,
+      { method: 'GET', auth: 'none' }
     ),
 
   getSurveyorBySlug: (slug: string): Promise<ApiResult<TSurveyorProfile>> =>
     apiFetch<TSurveyorProfile>(API_ENDPOINTS.surveyors.bySlug(slug), {
       method: 'GET',
-      auth: false,
+      auth: 'none',
     }),
 
   applyAsSurveyor: (payload: SurveyorApplicationPayload): Promise<ApiResult<TSurveyorProfile>> =>
     apiFetch<TSurveyorProfile>(API_ENDPOINTS.surveyors.profile, {
       method: 'POST',
       body: payload,
-      auth: true,
+      auth: 'auth',
     }),
 
   getMyProfile: (): Promise<ApiResult<TSurveyorProfile>> =>
     apiFetch<TSurveyorProfile>(API_ENDPOINTS.surveyors.profile, {
       method: 'GET',
-      auth: true,
+      auth: 'auth',
     }),
 
   updateMyProfile: (payload: UpdateSurveyorProfilePayload): Promise<ApiResult<TSurveyorProfile>> =>
     apiFetch<TSurveyorProfile>(API_ENDPOINTS.surveyors.profile, {
       method: 'PATCH',
       body: payload,
-      auth: true,
+      auth: 'auth',
     }),
 
   uploadCertificate: (
@@ -50,7 +52,7 @@ export const SurveyorService = {
       {
         method: 'POST',
         body: formData,
-        auth: true,
+        auth: 'auth',
       }
     ),
 
@@ -58,6 +60,6 @@ export const SurveyorService = {
     apiFetch<null>(API_ENDPOINTS.surveyors.deleteCertificate, {
       method: 'DELETE',
       body: { publicId },
-      auth: true,
+      auth: 'auth',
     }),
 };
