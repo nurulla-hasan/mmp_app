@@ -1,13 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import {
   CalendarDays,
   ShieldCheck,
   Sparkles,
-  Camera,
   Edit3,
   MapPin,
 } from 'lucide-react-native';
+import { PAGE_LAYOUT } from '../common/page-layout';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
 import { useThemeStore } from '../../stores/theme-store';
@@ -50,27 +50,30 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({
       style={[
         styles.card,
         {
-          backgroundColor: isDark ? '#111827' : '#ffffff',
-          borderColor: isDark ? '#1f2937' : '#e2e8f0',
+          backgroundColor: colors.card,
+          borderColor: colors.cardBorder,
         },
       ]}
     >
       <View style={styles.centerCol}>
-        {/* Profile Avatar Upload with Native Cropper */}
-        <View style={{ marginBottom: 10 }}>
+        <View style={styles.avatarWrap}>
           <ProfileAvatarUpload
             src={user.imageUrl}
             name={user.name}
             isPro={user.isSubscribed}
-            size='xl'
+            size='lg'
           />
         </View>
 
-        {/* User Name & Email */}
         <Text style={[styles.userName, { color: colors.text }]}>{user.name}</Text>
-        <Text style={[styles.userEmail, { color: colors.textMuted }]}>{user.email}</Text>
+        <Text
+          style={[styles.userEmail, { color: colors.textMuted }]}
+          numberOfLines={1}
+          ellipsizeMode='middle'
+        >
+          {user.email}
+        </Text>
 
-        {/* Badges Row (Role + Subscription) */}
         <View style={styles.badgesRow}>
           <View
             style={[
@@ -105,11 +108,10 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({
           )}
         </View>
 
-        {/* Location & Joined Date Info */}
         <View style={styles.metaCol}>
           {hasLocation ? (
             <View style={styles.metaRow}>
-              <MapPin size={12} color='#16a34a' />
+              <MapPin size={12} color={colors.primary} />
               <Text style={[styles.metaText, { color: colors.textMuted }]}>
                 {locationText}
               </Text>
@@ -118,7 +120,7 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({
 
           {user.createdAt ? (
             <View style={styles.metaRow}>
-              <CalendarDays size={12} color='#16a34a' />
+              <CalendarDays size={12} color={colors.primary} />
               <Text style={[styles.metaText, { color: colors.textMuted }]}>
                 যোগদান: {formatJoinedDate(user.createdAt)}
               </Text>
@@ -127,14 +129,13 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({
         </View>
       </View>
 
-      {/* Edit Profile Action Button */}
       <TouchableOpacity
         activeOpacity={0.8}
         style={[
           styles.editBtn,
           {
             backgroundColor: isDark ? '#131b2e' : '#f8fafc',
-            borderColor: isDark ? '#1f2937' : '#e2e8f0',
+            borderColor: colors.cardBorder,
           },
         ]}
         onPress={onEditPress}
@@ -148,76 +149,35 @@ export const ProfileHeaderCard: React.FC<ProfileHeaderCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
+    borderRadius: PAGE_LAYOUT.radius,
     borderWidth: 1,
-    padding: 16,
-    gap: 12,
+    padding: PAGE_LAYOUT.sectionPadding,
+    gap: 10,
   },
   centerCol: {
     alignItems: 'center',
   },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 8,
-  },
-  avatarBorder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
-    padding: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  proAvatarBorder: {
-    borderColor: '#f59e0b',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 34,
-  },
-  avatarFallback: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    color: '#ffffff',
-    fontSize: 26,
-    fontFamily: Fonts.headingBold,
-  },
-  cameraBtn: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#16a34a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#111827',
+  avatarWrap: {
+    marginBottom: 7,
   },
   userName: {
     fontSize: 16.5,
+    lineHeight: 21,
     fontFamily: Fonts.headingBold,
-    marginBottom: 1,
+    marginBottom: 0,
   },
   userEmail: {
-    fontSize: 11.5,
+    maxWidth: '88%',
+    fontSize: 10.5,
+    lineHeight: 15,
     fontFamily: Fonts.sansRegular,
-    marginBottom: 8,
+    marginBottom: 7,
   },
   badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8,
+    marginBottom: 7,
   },
   badgeOutline: {
     flexDirection: 'row',
@@ -249,9 +209,9 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.sansMedium,
   },
   metaCol: {
-    gap: 4,
+    gap: 3,
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 1,
   },
   metaRow: {
     flexDirection: 'row',
@@ -260,6 +220,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 11,
+    lineHeight: 15,
     fontFamily: Fonts.sansRegular,
   },
   editBtn: {
@@ -267,13 +228,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    height: 36,
-    borderRadius: 7,
+    height: 34,
+    borderRadius: 8,
     borderWidth: 1,
   },
   editBtnText: {
-    fontSize: 12.5,
+    fontSize: 12,
     fontFamily: Fonts.sansMedium,
   },
 });
-
