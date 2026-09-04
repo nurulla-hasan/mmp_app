@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -74,8 +75,6 @@ const getSafPdfDirectory = async () => {
           PDF_DIRECTORY_NAME,
         );
       } catch (error) {
-        // The folder can already exist if another export created it between the
-        // directory scan and create call. Re-scan before treating it as failure.
         existingDirectory = await findMmpDirectory(directoryUri);
         if (!existingDirectory) throw error;
       }
@@ -90,6 +89,7 @@ const getSafPdfDirectory = async () => {
 
 const savePdfWithMediaStore = async (sourceUri: string, fileName: string) => {
   if (Platform.OS !== 'android' || Number(Platform.Version) < 29) return false;
+  if (Constants.expoGoConfig) return false;
   try {
     const module = await import('react-native-blob-util');
     const ReactNativeBlobUtil = module.default;
@@ -104,8 +104,6 @@ const savePdfWithMediaStore = async (sourceUri: string, fileName: string) => {
     );
     return Boolean(savedUri);
   } catch {
-    // Expo Go does not include this native module. Fall back to SAF below so
-    // PDF export still works while developing in Expo Go.
     return false;
   }
 };
