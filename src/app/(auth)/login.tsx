@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -40,7 +41,7 @@ function GoogleIcon() {
       />
       <Path
         fill='#EA4335'
-        d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
+        d='M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 0 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
       />
     </Svg>
   );
@@ -404,7 +405,9 @@ export default function AuthScreen() {
               style={[styles.primaryActionBtn, isBusy && { opacity: 0.65 }]}
               onPress={activeTab === 'login' ? handleLogin : handleRegister}
               disabled={isBusy}
+              accessibilityState={{ busy: loading, disabled: isBusy }}
             >
+              {loading ? <ActivityIndicator size='small' color='#ffffff' /> : null}
               <Text style={styles.primaryActionBtnText}>
                 {loading
                   ? activeTab === 'login'
@@ -436,8 +439,13 @@ export default function AuthScreen() {
                 isBusy && { opacity: 0.65 },
               ]}
               onPress={handleGoogleLogin}
+              accessibilityState={{ busy: googleLoading, disabled: isBusy }}
             >
-              {!googleLoading ? <GoogleIcon /> : null}
+              {googleLoading ? (
+                <ActivityIndicator size='small' color='#16a34a' />
+              ) : (
+                <GoogleIcon />
+              )}
               <Text style={[styles.googleButtonText, { color: isDark ? '#f8fafc' : '#0f172a' }]}>
                 {googleLoading ? 'Google সাইন ইন হচ্ছে...' : 'Google দিয়ে চালিয়ে যান'}
               </Text>
@@ -595,8 +603,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a',
     height: 36,
     borderRadius: 6,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
   },
   primaryActionBtnText: {
     color: '#ffffff',
