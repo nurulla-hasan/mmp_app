@@ -1,12 +1,19 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Layers, MapPin, Ruler, User, type LucideIcon } from 'lucide-react-native';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
 
 export type AppBottomNavKey = 'index' | 'surveyors' | 'tools' | 'profile';
+
+export const APP_BOTTOM_NAV_LAYOUT = {
+  baseHeight: 58,
+  baseBottomPadding: 4,
+  centerOverhang: 22,
+} as const;
 
 type Props = {
   activeKey?: AppBottomNavKey;
@@ -15,6 +22,7 @@ type Props = {
 
 export function AppBottomNav({ activeKey, onNavigate }: Props) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
 
@@ -61,7 +69,16 @@ export function AppBottomNav({ activeKey, onNavigate }: Props) {
     <View
       style={[
         styles.tabBarContainer,
-        { backgroundColor: colors.tabBarBg, borderTopColor: colors.tabBarBorder },
+        {
+          backgroundColor: colors.tabBarBg,
+          borderTopColor: colors.tabBarBorder,
+          height:
+            APP_BOTTOM_NAV_LAYOUT.baseHeight +
+            APP_BOTTOM_NAV_LAYOUT.centerOverhang +
+            insets.bottom,
+          paddingTop: APP_BOTTOM_NAV_LAYOUT.centerOverhang,
+          paddingBottom: APP_BOTTOM_NAV_LAYOUT.baseBottomPadding + insets.bottom,
+        },
       ]}
     >
       {item('index', 'হোম', Home)}
@@ -94,10 +111,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    height: 58,
     borderTopWidth: 1,
     paddingHorizontal: 8,
-    paddingBottom: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.05,
@@ -120,7 +135,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -22,
+    marginTop: -APP_BOTTOM_NAV_LAYOUT.centerOverhang,
   },
   centerFloatingButton: {
     width: 48,
