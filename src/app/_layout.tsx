@@ -21,6 +21,7 @@ import {
 } from '@expo-google-fonts/noto-sans-bengali';
 import { BroadcastAnnouncementModal } from '../components/broadcasts/broadcast-announcement-modal';
 import { AppBottomNav, type AppBottomNavKey } from '../components/common/app-bottom-nav';
+import { StandalonePageHeader } from '../components/common/standalone-page-header';
 import { Colors } from '../constants/colors';
 import { useThemeStore } from '../stores/theme-store';
 import { useAuthStore } from '../stores/auth-store';
@@ -95,14 +96,26 @@ export default function RootLayout() {
               <Stack.Screen name='(tools)' options={{ headerShown: false }} />
               <Stack.Screen name='(auth)' options={{ headerShown: false }} />
 
-              <Stack.Screen name='calculations' options={{ headerShown: false }} />
+              <Stack.Screen
+                name='calculations'
+                options={{
+                  headerShown: true,
+                  header: () => <StandalonePageHeader title='সংরক্ষিত ক্যালকুলেশন' />,
+                }}
+              />
               <Stack.Screen
                 name='pricing'
-                options={{ headerShown: true, title: 'সাবস্ক্রিপশন' }}
+                options={{
+                  headerShown: true,
+                  header: () => <StandalonePageHeader title='সাবস্ক্রিপশন' />,
+                }}
               />
               <Stack.Screen
                 name='join-as-surveyor'
-                options={{ headerShown: true, title: 'সার্ভেয়ার আবেদন' }}
+                options={{
+                  headerShown: true,
+                  header: () => <StandalonePageHeader title='সার্ভেয়ার আবেদন' />,
+                }}
               />
               <Stack.Screen
                 name='surveyor-profile'
