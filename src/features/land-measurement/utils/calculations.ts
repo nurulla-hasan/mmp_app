@@ -1,5 +1,5 @@
 import type { Point, PolygonResults } from '../types/map';
-import { normalizePolygonPoints, getLogicalCorners, triangulatePolygon } from './geometry';
+import { normalizePolygonPoints } from './geometry';
 
 // ============================================================================
 // 1. LAND MEASUREMENT & CALCULATION CONSTANTS
@@ -90,8 +90,7 @@ export type PolygonAreaSummary = {
 /**
  * Lightweight area-only calculation for live previews.
  * It deliberately uses the exact same normalization, shoelace area and unit
- * conversion as calculatePolygonData, but skips edge lengths and diagonal
- * triangulation. Final saved/divided plots still use calculatePolygonData.
+ * conversion as calculatePolygonData, while skipping edge-length work.
  */
 export const calculatePolygonAreaSummary = (
   points: Point[],
@@ -156,34 +155,11 @@ export const calculatePolygonData = (points: Point[], scale: number | null): Pol
   // sqft = px^2 / (px^2 / ft^2)
   const sqft = pixelArea / (scale * scale);
 
-  // Calculate diagonals using Ear Clipping triangulation to ensure they stay inside concave polygons
-  const diagonals: { p1Index: number; p2Index: number; lengthFt: number; }[] = [];
-  const logicalCorners = getLogicalCorners(normalizedPoints);
-
-  if (logicalCorners.length >= 4 && logicalCorners.length <= 8) {
-    const triangulatedDiagonals = triangulatePolygon(logicalCorners);
-    for (const diag of triangulatedDiagonals) {
-      const p1 = logicalCorners[diag.p1Index];
-      const p2 = logicalCorners[diag.p2Index];
-      const pixelDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      const distFt = pixelDist / scale;
-
-      const origP1Index = normalizedPoints.indexOf(p1);
-      const origP2Index = normalizedPoints.indexOf(p2);
-      diagonals.push({
-        p1Index: origP1Index !== -1 ? origP1Index : diag.p1Index,
-        p2Index: origP2Index !== -1 ? origP2Index : diag.p2Index,
-        lengthFt: distFt
-      });
-    }
-  }
-
   return {
-    sqft: sqft,
+    sqft,
     shotok: sqft / SHOTOK_SQ_FT,
     katha: sqft / KATHA_SQ_FT,
     lengths: individualLengths, // exact individual segment lengths in feet
     perimeter: individualLengths.reduce((total, length) => total + length, 0),
-    diagonals: diagonals
   };
 };
