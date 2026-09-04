@@ -13,6 +13,7 @@ export const APP_BOTTOM_NAV_LAYOUT = {
   baseHeight: 58,
   baseBottomPadding: 4,
   centerOverhang: 22,
+  centerSlotWidth: 80,
 } as const;
 
 type Props = {
@@ -68,57 +69,43 @@ export function AppBottomNav({ activeKey, onNavigate }: Props) {
   return (
     <View
       style={[
-        styles.tabBarShell,
+        styles.tabBarContainer,
         {
-          height:
-            APP_BOTTOM_NAV_LAYOUT.baseHeight +
-            APP_BOTTOM_NAV_LAYOUT.centerOverhang +
-            insets.bottom,
+          backgroundColor: colors.tabBarBg,
+          borderTopColor: colors.tabBarBorder,
+          height: APP_BOTTOM_NAV_LAYOUT.baseHeight + insets.bottom,
+          paddingBottom: APP_BOTTOM_NAV_LAYOUT.baseBottomPadding + insets.bottom,
         },
       ]}
     >
-      <View
-        style={[
-          styles.tabBarContainer,
-          {
-            backgroundColor: colors.tabBarBg,
-            borderTopColor: colors.tabBarBorder,
-            height: APP_BOTTOM_NAV_LAYOUT.baseHeight + insets.bottom,
-            paddingBottom: APP_BOTTOM_NAV_LAYOUT.baseBottomPadding + insets.bottom,
-          },
-        ]}
+      {item('index', 'হোম', Home)}
+      {item('surveyors', 'সার্ভেয়ার', MapPin)}
+      <View style={styles.centerSlot} pointerEvents='none' />
+      {item('tools', 'টুলস হাব', Layers)}
+      {item('profile', 'প্রোফাইল', User)}
+
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.centerButtonWrapper}
+        onPress={() => router.push('/land-measurement')}
       >
-        {item('index', 'হোম', Home)}
-        {item('surveyors', 'সার্ভেয়ার', MapPin)}
-
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.centerButtonWrapper}
-          onPress={() => router.push('/land-measurement')}
+        <View
+          style={[
+            styles.centerFloatingButton,
+            { backgroundColor: colors.primary, borderColor: colors.tabBarBg },
+          ]}
         >
-          <View
-            style={[
-              styles.centerFloatingButton,
-              { backgroundColor: colors.primary, borderColor: colors.tabBarBg },
-            ]}
-          >
-            <Ruler size={22} color='#ffffff' strokeWidth={2.4} />
-          </View>
-          <Text style={[styles.centerLabel, { color: colors.text }]}>ল্যান্ড টুলস</Text>
-        </TouchableOpacity>
-
-        {item('tools', 'টুলস হাব', Layers)}
-        {item('profile', 'প্রোফাইল', User)}
-      </View>
+          <Ruler size={22} color='#ffffff' strokeWidth={2.4} />
+        </View>
+        <Text style={[styles.centerLabel, { color: colors.text }]}>ল্যান্ড টুলস</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tabBarShell: {
-    justifyContent: 'flex-end',
-  },
   tabBarContainer: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
@@ -142,11 +129,18 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.headingSemiBold,
     marginTop: -1,
   },
-  centerButtonWrapper: {
+  centerSlot: {
     flex: 1,
+  },
+  centerButtonWrapper: {
+    position: 'absolute',
+    top: -APP_BOTTOM_NAV_LAYOUT.centerOverhang,
+    left: '50%',
+    width: APP_BOTTOM_NAV_LAYOUT.centerSlotWidth,
+    marginLeft: -(APP_BOTTOM_NAV_LAYOUT.centerSlotWidth / 2),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -APP_BOTTOM_NAV_LAYOUT.centerOverhang,
+    zIndex: 3,
   },
   centerFloatingButton: {
     width: 48,
