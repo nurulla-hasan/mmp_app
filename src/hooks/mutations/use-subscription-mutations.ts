@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { unwrapApiResult } from '../../lib/api-result';
 import { queryKeys } from '../../lib/query-keys';
 import { SubscriptionService } from '../../services/subscription-service';
 import { useAuthStore } from '../../stores/auth-store';
@@ -10,14 +11,9 @@ export function useSubmitManualCheckout() {
   const refreshUser = useAuthStore((state) => state.refreshUser);
 
   return useMutation({
-    mutationFn: (payload: ManualCheckoutPayload) =>
-      SubscriptionService.submitManualCheckout(payload),
-    onSuccess: async (res) => {
-      if (!res.success) {
-        ErrorToast(res.message || 'পেমেন্ট রিকোয়েস্ট জমা দেওয়া যায়নি।');
-        return;
-      }
-
+    mutationFn: async (payload: ManualCheckoutPayload) =>
+      unwrapApiResult(await SubscriptionService.submitManualCheckout(payload)),
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.subscriptions.all });
       await refreshUser();
       void queryClient.invalidateQueries({ queryKey: queryKeys.profile.me() });
