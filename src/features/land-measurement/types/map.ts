@@ -16,7 +16,6 @@ export type PolygonResults = {
   katha: number;
   lengths: number[];
   perimeter: number;
-  diagonals?: { p1Index: number; p2Index: number; lengthFt: number; }[];
 };
 
 export type PlotRecord = {
