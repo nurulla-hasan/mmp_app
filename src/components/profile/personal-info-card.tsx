@@ -95,7 +95,6 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({
         },
       ]}
     >
-      {/* Header */}
       <View style={styles.headerRow}>
         <Text style={[styles.cardTitle, { color: colors.text }]}>ব্যক্তিগত ও যোগাযোগ তথ্য</Text>
         <TouchableOpacity activeOpacity={0.7} style={styles.editActionBtn} onPress={onEditPress}>
@@ -104,12 +103,13 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* 2-Column Info Grid */}
       <View style={styles.gridContainer}>
         {infoRows.map((pair, rowIdx) => (
           <View key={rowIdx} style={styles.gridRow}>
             {pair.map((item, colIdx) => {
               const Icon = item.icon;
+              const isEmail = item.icon === Mail;
+
               return (
                 <View
                   key={colIdx}
@@ -128,7 +128,16 @@ export const PersonalInfoCard: React.FC<PersonalInfoCardProps> = ({
                     <Text style={[styles.infoLabel, { color: colors.textMuted }]} numberOfLines={1}>
                       {item.label}
                     </Text>
-                    <Text style={[styles.infoValue, { color: colors.text }]} numberOfLines={1}>
+                    <Text
+                      style={[
+                        styles.infoValue,
+                        { color: colors.text },
+                        isEmail && styles.emailValue,
+                      ]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit={isEmail}
+                      minimumFontScale={isEmail ? 0.68 : 1}
+                    >
                       {item.value}
                     </Text>
                   </View>
@@ -196,6 +205,7 @@ const styles = StyleSheet.create({
   },
   infoTextCol: {
     flex: 1,
+    minWidth: 0,
     justifyContent: 'center',
   },
   infoLabel: {
@@ -207,5 +217,8 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontFamily: Fonts.sansMedium,
   },
+  emailValue: {
+    fontSize: 11,
+    letterSpacing: -0.2,
+  },
 });
-
