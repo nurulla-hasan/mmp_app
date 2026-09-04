@@ -12,7 +12,7 @@ import { formatFeetInches } from '../../utils/canvas';
 import { Fonts } from '../../../../constants/typography';
 import { useThemeStore } from '../../../../stores/theme-store';
 import { getLandMeasurementToolColors } from '../../utils/tool-theme';
-import { buildWebPrintHtml } from '../print/buildWebPrintHtml';
+import { buildWebPrintHtmlWithBrandLogo } from '../print/buildWebPrintHtmlWithBrandLogo';
 
 const PDF_DIRECTORY_KEY = 'mmp_pdf_download_root_v3';
 const LEGACY_PDF_DIRECTORY_KEY = 'mmp_pdf_download_directory';
@@ -124,7 +124,7 @@ export function MobileResultsBar() {
     setExporting(true);
     try {
       const state = useMapStore.getState();
-      const html = buildWebPrintHtml(state);
+      const html = await buildWebPrintHtmlWithBrandLogo(state);
       if (!html) throw new Error('No plots to print');
       const result = await Print.printToFileAsync({ html });
       const displayFileName = buildPdfFileName(state.mapImage?.name, state.plots.length);
