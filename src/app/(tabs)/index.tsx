@@ -554,7 +554,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 14, gap: 12, paddingBottom: 28 },
+  content: { padding: 14, gap: 12, paddingBottom: 64 },
   flexText: { flex: 1, gap: 2 },
   heroCard: {
     borderRadius: 14,
