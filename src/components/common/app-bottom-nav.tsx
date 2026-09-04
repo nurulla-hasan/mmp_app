@@ -68,45 +68,56 @@ export function AppBottomNav({ activeKey, onNavigate }: Props) {
   return (
     <View
       style={[
-        styles.tabBarContainer,
+        styles.tabBarShell,
         {
-          backgroundColor: colors.tabBarBg,
-          borderTopColor: colors.tabBarBorder,
           height:
             APP_BOTTOM_NAV_LAYOUT.baseHeight +
             APP_BOTTOM_NAV_LAYOUT.centerOverhang +
             insets.bottom,
-          paddingTop: APP_BOTTOM_NAV_LAYOUT.centerOverhang,
-          paddingBottom: APP_BOTTOM_NAV_LAYOUT.baseBottomPadding + insets.bottom,
         },
       ]}
     >
-      {item('index', 'হোম', Home)}
-      {item('surveyors', 'সার্ভেয়ার', MapPin)}
-
-      <TouchableOpacity
-        activeOpacity={0.85}
-        style={styles.centerButtonWrapper}
-        onPress={() => router.push('/land-measurement')}
+      <View
+        style={[
+          styles.tabBarContainer,
+          {
+            backgroundColor: colors.tabBarBg,
+            borderTopColor: colors.tabBarBorder,
+            height: APP_BOTTOM_NAV_LAYOUT.baseHeight + insets.bottom,
+            paddingBottom: APP_BOTTOM_NAV_LAYOUT.baseBottomPadding + insets.bottom,
+          },
+        ]}
       >
-        <View
-          style={[
-            styles.centerFloatingButton,
-            { backgroundColor: colors.primary, borderColor: colors.tabBarBg },
-          ]}
-        >
-          <Ruler size={22} color='#ffffff' strokeWidth={2.4} />
-        </View>
-        <Text style={[styles.centerLabel, { color: colors.text }]}>ল্যান্ড টুলস</Text>
-      </TouchableOpacity>
+        {item('index', 'হোম', Home)}
+        {item('surveyors', 'সার্ভেয়ার', MapPin)}
 
-      {item('tools', 'টুলস হাব', Layers)}
-      {item('profile', 'প্রোফাইল', User)}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.centerButtonWrapper}
+          onPress={() => router.push('/land-measurement')}
+        >
+          <View
+            style={[
+              styles.centerFloatingButton,
+              { backgroundColor: colors.primary, borderColor: colors.tabBarBg },
+            ]}
+          >
+            <Ruler size={22} color='#ffffff' strokeWidth={2.4} />
+          </View>
+          <Text style={[styles.centerLabel, { color: colors.text }]}>ল্যান্ড টুলস</Text>
+        </TouchableOpacity>
+
+        {item('tools', 'টুলস হাব', Layers)}
+        {item('profile', 'প্রোফাইল', User)}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  tabBarShell: {
+    justifyContent: 'flex-end',
+  },
   tabBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
