@@ -37,7 +37,7 @@ const SPECIALIZED_TOOLS = [
     id: 'mouza-geo-studio',
     title: 'মৌজা জিও স্টুডিও',
     description: 'মৌজা ম্যাপকে বাস্তব পৃথিবীর অবস্থানের সঙ্গে align করে Google Earth-এর জন্য KMZ তৈরি করুন।',
-    route: '/(tools)/land-measurement',
+    route: '/(tools)/mouza-geo',
     badge: 'বেটা',
     badgeVariant: 'warning' as const,
     icon: Globe,
