@@ -3,7 +3,6 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import type { MapImage } from '../../store/useMapStore';
-import { useTileProgressStore } from '../../store/useTileProgressStore';
 import type { Point } from '../../types/map';
 
 const TILE_TEXTURE_SIZE = 512;
@@ -270,9 +269,6 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
   const [tiles, setTiles] = useState<Tile[]>([]);
   const overviewTicketRef = useRef(0);
   const tileTicketRef = useRef(0);
-  const wasTilingRef = useRef(false);
-  const setProgress = useTileProgressStore((state) => state.setProgress);
-  const resetProgress = useTileProgressStore((state) => state.reset);
 
   const tileActivationScale = Math.max(fitScale * 1.15, overviewScale * 1.15);
   const shouldTile = isLargeImage && Boolean(overviewUri) && stageScale >= tileActivationScale;
@@ -295,46 +291,32 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
   );
   const coordKey = coords.map((coord) => coord.key).join('|');
 
-  useEffect(() => () => resetProgress(), [resetProgress]);
-
   useEffect(() => {
     clearOtherMapTiles(imageKey);
     const ticket = ++overviewTicketRef.current;
     tileTicketRef.current += 1;
-    wasTilingRef.current = false;
     setTiles([]);
 
     if (!isLargeImage) {
       setOverviewUri(image.uri);
-      resetProgress();
       return;
     }
 
     setOverviewUri(null);
-    setProgress('preparing', 0, 1);
     void getOverviewUri(image)
       .then((uri) => {
-        if (ticket !== overviewTicketRef.current) return;
-        setOverviewUri(uri);
-        setProgress('ready', 1, 1);
+        if (ticket === overviewTicketRef.current) setOverviewUri(uri);
       })
       .catch(() => {
         // Functional fallback for unusual files/devices that cannot create a preview.
-        if (ticket === overviewTicketRef.current) {
-          setOverviewUri(image.uri);
-          resetProgress();
-        }
+        if (ticket === overviewTicketRef.current) setOverviewUri(image.uri);
       });
-  }, [image.height, image.uri, image.width, imageKey, isLargeImage, resetProgress, setProgress]);
+  }, [image.height, image.uri, image.width, imageKey, isLargeImage]);
 
   useEffect(() => {
     const ticket = ++tileTicketRef.current;
-    const wasTiling = wasTilingRef.current;
-    wasTilingRef.current = shouldTile;
-
     if (!shouldTile || coords.length === 0) {
       setTiles([]);
-      if (wasTiling) setProgress('ready', 1, 1);
       return;
     }
 
@@ -360,13 +342,7 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
       setTiles(coords.map((coord) => getCachedTile(coord.key)).filter((tile): tile is Tile => Boolean(tile)));
 
       const missing = coords.filter((coord) => !tileCache.has(coord.key));
-      if (missing.length === 0) {
-        resetProgress();
-        return;
-      }
-
-      let completed = coords.length - missing.length;
-      setProgress('generating', completed, coords.length);
+      if (missing.length === 0) return;
 
       // Reuse one source context and process sequentially. Parallel crops can
       // cause large temporary native allocations on low-memory Android phones.
@@ -393,9 +369,7 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
         const targetUri = directory ? `${directory}${getTileFileName(coord)}` : null;
         const uri = await persistGeneratedFile(saved.uri, targetUri);
         cacheTile({ ...coord, uri });
-        completed += 1;
         completedSinceRender += 1;
-        setProgress('generating', completed, coords.length);
 
         if (completedSinceRender >= 3 && ticket === tileTicketRef.current) {
           completedSinceRender = 0;
@@ -405,10 +379,8 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
 
       if (ticket === tileTicketRef.current) {
         setTiles(coords.map((coord) => getCachedTile(coord.key)).filter((tile): tile is Tile => Boolean(tile)));
-        setProgress('ready', coords.length, coords.length);
       }
     })().catch(() => {
-      if (ticket === tileTicketRef.current) resetProgress();
       // The overview remains available if a device cannot crop/persist tiles.
     });
   // coordKey intentionally represents committed viewport/level changes only.
