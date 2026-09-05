@@ -111,9 +111,10 @@ export function PageWrapper({
       style={[styles.page, { backgroundColor: colors.background }, style]}
       contentContainerStyle={[
         styles.content,
-        { gap, paddingTop: topPadding, paddingBottom: resolvedBottomPadding },
+        { gap, paddingTop: topPadding },
         contentContainerStyle,
         contentStyle,
+        { paddingBottom: resolvedBottomPadding },
       ]}
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
     >
