@@ -5,6 +5,7 @@ import { Briefcase, Search, SlidersHorizontal, Users } from 'lucide-react-native
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import {
+  PAGE_BOTTOM_WITH_FLOATING_NAV,
   PAGE_CONTENT_INSETS,
   PAGE_LAYOUT,
   PageSectionHeader,
@@ -139,7 +140,7 @@ export default function SurveyorsScreen() {
                 onPress={() => surveyorQuery.fetchNextPage()}
               />
             </View>
-          ) : <View style={{ height: 14 }} />
+          ) : null
         }
         onEndReachedThreshold={0.3}
         onEndReached={() => {
@@ -162,7 +163,7 @@ export default function SurveyorsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { ...PAGE_CONTENT_INSETS },
+  content: { ...PAGE_CONTENT_INSETS, paddingBottom: PAGE_BOTTOM_WITH_FLOATING_NAV },
   headerArea: { gap: PAGE_LAYOUT.gap, marginBottom: PAGE_LAYOUT.gap },
   joinButton: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, height: 34 },
   joinText: { fontSize: 11, fontFamily: Fonts.sansMedium },
