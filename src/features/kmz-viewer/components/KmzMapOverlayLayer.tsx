@@ -62,14 +62,22 @@ function getNativePlacement(overlay: KmzGroundOverlay) {
     distanceMeters(lowerLeft, upperLeft) + distanceMeters(lowerRight, upperRight)
   ) / 2;
   const cosLat = Math.max(0.01, Math.cos(toRadians(center.latitude)));
-  const halfLat = (heightMeters / 2) / METERS_PER_DEGREE_LAT;
-  const halfLng = (widthMeters / 2) / (METERS_PER_DEGREE_LAT * cosLat);
+  const halfLat = Math.max(0.0000001, (heightMeters / 2) / METERS_PER_DEGREE_LAT);
+  const halfLng = Math.max(0.0000001, (widthMeters / 2) / (METERS_PER_DEGREE_LAT * cosLat));
   const bearing = normalizeBearing(headingDegrees(upperLeft, upperRight) - 90);
+
+  // AIRMapOverlay expects bounds in south-west -> north-east order.
+  // Passing north first makes Android throw
+  // "southern latitude exceeds northern latitude" while mounting the overlay.
+  const south = Math.min(center.latitude - halfLat, center.latitude + halfLat);
+  const north = Math.max(center.latitude - halfLat, center.latitude + halfLat);
+  const west = Math.min(center.longitude - halfLng, center.longitude + halfLng);
+  const east = Math.max(center.longitude - halfLng, center.longitude + halfLng);
 
   return {
     bounds: [
-      [center.latitude + halfLat, center.longitude - halfLng],
-      [center.latitude - halfLat, center.longitude + halfLng],
+      [south, west],
+      [north, east],
     ] as [[number, number], [number, number]],
     bearing,
   };
