@@ -10,6 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { usePathname } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -55,6 +56,22 @@ export function hasFloatingBottomNav(pathname: string) {
 }
 
 /**
+ * Single source of truth for mobile bottom content clearance.
+ * Screens with the app's floating bottom nav reserve its visual overhang.
+ * Other normal pages reserve the device system-navigation / gesture inset.
+ */
+export function usePageBottomPadding(bottomPadding?: number) {
+  const pathname = usePathname();
+  const insets = useSafeAreaInsets();
+
+  if (bottomPadding !== undefined) return bottomPadding;
+
+  return hasFloatingBottomNav(pathname)
+    ? PAGE_BOTTOM_WITH_FLOATING_NAV
+    : PAGE_LAYOUT.bottom + insets.bottom;
+}
+
+/**
  * Use this for FlatList/FlashList screens that cannot render through PageWrapper.
  * Keeping the list insets here prevents list pages from slowly drifting away from
  * the same outer spacing used by ordinary ScrollView pages.
@@ -84,12 +101,9 @@ export function PageWrapper({
   showsVerticalScrollIndicator = false,
   ...props
 }: PageWrapperProps) {
-  const pathname = usePathname();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
-  const resolvedBottomPadding =
-    bottomPadding ??
-    (hasFloatingBottomNav(pathname) ? PAGE_BOTTOM_WITH_FLOATING_NAV : PAGE_LAYOUT.bottom);
+  const resolvedBottomPadding = usePageBottomPadding(bottomPadding);
 
   return (
     <ScrollView
@@ -97,9 +111,10 @@ export function PageWrapper({
       style={[styles.page, { backgroundColor: colors.background }, style]}
       contentContainerStyle={[
         styles.content,
-        { gap, paddingTop: topPadding, paddingBottom: resolvedBottomPadding },
+        { gap, paddingTop: topPadding },
         contentContainerStyle,
         contentStyle,
+        { paddingBottom: resolvedBottomPadding },
       ]}
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
     >
