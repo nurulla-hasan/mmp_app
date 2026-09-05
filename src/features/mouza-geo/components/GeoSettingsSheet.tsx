@@ -36,11 +36,13 @@ export function GeoSettingsSheet({ visible, onClose, onOpenImport }: Props) {
   const opacity = useMouzaGeoStore((state) => state.opacity);
   const backgroundRemoved = useMouzaGeoStore((state) => state.backgroundRemoved);
   const backgroundSensitivity = useMouzaGeoStore((state) => state.backgroundSensitivity);
+  const exportQuality = useMouzaGeoStore((state) => state.exportQuality);
   const setAlignmentMode = useMouzaGeoStore((state) => state.setAlignmentMode);
   const setMapStyle = useMouzaGeoStore((state) => state.setMapStyle);
   const setOpacity = useMouzaGeoStore((state) => state.setOpacity);
   const setBackgroundRemoved = useMouzaGeoStore((state) => state.setBackgroundRemoved);
   const setBackgroundSensitivity = useMouzaGeoStore((state) => state.setBackgroundSensitivity);
+  const setExportQuality = useMouzaGeoStore((state) => state.setExportQuality);
   const removePair = useMouzaGeoStore((state) => state.removePair);
   const resetAlignment = useMouzaGeoStore((state) => state.resetAlignment);
   const residual = transform ? calculateResidualMeters(transform, pairs) : null;
@@ -128,9 +130,21 @@ export function GeoSettingsSheet({ visible, onClose, onOpenImport }: Props) {
             </Section>
 
             <Section title='Export quality' color={colors.textMuted}>
+              <View style={styles.row}>
+                <Chip label='High · Small File' active={exportQuality === 'optimized'} onPress={() => setExportQuality('optimized')} colors={colors} />
+                <Chip label='Original Quality' active={exportQuality === 'original'} onPress={() => setExportQuality('original')} colors={colors} />
+              </View>
               <View style={[styles.qualityCard, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                <Text style={[styles.qualityTitle, { color: colors.text }]}>Original quality • Lossless PNG</Text>
-                <Text style={[styles.help, { color: colors.textMuted }]}>KMZ uses the full source pixel grid in 2048 px tiles. The smaller interactive preview is never used for export.</Text>
+                <Text style={[styles.qualityTitle, { color: colors.text }]}>
+                  {exportQuality === 'optimized' ? 'Web-matched optimized export' : 'Original quality • Lossless PNG'}
+                </Text>
+                <Text style={[styles.help, { color: colors.textMuted }]}>
+                  {backgroundRemoved
+                    ? 'Background removal needs transparency, so PNG is kept just like the web exporter.'
+                    : exportQuality === 'optimized'
+                      ? 'Uses the full source pixel grid in 2048 px tiles, encoded as JPEG at the same 0.94 quality as the web High · Small File option.'
+                      : 'Uses the full source pixel grid in 2048 px lossless PNG tiles. This can be much larger.'}
+                </Text>
               </View>
             </Section>
 
