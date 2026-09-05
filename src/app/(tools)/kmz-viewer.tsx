@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { UrlTile, type Region } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE, UrlTile, type Region } from 'react-native-maps';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
@@ -28,6 +28,7 @@ import { Badge } from '../../components/ui/badge';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { KmzMapOverlayLayer } from '../../features/kmz-viewer/components/KmzMapOverlayLayer';
+import { MapBlurPlaceholder } from '../../features/kmz-viewer/components/MapBlurPlaceholder';
 import type { KmzDocument } from '../../features/kmz-viewer/types';
 import {
   cleanupKmzDocument,
@@ -35,13 +36,49 @@ import {
 } from '../../features/kmz-viewer/utils/kmz-parser';
 import { useThemeStore } from '../../stores/theme-store';
 
-// Google Maps canvas background — replaces the default WHITE canvas with dark navy.
-// Without this, every zoom in/out shows a blinding white flash while new tiles load.
-// customMapStyle works even with mapType="none" on Android.
+// Google Maps canvas background — replaces default white canvas with dark navy.
+// Google Maps requires mapType="standard" for customMapStyle to apply.
+// With mapType="none", Google Maps ignores customMapStyle and clears to white on zoom.
 const DARK_MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#0a0f1d' }] },
-  { elementType: 'labels', stylers: [{ visibility: 'off' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#050a14' }] },
+  {
+    elementType: 'geometry',
+    stylers: [{ color: '#0a0f1d' }],
+  },
+  {
+    elementType: 'labels',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'administrative',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'landscape',
+    elementType: 'geometry',
+    stylers: [{ color: '#0a0f1d' }],
+  },
+  {
+    featureType: 'poi',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'road',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'transit',
+    stylers: [{ visibility: 'off' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'geometry',
+    stylers: [{ color: '#050a14' }],
+  },
+  {
+    featureType: 'water',
+    elementType: 'labels',
+    stylers: [{ visibility: 'off' }],
+  },
 ];
 
 // Tile cache directory — once a tile is downloaded it lives here.
@@ -74,6 +111,7 @@ export default function KmzViewerScreen() {
   const [mapStyle, setMapStyle] = useState<'hybrid' | 'standard'>('hybrid');
   const [overlayOpacity, setOverlayOpacity] = useState(1);
   const [isOpacityOpen, setIsOpacityOpen] = useState(false);
+  const [isMapReady, setIsMapReady] = useState(false);
 
   useEffect(() => {
     documentRef.current = document;
@@ -83,11 +121,13 @@ export default function KmzViewerScreen() {
     let active = true;
     void (async () => {
       try {
-        let permission = await Location.getForegroundPermissionsAsync();
-        if (!permission.granted && permission.canAskAgain) {
-          permission = await Location.requestForegroundPermissionsAsync();
+        const [servicesEnabled, permission] = await Promise.all([
+          Location.hasServicesEnabledAsync().catch(() => false),
+          Location.getForegroundPermissionsAsync().catch(() => null),
+        ]);
+        if (active) {
+          setLocationGranted(Boolean(permission?.granted && servicesEnabled));
         }
-        if (active) setLocationGranted(permission.granted);
       } catch {
         if (active) setLocationGranted(false);
       }
@@ -131,13 +171,25 @@ export default function KmzViewerScreen() {
     if (locating) return;
     setLocating(true);
     try {
+      const isServicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!isServicesEnabled) {
+        Alert.alert(
+          'Location সার্ভিস বন্ধ আছে',
+          'আপনার ফোনের GPS / Location চালু করে আবার চেষ্টা করুন।',
+        );
+        return;
+      }
+
       let permission = await Location.getForegroundPermissionsAsync();
       if (!permission.granted) {
         permission = await Location.requestForegroundPermissionsAsync();
       }
       if (!permission.granted) {
         setLocationGranted(false);
-        Alert.alert('Location permission দরকার', 'আপনি কোন প্লটের উপর আছেন দেখাতে Location permission Allow করুন।');
+        Alert.alert(
+          'Location permission দরকার',
+          'আপনি কোন প্লটের উপর আছেন দেখতে Location permission Allow করুন।',
+        );
         return;
       }
 
@@ -146,9 +198,11 @@ export default function KmzViewerScreen() {
         maxAge: 15_000,
         requiredAccuracy: 80,
       });
-      const position = lastKnown ?? await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+      const position =
+        lastKnown ??
+        (await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        }));
 
       mapRef.current?.animateToRegion(
         {
@@ -233,11 +287,14 @@ export default function KmzViewerScreen() {
       </View>
 
       <View style={styles.mapWrap}>
+        <MapBlurPlaceholder isReady={isMapReady} mapStyle={mapStyle} />
+
         <MapView
           ref={mapRef}
+          provider={PROVIDER_GOOGLE}
           style={[StyleSheet.absoluteFill, { backgroundColor: '#0a0f1d' }]}
           initialRegion={INITIAL_REGION}
-          mapType="none"
+          mapType="standard"
           customMapStyle={DARK_MAP_STYLE}
           rotateEnabled={false}
           pitchEnabled={false}
@@ -245,7 +302,12 @@ export default function KmzViewerScreen() {
           showsCompass
           showsUserLocation={locationGranted}
           showsMyLocationButton={false}
+          loadingEnabled={true}
           loadingBackgroundColor="#0a0f1d"
+          loadingIndicatorColor="#16a34a"
+          userInterfaceStyle="dark"
+          onMapReady={() => setIsMapReady(true)}
+          onMapLoaded={() => setIsMapReady(true)}
           onPress={() => setIsOpacityOpen(false)}
         >
           <UrlTile
@@ -256,6 +318,7 @@ export default function KmzViewerScreen() {
                 : 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&scale=2'
             }
             tileSize={256}
+            minimumZ={0}
             maximumZ={22}
             flipY={false}
             zIndex={-1}
@@ -267,230 +330,247 @@ export default function KmzViewerScreen() {
           ) : null}
         </MapView>
 
-        {isOpacityOpen && (
+        {isOpacityOpen && document && (
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => setIsOpacityOpen(false)}
           />
         )}
 
-        {document ? (
-          <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 12 }]}>
-            {/* ─── Opacity Popover Panel ─── */}
-            {isOpacityOpen && (
-              <View
-                style={[
-                  styles.opacityPanel,
-                  {
-                    backgroundColor:
-                      theme === 'dark' ? 'rgba(15,23,42,0.98)' : 'rgba(255,255,255,0.98)',
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <View style={styles.opacityHeader}>
-                  <View style={styles.opacityTitleRow}>
-                    <View
-                      style={[
-                        styles.opacityIconBadge,
-                        {
-                          backgroundColor:
-                            theme === 'dark'
-                              ? 'rgba(34,197,94,0.18)'
-                              : 'rgba(22,163,74,0.12)',
-                        },
-                      ]}
-                    >
-                      <Layers size={14} color={colors.primary} />
-                    </View>
-                    <Text style={[styles.opacityTitle, { color: colors.text }]}>
-                      Overlay Opacity
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.opacityValuePill,
-                      {
-                        backgroundColor:
-                          theme === 'dark'
-                            ? 'rgba(34,197,94,0.16)'
-                            : 'rgba(22,163,74,0.12)',
-                        borderColor:
-                          theme === 'dark'
-                            ? 'rgba(34,197,94,0.3)'
-                            : 'rgba(22,163,74,0.25)',
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.opacityValueText, { color: colors.primary }]}>
-                      {Math.round(overlayOpacity * 100)}%
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Quick Presets */}
-                <View style={styles.presetRow}>
-                  {[0.25, 0.5, 0.75, 1.0].map((preset) => {
-                    const isSelected = Math.abs(overlayOpacity - preset) < 0.05;
-                    return (
-                      <TouchableOpacity
-                        key={preset}
-                        activeOpacity={0.7}
-                        onPress={() => setOverlayOpacity(preset)}
-                        style={[
-                          styles.presetChip,
-                          {
-                            borderColor: isSelected ? colors.primary : colors.border,
-                            backgroundColor: isSelected
-                              ? colors.primary
-                              : theme === 'dark'
-                              ? 'rgba(30,41,59,0.7)'
-                              : 'rgba(241,245,249,0.9)',
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.presetText,
-                            {
-                              color: isSelected ? '#ffffff' : colors.textMuted,
-                              fontFamily: isSelected ? Fonts.headingBold : Fonts.sansMedium,
-                            },
-                          ]}
-                        >
-                          {Math.round(preset * 100)}%
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Fine Adjustment Stepper */}
-                <View style={styles.stepperRow}>
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() =>
-                      setOverlayOpacity((v) =>
-                        Math.max(0.1, Math.round((v - 0.1) * 10) / 10)
-                      )
-                    }
-                    disabled={overlayOpacity <= 0.1}
-                    style={[
-                      styles.stepperButton,
-                      {
-                        borderColor: colors.border,
-                        backgroundColor:
-                          theme === 'dark'
-                            ? 'rgba(30,41,59,0.7)'
-                            : 'rgba(241,245,249,0.9)',
-                        opacity: overlayOpacity <= 0.1 ? 0.35 : 1,
-                      },
-                    ]}
-                  >
-                    <Minus size={15} color={colors.text} />
-                  </TouchableOpacity>
-
-                  <View style={styles.stepperCenter}>
-                    <Text style={[styles.stepperHint, { color: colors.textMuted }]}>
-                      -10% অথবা +10% সমন্বয়
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() =>
-                      setOverlayOpacity((v) =>
-                        Math.min(1.0, Math.round((v + 0.1) * 10) / 10)
-                      )
-                    }
-                    disabled={overlayOpacity >= 1.0}
-                    style={[
-                      styles.stepperButton,
-                      {
-                        borderColor: colors.border,
-                        backgroundColor:
-                          theme === 'dark'
-                            ? 'rgba(30,41,59,0.7)'
-                            : 'rgba(241,245,249,0.9)',
-                        opacity: overlayOpacity >= 1.0 ? 0.35 : 1,
-                      },
-                    ]}
-                  >
-                    <Plus size={15} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* ─── Floating Dock Toolbar ─── */}
+        <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 12 }]}>
+          {/* ─── Opacity Popover Panel (Only when document exists) ─── */}
+          {isOpacityOpen && document && (
             <View
               style={[
-                styles.toolbar,
+                styles.opacityPanel,
                 {
                   backgroundColor:
-                    theme === 'dark' ? 'rgba(15,23,42,0.96)' : 'rgba(255,255,255,0.98)',
+                    theme === 'dark' ? 'rgba(15,23,42,0.98)' : 'rgba(255,255,255,0.98)',
                   borderColor: colors.border,
                 },
               ]}
             >
-              <Tool
-                icon={
-                  <Satellite
-                    size={18}
-                    color={mapStyle === 'hybrid' ? colors.primary : colors.textMuted}
-                  />
-                }
-                label={mapStyle === 'hybrid' ? 'Satellite' : 'Map'}
-                active={mapStyle === 'hybrid'}
-                onPress={() =>
-                  setMapStyle((value) => (value === 'hybrid' ? 'standard' : 'hybrid'))
-                }
-                colors={colors}
-                theme={theme}
-              />
+              <View style={styles.opacityHeader}>
+                <View style={styles.opacityTitleRow}>
+                  <View
+                    style={[
+                      styles.opacityIconBadge,
+                      {
+                        backgroundColor:
+                          theme === 'dark'
+                            ? 'rgba(34,197,94,0.18)'
+                            : 'rgba(22,163,74,0.12)',
+                      },
+                    ]}
+                  >
+                    <Layers size={14} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.opacityTitle, { color: colors.text }]}>
+                    Overlay Opacity
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.opacityValuePill,
+                    {
+                      backgroundColor:
+                        theme === 'dark'
+                          ? 'rgba(34,197,94,0.16)'
+                          : 'rgba(22,163,74,0.12)',
+                      borderColor:
+                        theme === 'dark'
+                          ? 'rgba(34,197,94,0.3)'
+                          : 'rgba(22,163,74,0.25)',
+                    },
+                  ]}
+                >
+                  <Text style={[styles.opacityValueText, { color: colors.primary }]}>
+                    {Math.round(overlayOpacity * 100)}%
+                  </Text>
+                </View>
+              </View>
 
+              {/* Quick Presets */}
+              <View style={styles.presetRow}>
+                {[0.25, 0.5, 0.75, 1.0].map((preset) => {
+                  const isSelected = Math.abs(overlayOpacity - preset) < 0.05;
+                  return (
+                    <TouchableOpacity
+                      key={preset}
+                      activeOpacity={0.7}
+                      onPress={() => setOverlayOpacity(preset)}
+                      style={[
+                        styles.presetChip,
+                        {
+                          borderColor: isSelected ? colors.primary : colors.border,
+                          backgroundColor: isSelected
+                            ? colors.primary
+                            : theme === 'dark'
+                            ? 'rgba(30,41,59,0.7)'
+                            : 'rgba(241,245,249,0.9)',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.presetText,
+                          {
+                            color: isSelected ? '#ffffff' : colors.textMuted,
+                            fontFamily: isSelected ? Fonts.headingBold : Fonts.sansMedium,
+                          },
+                        ]}
+                      >
+                        {Math.round(preset * 100)}%
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Fine Adjustment Stepper */}
+              <View style={styles.stepperRow}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    setOverlayOpacity((v) =>
+                      Math.max(0.1, Math.round((v - 0.1) * 10) / 10)
+                    )
+                  }
+                  disabled={overlayOpacity <= 0.1}
+                  style={[
+                    styles.stepperButton,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor:
+                        theme === 'dark'
+                          ? 'rgba(30,41,59,0.7)'
+                          : 'rgba(241,245,249,0.9)',
+                      opacity: overlayOpacity <= 0.1 ? 0.35 : 1,
+                    },
+                  ]}
+                >
+                  <Minus size={15} color={colors.text} />
+                </TouchableOpacity>
+
+                <View style={styles.stepperCenter}>
+                  <Text style={[styles.stepperHint, { color: colors.textMuted }]}>
+                    -10% অথবা +10% সমন্বয়
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    setOverlayOpacity((v) =>
+                      Math.min(1.0, Math.round((v + 0.1) * 10) / 10)
+                    )
+                  }
+                  disabled={overlayOpacity >= 1.0}
+                  style={[
+                    styles.stepperButton,
+                    {
+                      borderColor: colors.border,
+                      backgroundColor:
+                        theme === 'dark'
+                          ? 'rgba(30,41,59,0.7)'
+                          : 'rgba(241,245,249,0.9)',
+                      opacity: overlayOpacity >= 1.0 ? 0.35 : 1,
+                    },
+                  ]}
+                >
+                  <Plus size={15} color={colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* ─── Floating Dock Toolbar ─── */}
+          <View
+            style={[
+              styles.toolbar,
+              {
+                backgroundColor:
+                  theme === 'dark' ? 'rgba(15,23,42,0.96)' : 'rgba(255,255,255,0.98)',
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            <Tool
+              icon={
+                <Satellite
+                  size={18}
+                  color={mapStyle === 'hybrid' ? colors.primary : colors.textMuted}
+                />
+              }
+              label={mapStyle === 'hybrid' ? 'Satellite' : 'Map'}
+              active={mapStyle === 'hybrid'}
+              onPress={() =>
+                setMapStyle((value) => (value === 'hybrid' ? 'standard' : 'hybrid'))
+              }
+              colors={colors}
+              theme={theme}
+            />
+
+            <Tool
+              icon={
+                locating ? (
+                  <ActivityIndicator size='small' color={colors.primary} />
+                ) : (
+                  <Navigation
+                    size={18}
+                    color={locationGranted ? colors.primary : colors.textMuted}
+                  />
+                )
+              }
+              label='Location'
+              active={locationGranted}
+              onPress={goToMyLocation}
+              colors={colors}
+              theme={theme}
+            />
+
+            {document ? (
+              <>
+                <Tool
+                  icon={<LocateFixed size={18} color={colors.textMuted} />}
+                  label='Fit KMZ'
+                  onPress={() => fitDocument()}
+                  colors={colors}
+                  theme={theme}
+                />
+
+                <Tool
+                  icon={
+                    <Layers
+                      size={18}
+                      color={isOpacityOpen ? colors.primary : colors.textMuted}
+                    />
+                  }
+                  label={`${Math.round(overlayOpacity * 100)}%`}
+                  active={isOpacityOpen}
+                  onPress={() => setIsOpacityOpen((prev) => !prev)}
+                  colors={colors}
+                  theme={theme}
+                />
+              </>
+            ) : (
               <Tool
                 icon={
-                  locating ? (
+                  loading ? (
                     <ActivityIndicator size='small' color={colors.primary} />
                   ) : (
-                    <Navigation
-                      size={18}
-                      color={locationGranted ? colors.primary : colors.textMuted}
-                    />
+                    <FileUp size={18} color={colors.primary} />
                   )
                 }
-                label='Location'
-                active={locationGranted || locating}
-                onPress={goToMyLocation}
+                label='Import KMZ'
+                active={true}
+                onPress={openKmz}
                 colors={colors}
                 theme={theme}
               />
-
-              <Tool
-                icon={<LocateFixed size={18} color={colors.textMuted} />}
-                label='Fit KMZ'
-                onPress={() => fitDocument()}
-                colors={colors}
-                theme={theme}
-              />
-
-              <Tool
-                icon={
-                  <Layers
-                    size={18}
-                    color={isOpacityOpen ? colors.primary : colors.textMuted}
-                  />
-                }
-                label={`${Math.round(overlayOpacity * 100)}%`}
-                active={isOpacityOpen}
-                onPress={() => setIsOpacityOpen((prev) => !prev)}
-                colors={colors}
-                theme={theme}
-              />
-            </View>
+            )}
           </View>
-        ) : null}
+        </View>
       </View>
     </SafeAreaView>
   );

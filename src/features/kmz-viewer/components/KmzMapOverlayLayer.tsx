@@ -112,6 +112,7 @@ export const KmzMapOverlayLayer = memo(function KmzMapOverlayLayer({
             fillColor={placemark.style.polygonFillColor}
             strokeColor={placemark.style.polygonStrokeColor}
             strokeWidth={placemark.style.lineWidth}
+            zIndex={20}
           />
         )),
       )}
@@ -123,6 +124,7 @@ export const KmzMapOverlayLayer = memo(function KmzMapOverlayLayer({
             coordinates={coordinates}
             strokeColor={placemark.style.lineColor}
             strokeWidth={placemark.style.lineWidth}
+            zIndex={30}
           />
         )),
       )}
@@ -136,6 +138,7 @@ export const KmzMapOverlayLayer = memo(function KmzMapOverlayLayer({
             description={placemark.description}
             pinColor='#dc2626'
             tracksViewChanges={false}
+            zIndex={40}
           />
         )),
       )}
