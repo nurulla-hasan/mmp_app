@@ -147,7 +147,12 @@ export default function ProfileScreen() {
               title='সাইন ইন করুন'
               variant='primary'
               size='md'
-              onPress={() => router.push('/(auth)/login')}
+              onPress={() =>
+                router.push({
+                  pathname: '/(auth)/login',
+                  params: { callbackUrl: '/profile' },
+                })
+              }
               icon={<LogIn size={14} color='#ffffff' />}
               style={{ flex: 1 }}
             />
@@ -155,7 +160,12 @@ export default function ProfileScreen() {
               title='নতুন অ্যাকাউন্ট'
               variant='outline'
               size='md'
-              onPress={() => router.push('/(auth)/register')}
+              onPress={() =>
+                router.push({
+                  pathname: '/(auth)/login',
+                  params: { tab: 'register', callbackUrl: '/profile' },
+                })
+              }
               icon={<UserPlus size={14} color={colors.text} />}
               style={{ flex: 1 }}
             />

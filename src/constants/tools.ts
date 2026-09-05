@@ -12,6 +12,17 @@ export interface ToolItem {
   features?: string[];
 }
 
+export const COMING_SOON_TOOL_IDS = [
+  'mouza-map-studio',
+  'pantagraph',
+  'tracer',
+  'inheritance-calculator',
+] as const;
+
+export function isToolComingSoon(toolId: string) {
+  return (COMING_SOON_TOOL_IDS as readonly string[]).includes(toolId);
+}
+
 export const FEATURED_TOOL: ToolItem = {
   id: 'land-measurement',
   title: 'মৌজা ম্যাপ ও জমি পরিমাপ',
@@ -51,7 +62,7 @@ export const OTHER_CORE_TOOLS: ToolItem[] = [
     title: 'মৌজা জিও স্টুডিও',
     subtitle: 'Geo Studio',
     description: 'মৌজা ম্যাপকে বাস্তব পৃথিবীর অবস্থানের সঙ্গে align করে Google Earth-এর জন্য KMZ তৈরি করুন।',
-    route: '/land-measurement',
+    route: '/mouza-geo',
     isPro: true,
     badge: 'বেটা',
     badgeVariant: 'warning',

@@ -19,7 +19,7 @@ import { PageSectionHeader, PageWrapper } from '../../components/common/page-lay
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
-import { FEATURED_TOOL } from '../../constants/tools';
+import { FEATURED_TOOL, isToolComingSoon } from '../../constants/tools';
 
 const SPECIALIZED_TOOLS = [
   {
@@ -167,11 +167,18 @@ export default function ToolsHubScreen() {
       <View style={styles.toolsList}>
         {SPECIALIZED_TOOLS.map((tool) => {
           const IconComp = tool.icon;
+          const comingSoon = isToolComingSoon(tool.id);
+
           return (
             <TouchableOpacity
               key={tool.id}
               activeOpacity={0.8}
-              style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+              disabled={comingSoon}
+              style={[
+                styles.toolCard,
+                { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                comingSoon && styles.comingSoonCard,
+              ]}
               onPress={() => router.push(tool.route as any)}
             >
               <View style={[styles.toolIconBox, { backgroundColor: tool.bg }]}>
@@ -181,14 +188,17 @@ export default function ToolsHubScreen() {
               <View style={styles.toolTextCol}>
                 <View style={styles.toolTitleRow}>
                   <Text style={[styles.toolTitle, { color: colors.text }]}>{tool.title}</Text>
-                  <Badge label={tool.badge} variant={tool.badgeVariant} />
+                  <Badge
+                    label={comingSoon ? 'Coming Soon' : tool.badge}
+                    variant={comingSoon ? 'neutral' : tool.badgeVariant}
+                  />
                 </View>
                 <Text style={[styles.toolDesc, { color: colors.textMuted }]} numberOfLines={2}>
                   {tool.description}
                 </Text>
               </View>
 
-              <ChevronRight size={16} color={colors.textMuted} />
+              {comingSoon ? null : <ChevronRight size={16} color={colors.textMuted} />}
             </TouchableOpacity>
           );
         })}
@@ -202,11 +212,18 @@ export default function ToolsHubScreen() {
       <View style={styles.toolsList}>
         {CALCULATION_TOOLS.map((tool) => {
           const IconComp = tool.icon;
+          const comingSoon = isToolComingSoon(tool.id);
+
           return (
             <TouchableOpacity
               key={tool.id}
               activeOpacity={0.8}
-              style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+              disabled={comingSoon}
+              style={[
+                styles.toolCard,
+                { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                comingSoon && styles.comingSoonCard,
+              ]}
               onPress={() => router.push(tool.route as any)}
             >
               <View style={[styles.toolIconBox, { backgroundColor: tool.bg }]}>
@@ -216,14 +233,17 @@ export default function ToolsHubScreen() {
               <View style={styles.toolTextCol}>
                 <View style={styles.toolTitleRow}>
                   <Text style={[styles.toolTitle, { color: colors.text }]}>{tool.title}</Text>
-                  <Badge label={tool.badge} variant={tool.badgeVariant} />
+                  <Badge
+                    label={comingSoon ? 'Coming Soon' : tool.badge}
+                    variant={comingSoon ? 'neutral' : tool.badgeVariant}
+                  />
                 </View>
                 <Text style={[styles.toolDesc, { color: colors.textMuted }]} numberOfLines={2}>
                   {tool.description}
                 </Text>
               </View>
 
-              <ChevronRight size={16} color={colors.textMuted} />
+              {comingSoon ? null : <ChevronRight size={16} color={colors.textMuted} />}
             </TouchableOpacity>
           );
         })}
@@ -302,6 +322,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     gap: 11,
+  },
+  comingSoonCard: {
+    opacity: 0.62,
   },
   toolIconBox: {
     width: 38,
