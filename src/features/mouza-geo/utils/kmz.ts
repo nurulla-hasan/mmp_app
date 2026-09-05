@@ -2,8 +2,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
 import { strToU8, zipSync } from 'fflate';
-import type { GeoImage, GeoTransform } from '../types';
+import type { GeoBackgroundMode, GeoImage, GeoTransform } from '../types';
 import { getKmzCorners } from './geo-math';
+import { getGeoOverlayImageUri } from './overlay-image';
 
 function sanitizeName(name: string) {
   return (name.replace(/\.[^.]+$/, '').replace(/[<>:"/\\|?*]+/g, '-').trim() || 'mouza-map').slice(0, 80);
@@ -30,27 +31,40 @@ function base64ToBytes(base64: string) {
   return bytes;
 }
 
-export async function exportMouzaKmz({ image, transform, opacity }: {
+export async function exportMouzaKmz({ image, transform, opacity, backgroundMode }: {
   image: GeoImage;
   transform: GeoTransform;
   opacity: number;
+  backgroundMode: GeoBackgroundMode;
 }) {
   const name = sanitizeName(image.name);
-  const prepared = await ImageManipulator.manipulateAsync(
-    image.uri,
-    [],
-    { format: ImageManipulator.SaveFormat.JPEG, compress: 0.94, base64: true },
-  );
-  if (!prepared.base64) throw new Error('Could not prepare map image for KMZ');
+  const transparentOverlay = backgroundMode !== 'original';
+  let mapBase64: string;
+  let mapPath: 'files/map.jpg' | 'files/map.png';
+
+  if (transparentOverlay) {
+    const overlayUri = await getGeoOverlayImageUri(image, backgroundMode);
+    mapBase64 = await FileSystem.readAsStringAsync(overlayUri, { encoding: FileSystem.EncodingType.Base64 });
+    mapPath = 'files/map.png';
+  } else {
+    const prepared = await ImageManipulator.manipulateAsync(
+      image.uri,
+      [],
+      { format: ImageManipulator.SaveFormat.JPEG, compress: 0.94, base64: true },
+    );
+    if (!prepared.base64) throw new Error('Could not prepare map image for KMZ');
+    mapBase64 = prepared.base64;
+    mapPath = 'files/map.jpg';
+  }
 
   const corners = getKmzCorners(transform, image);
   const alpha = Math.round(Math.max(0, Math.min(1, opacity)) * 255).toString(16).padStart(2, '0');
-  const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n  <Document>\n    <name>${name}</name>\n    <GroundOverlay>\n      <name>${name}</name>\n      <drawOrder>1</drawOrder>\n      <color>${alpha}ffffff</color>\n      <Icon><href>files/map.jpg</href></Icon>\n      <altitudeMode>clampToGround</altitudeMode>\n      <gx:LatLonQuad><coordinates>${coordinateText(corners)}</coordinates></gx:LatLonQuad>\n    </GroundOverlay>\n  </Document>\n</kml>`;
+  const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n  <Document>\n    <name>${name}</name>\n    <GroundOverlay>\n      <name>${name}</name>\n      <drawOrder>1</drawOrder>\n      <color>${alpha}ffffff</color>\n      <Icon><href>${mapPath}</href></Icon>\n      <altitudeMode>clampToGround</altitudeMode>\n      <gx:LatLonQuad><coordinates>${coordinateText(corners)}</coordinates></gx:LatLonQuad>\n    </GroundOverlay>\n  </Document>\n</kml>`;
 
   const archive = zipSync(
     {
       'doc.kml': strToU8(kml),
-      'files/map.jpg': base64ToBytes(prepared.base64),
+      [mapPath]: base64ToBytes(mapBase64),
     },
     { level: 0 },
   );

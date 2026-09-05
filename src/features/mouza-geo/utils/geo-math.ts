@@ -184,11 +184,16 @@ export function getNativeOverlayPreview(
   const halfHeight = (Math.hypot(transform.b, transform.d) * imageSize.height) / 2;
   const northWest = fromMercator({ u: center.u - halfWidth, v: center.v - halfHeight });
   const southEast = fromMercator({ u: center.u + halfWidth, v: center.v + halfHeight });
+  const south = Math.min(northWest.lat, southEast.lat);
+  const north = Math.max(northWest.lat, southEast.lat);
+  const west = Math.min(northWest.lng, southEast.lng);
+  const east = Math.max(northWest.lng, southEast.lng);
   const bearing = ((Math.atan2(-transform.b, transform.d) * 180) / Math.PI + 360) % 360;
   return {
+    // react-native-maps Android expects Overlay bounds as southwest, northeast.
     bounds: [
-      [northWest.lat, northWest.lng],
-      [southEast.lat, southEast.lng],
+      [south, west],
+      [north, east],
     ] as [[number, number], [number, number]],
     bearing,
   };

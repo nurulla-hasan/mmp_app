@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   AlignmentMode,
   ControlPair,
+  GeoBackgroundMode,
   GeoImage,
   GeoMapStyle,
   GeoPoint,
@@ -21,11 +22,13 @@ type GeoState = {
   alignmentMode: AlignmentMode;
   mapStyle: GeoMapStyle;
   opacity: number;
+  backgroundMode: GeoBackgroundMode;
   setImage: (image: GeoImage) => void;
   clear: () => void;
   setActiveView: (view: GeoView) => void;
   setMapStyle: (style: GeoMapStyle) => void;
   setOpacity: (opacity: number) => void;
+  setBackgroundMode: (mode: GeoBackgroundMode) => void;
   setAlignmentMode: (mode: AlignmentMode) => void;
   captureSource: (point: Point2D) => void;
   captureWorld: (point: GeoPoint) => void;
@@ -59,6 +62,7 @@ const initial = {
   alignmentMode: 'similarity' as AlignmentMode,
   mapStyle: 'satellite' as GeoMapStyle,
   opacity: 0.72,
+  backgroundMode: 'original' as GeoBackgroundMode,
 };
 
 export const useMouzaGeoStore = create<GeoState>((set, get) => ({
@@ -68,6 +72,7 @@ export const useMouzaGeoStore = create<GeoState>((set, get) => ({
   setActiveView: (activeView) => set({ activeView }),
   setMapStyle: (mapStyle) => set({ mapStyle }),
   setOpacity: (opacity) => set({ opacity: Math.max(0.2, Math.min(1, opacity)) }),
+  setBackgroundMode: (backgroundMode) => set({ backgroundMode }),
   setAlignmentMode: (alignmentMode) => {
     const state = get();
     set({ alignmentMode, transform: fit(state.controlPairs, state.image, alignmentMode) });

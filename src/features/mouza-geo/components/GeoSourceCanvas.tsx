@@ -43,14 +43,16 @@ const SourceMarker = memo(function SourceMarker({
 }) {
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: size.width / 2 + offsetX.value + (point.x - image.width / 2) * scale.value - 12 },
-      { translateY: size.height / 2 + offsetY.value + (point.y - image.height / 2) * scale.value - 24 },
+      { translateX: size.width / 2 + offsetX.value + (point.x - image.width / 2) * scale.value - 14 },
+      { translateY: size.height / 2 + offsetY.value + (point.y - image.height / 2) * scale.value - 14 },
     ],
   }));
   return (
-    <Animated.View pointerEvents='none' style={[styles.marker, pending && styles.pendingMarker, animatedStyle]}>
-      <Text style={styles.markerText}>{label}</Text>
-      <View style={styles.markerTip} />
+    <Animated.View pointerEvents='none' style={[styles.markerWrap, animatedStyle]}>
+      <View style={[styles.markerHalo, pending && styles.pendingHalo]} />
+      <View style={[styles.markerCore, pending && styles.pendingMarker]}>
+        <Text style={styles.markerText}>{label}</Text>
+      </View>
     </Animated.View>
   );
 });
@@ -107,7 +109,9 @@ export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function
     }), []);
 
   const pinch = useMemo(() => Gesture.Pinch()
-    .onBegin((event) => {
+    // Android can report an invalid focal point during BEGIN. START is the first
+    // frame where focalX/focalY are stable, which prevents the map from jumping.
+    .onStart((event) => {
       pinchStartScale.value = scale.value;
       pinchStartX.value = offsetX.value;
       pinchStartY.value = offsetY.value;
@@ -178,32 +182,38 @@ export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden', backgroundColor: '#111827' },
   imageOuter: { position: 'absolute' },
-  marker: {
+  markerWrap: {
     position: 'absolute',
     left: 0,
     top: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#dc2626',
-    borderWidth: 2,
-    borderColor: '#fff',
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 20,
   },
-  pendingMarker: { opacity: 0.72, backgroundColor: '#2563eb' },
-  markerText: { color: '#fff', fontSize: 10, fontWeight: '800' },
-  markerTip: {
-    position: 'absolute',
-    bottom: -6,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 7,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    borderTopColor: '#dc2626',
+  markerHalo: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 14,
+    backgroundColor: 'rgba(220,38,38,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.72)',
   },
+  pendingHalo: { backgroundColor: 'rgba(37,99,235,0.18)' },
+  markerCore: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#dc2626',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.24,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  pendingMarker: { backgroundColor: '#2563eb' },
+  markerText: { color: '#fff', fontSize: 9, fontWeight: '800', lineHeight: 11 },
 });
