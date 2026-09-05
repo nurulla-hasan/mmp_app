@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Ruler } from 'lucide-react-native';
 import { SkiaMapCanvas } from '../../features/land-measurement/components/canvas/SkiaMapCanvas';
+import { MapTileProgressOverlay } from '../../features/land-measurement/components/canvas/MapTileProgressOverlay';
 import { MobileCanvasToolbar } from '../../features/land-measurement/components/toolbar/MobileCanvasToolbar';
 import { MobileResultsBar } from '../../features/land-measurement/components/results/MobileResultsBar';
 import { ScaleCalibrationModal } from '../../features/land-measurement/components/modals/ScaleCalibrationModal';
@@ -102,6 +103,7 @@ export default function LandMeasurementScreen() {
 
       <View style={[styles.canvasContainer, { backgroundColor: colors.workspace }]}>
         <SkiaMapCanvas />
+        <MapTileProgressOverlay />
 
         {theme === 'light' && !mapImage && (
           <View pointerEvents='none' style={[styles.lightEmptyCanvas, { backgroundColor: colors.workspace }]}>
