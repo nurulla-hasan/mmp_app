@@ -32,6 +32,7 @@ import { SurveyorCard } from '../../components/surveyors/surveyor-card';
 import { PageWrapper } from '../../components/common/page-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
+import { isToolComingSoon } from '../../constants/tools';
 import { useThemeStore } from '../../stores/theme-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { useCalculations } from '../../hooks/queries/use-calculations';
@@ -170,6 +171,9 @@ export default function HomeScreen() {
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
+  const mapStudioComingSoon = isToolComingSoon('mouza-map-studio');
+  const pantagraphComingSoon = isToolComingSoon('pantagraph');
+  const tracerComingSoon = isToolComingSoon('tracer');
 
   const {
     data: allCalculations = [],
@@ -322,7 +326,12 @@ export default function HomeScreen() {
       <View style={styles.grid}>
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          disabled={mapStudioComingSoon}
+          style={[
+            styles.toolCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+            mapStudioComingSoon && styles.comingSoonToolCard,
+          ]}
           onPress={() => router.push('/(tools)/land-measurement')}
         >
           <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
@@ -330,14 +339,14 @@ export default function HomeScreen() {
           </View>
           <View style={styles.toolTextCol}>
             <Text style={[styles.toolTitle, { color: colors.text }]}>ম্যাপ স্টুডিও</Text>
-            <Badge label='বেটা' variant='warning' />
+            <Badge label='Coming Soon' variant='neutral' />
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.8}
           style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-          onPress={() => router.push('/(tools)/land-measurement')}
+          onPress={() => router.push('/(tools)/mouza-geo')}
         >
           <View style={[styles.iconBox, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}>
             <Globe size={19} color='#16a34a' strokeWidth={2} />
@@ -352,7 +361,12 @@ export default function HomeScreen() {
       <View style={styles.grid}>
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          disabled={pantagraphComingSoon}
+          style={[
+            styles.toolCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+            pantagraphComingSoon && styles.comingSoonToolCard,
+          ]}
           onPress={() => router.push('/(tools)/pantagraph')}
         >
           <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.12)' }]}>
@@ -360,13 +374,18 @@ export default function HomeScreen() {
           </View>
           <View style={styles.toolTextCol}>
             <Text style={[styles.toolTitle, { color: colors.text }]}>প্যান্টাগ্রাফ</Text>
-            <Badge label='নতুন' variant='pro' />
+            <Badge label='Coming Soon' variant='neutral' />
           </View>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.8}
-          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+          disabled={tracerComingSoon}
+          style={[
+            styles.toolCard,
+            { backgroundColor: colors.card, borderColor: colors.cardBorder },
+            tracerComingSoon && styles.comingSoonToolCard,
+          ]}
           onPress={() => router.push('/(tools)/tracer')}
         >
           <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
@@ -374,7 +393,7 @@ export default function HomeScreen() {
           </View>
           <View style={styles.toolTextCol}>
             <Text style={[styles.toolTitle, { color: colors.text }]}>ম্যাপ ট্রেসিং</Text>
-            <Badge label='নতুন' variant='pro' />
+            <Badge label='Coming Soon' variant='neutral' />
           </View>
         </TouchableOpacity>
       </View>
@@ -400,7 +419,12 @@ export default function HomeScreen() {
         <TouchableOpacity
           activeOpacity={0.85}
           style={[styles.emptyProjectCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-          onPress={() => router.push('/(auth)/login')}
+          onPress={() =>
+            router.push({
+              pathname: '/(auth)/login',
+              params: { callbackUrl: '/' },
+            })
+          }
         >
           <FolderKanban size={22} color={colors.textMuted} />
           <View style={styles.flexText}>
@@ -620,6 +644,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 1,
   },
+  comingSoonToolCard: { opacity: 0.62 },
   iconBox: {
     width: 36,
     height: 36,
