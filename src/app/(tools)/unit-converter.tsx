@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
 import { Card } from '../../components/ui/card';
+import { PageWrapper } from '../../components/common/page-layout';
 import { Fonts } from '../../constants/typography';
 import { convertToSqFeet, convertFromSqFeet } from '../../lib/calculations';
 
@@ -21,8 +22,11 @@ export default function UnitConverterScreen() {
   const result = convertFromSqFeet(sqFeet);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      {/* Unit Selector Pills */}
+    <PageWrapper
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
       <View style={styles.pillContainer}>
         {UNITS.map((u) => (
           <TouchableOpacity
@@ -38,7 +42,6 @@ export default function UnitConverterScreen() {
         ))}
       </View>
 
-      {/* Input Box */}
       <Card style={styles.inputCard}>
         <Text style={styles.inputLabel}>জমির পরিমাণ ইনপুট দিন:</Text>
         <TextInput
@@ -51,7 +54,6 @@ export default function UnitConverterScreen() {
         />
       </Card>
 
-      {/* Conversion Table */}
       <Text style={styles.resultHeading}>সব এককে তাৎক্ষণিক রূপান্তর ফলাফল:</Text>
 
       <Card style={styles.resultCard}>
@@ -80,7 +82,7 @@ export default function UnitConverterScreen() {
           <Text style={styles.unitValue}>{result.sqMeter} মি²</Text>
         </View>
       </Card>
-    </ScrollView>
+    </PageWrapper>
   );
 }
 
@@ -90,7 +92,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   content: {
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingTop: 12,
     gap: 10,
   },
   pillContainer: {
