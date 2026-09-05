@@ -17,6 +17,11 @@ export type GeoImageCrop = {
   height: number;
 };
 
+type GeoExportEncoding = {
+  format?: 'png' | 'jpeg';
+  quality?: number;
+};
+
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const clampSensitivity = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 const getLuma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
@@ -115,17 +120,29 @@ function getPreviewActions(image: GeoImage) {
   return [{ resize: { height: Math.max(1, Math.round(sourceHeight * scale)) } }];
 }
 
-async function preparePngBase64(
+async function prepareImageBase64(
   image: GeoImage,
   actions: Parameters<typeof ImageManipulator.manipulateAsync>[1],
+  format: 'png' | 'jpeg',
+  quality = 1,
 ) {
   const prepared = await ImageManipulator.manipulateAsync(image.uri, actions, {
-    compress: 1,
-    format: ImageManipulator.SaveFormat.PNG,
+    compress: clamp01(quality),
+    format:
+      format === 'jpeg'
+        ? ImageManipulator.SaveFormat.JPEG
+        : ImageManipulator.SaveFormat.PNG,
     base64: true,
   });
   if (!prepared.base64) throw new Error('Could not read the map image.');
   return prepared.base64;
+}
+
+function preparePngBase64(
+  image: GeoImage,
+  actions: Parameters<typeof ImageManipulator.manipulateAsync>[1],
+) {
+  return prepareImageBase64(image, actions, 'png', 1);
 }
 
 /**
@@ -171,14 +188,15 @@ export function getGeoOverlayPreviewUri(image: GeoImage, sensitivity: number | n
 }
 
 /**
- * Prepare one export tile at its original pixel dimensions. There is no resize
- * and no JPEG pass: the tile is encoded as lossless PNG. When sensitivity is
- * provided, background removal is applied to the full-resolution tile.
+ * Prepare one export tile at its original pixel dimensions. Optimized KMZ can
+ * encode opaque tiles as JPEG (same 0.94 quality used by the web studio), while
+ * original quality and background-removed tiles remain lossless PNG.
  */
 export async function getGeoExportTileBase64(
   image: GeoImage,
   crop: GeoImageCrop,
   sensitivity: number | null,
+  encoding: GeoExportEncoding = {},
 ) {
   const isWholeImage =
     crop.x === 0 &&
@@ -195,10 +213,18 @@ export async function getGeoExportTileBase64(
           height: crop.height,
         },
       }];
-  const base64 = await preparePngBase64(image, actions);
-  return sensitivity === null
-    ? base64
-    : processPngBase64(base64, sensitivity);
+
+  // Background removal needs alpha, so always process through lossless PNG.
+  if (sensitivity !== null) {
+    const base64 = await preparePngBase64(image, actions);
+    return processPngBase64(base64, sensitivity);
+  }
+
+  if (encoding.format === 'jpeg') {
+    return prepareImageBase64(image, actions, 'jpeg', encoding.quality ?? 0.94);
+  }
+
+  return preparePngBase64(image, actions);
 }
 
 /**
