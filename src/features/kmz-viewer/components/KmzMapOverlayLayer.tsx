@@ -1,176 +1,135 @@
 import React, { memo, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
-import type { Region } from 'react-native-maps';
-import Svg, {
-  Circle,
-  G,
-  Image as SvgImage,
-  Polygon as SvgPolygon,
-  Polyline as SvgPolyline,
-  Text as SvgText,
-} from 'react-native-svg';
-import type { KmzCoordinate, KmzDocument } from '../types';
-
-type Size = { width: number; height: number };
+import { Marker, Overlay, Polygon, Polyline } from 'react-native-maps';
+import type { KmzCoordinate, KmzDocument, KmzGroundOverlay } from '../types';
 
 type Props = {
   document: KmzDocument;
-  region: Region;
-  viewport: Size;
   overlayOpacity: number;
 };
 
-const MAX_LATITUDE = 85.05112878;
+const EARTH_RADIUS_M = 6_378_137;
+const METERS_PER_DEGREE_LAT = 111_320;
 
-function clampLatitude(latitude: number) {
-  return Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latitude));
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
 }
 
-function mercatorV(latitude: number) {
-  const lat = clampLatitude(latitude);
-  const sinLatitude = Math.sin((lat * Math.PI) / 180);
-  return 0.5 - Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI);
+function normalizeBearing(value: number) {
+  return ((value % 360) + 360) % 360;
 }
 
-function longitudeU(longitude: number) {
-  return (longitude + 180) / 360;
+function distanceMeters(a: KmzCoordinate, b: KmzCoordinate) {
+  const lat1 = toRadians(a.latitude);
+  const lat2 = toRadians(b.latitude);
+  const dLat = lat2 - lat1;
+  const dLng = toRadians(b.longitude - a.longitude);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
-function createProjection(region: Region, viewport: Size) {
-  const west = longitudeU(region.longitude - region.longitudeDelta / 2);
-  const east = longitudeU(region.longitude + region.longitudeDelta / 2);
-  const north = mercatorV(region.latitude + region.latitudeDelta / 2);
-  const south = mercatorV(region.latitude - region.latitudeDelta / 2);
-  const spanU = Math.max(1e-12, east - west);
-  const spanV = Math.max(1e-12, south - north);
-
-  return (point: KmzCoordinate) => ({
-    x: ((longitudeU(point.longitude) - west) / spanU) * viewport.width,
-    y: ((mercatorV(point.latitude) - north) / spanV) * viewport.height,
-  });
+function headingDegrees(a: KmzCoordinate, b: KmzCoordinate) {
+  const lat1 = toRadians(a.latitude);
+  const lat2 = toRadians(b.latitude);
+  const dLng = toRadians(b.longitude - a.longitude);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2)
+    - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  return normalizeBearing((Math.atan2(y, x) * 180) / Math.PI);
 }
 
-function pointsText(points: { x: number; y: number }[]) {
-  return points.map((point) => `${point.x},${point.y}`).join(' ');
+/**
+ * Native Google Maps owns these overlays. That keeps KMZ imagery synchronized
+ * with map pan/zoom instead of updating a separate JS/SVG viewport one frame
+ * later. gx:LatLonQuad can technically be skewed, while GroundOverlay supports
+ * rectangle + bearing, so we use the quad's averaged physical size and bearing.
+ */
+function getNativePlacement(overlay: KmzGroundOverlay) {
+  const [lowerLeft, lowerRight, upperRight, upperLeft] = overlay.quad;
+  const center = overlay.quad.reduce(
+    (sum, point) => ({
+      latitude: sum.latitude + point.latitude / 4,
+      longitude: sum.longitude + point.longitude / 4,
+    }),
+    { latitude: 0, longitude: 0 },
+  );
+
+  const widthMeters = (
+    distanceMeters(lowerLeft, lowerRight) + distanceMeters(upperLeft, upperRight)
+  ) / 2;
+  const heightMeters = (
+    distanceMeters(lowerLeft, upperLeft) + distanceMeters(lowerRight, upperRight)
+  ) / 2;
+  const cosLat = Math.max(0.01, Math.cos(toRadians(center.latitude)));
+  const halfLat = (heightMeters / 2) / METERS_PER_DEGREE_LAT;
+  const halfLng = (widthMeters / 2) / (METERS_PER_DEGREE_LAT * cosLat);
+  const bearing = normalizeBearing(headingDegrees(upperLeft, upperRight) - 90);
+
+  return {
+    bounds: [
+      [center.latitude + halfLat, center.longitude - halfLng],
+      [center.latitude - halfLat, center.longitude + halfLng],
+    ] as [[number, number], [number, number]],
+    bearing,
+  };
 }
 
 export const KmzMapOverlayLayer = memo(function KmzMapOverlayLayer({
   document,
-  region,
-  viewport,
   overlayOpacity,
 }: Props) {
-  const project = useMemo(
-    () => createProjection(region, viewport),
-    [region, viewport],
+  const placements = useMemo(
+    () => document.overlays.map((overlay) => ({ overlay, placement: getNativePlacement(overlay) })),
+    [document.overlays],
   );
 
-  if (viewport.width <= 0 || viewport.height <= 0) return null;
-
   return (
-    <View pointerEvents='none' style={StyleSheet.absoluteFill}>
-      <Svg width={viewport.width} height={viewport.height}>
-        {document.overlays.map((overlay) => {
-          const lowerLeft = project(overlay.quad[0]);
-          const upperRight = project(overlay.quad[2]);
-          const upperLeft = project(overlay.quad[3]);
-          const lowerRight = project(overlay.quad[1]);
-          const a = upperRight.x - upperLeft.x;
-          const b = upperRight.y - upperLeft.y;
-          const c = lowerLeft.x - upperLeft.x;
-          const d = lowerLeft.y - upperLeft.y;
-          const predictedLowerRight = {
-            x: upperLeft.x + a + c,
-            y: upperLeft.y + b + d,
-          };
-          const quadError = Math.hypot(
-            predictedLowerRight.x - lowerRight.x,
-            predictedLowerRight.y - lowerRight.y,
-          );
+    <>
+      {placements.map(({ overlay, placement }) => (
+        <Overlay
+          key={overlay.id}
+          image={{ uri: overlay.imageUri }}
+          bounds={placement.bounds}
+          bearing={placement.bearing}
+          opacity={Math.max(0, Math.min(1, overlay.opacity * overlayOpacity))}
+        />
+      ))}
 
-          return (
-            <G
-              key={overlay.id}
-              opacity={Math.max(0, Math.min(1, overlay.opacity * overlayOpacity))}
-            >
-              <SvgImage
-                href={{ uri: overlay.imageUri }}
-                x={0}
-                y={0}
-                width={1}
-                height={1}
-                preserveAspectRatio='none'
-                transform={`matrix(${a} ${b} ${c} ${d} ${upperLeft.x} ${upperLeft.y})`}
-              />
-              {quadError > 6 ? (
-                <SvgPolygon
-                  points={pointsText([upperLeft, upperRight, lowerRight, lowerLeft])}
-                  fill='transparent'
-                  stroke='rgba(245,158,11,0.55)'
-                  strokeWidth={1}
-                  strokeDasharray='4 4'
-                />
-              ) : null}
-            </G>
-          );
-        })}
+      {document.placemarks.flatMap((placemark) =>
+        placemark.polygons.map((coordinates, index) => (
+          <Polygon
+            key={`${placemark.id}-polygon-${index}`}
+            coordinates={coordinates}
+            fillColor={placemark.style.polygonFillColor}
+            strokeColor={placemark.style.polygonStrokeColor}
+            strokeWidth={placemark.style.lineWidth}
+          />
+        )),
+      )}
 
-        {document.placemarks.flatMap((placemark) =>
-          placemark.polygons.map((polygon, index) => {
-            const points = polygon.map(project);
-            return (
-              <SvgPolygon
-                key={`${placemark.id}-polygon-${index}`}
-                points={pointsText(points)}
-                fill={placemark.style.polygonFillColor}
-                stroke={placemark.style.polygonStrokeColor}
-                strokeWidth={placemark.style.lineWidth}
-              />
-            );
-          }),
-        )}
+      {document.placemarks.flatMap((placemark) =>
+        placemark.lines.map((coordinates, index) => (
+          <Polyline
+            key={`${placemark.id}-line-${index}`}
+            coordinates={coordinates}
+            strokeColor={placemark.style.lineColor}
+            strokeWidth={placemark.style.lineWidth}
+          />
+        )),
+      )}
 
-        {document.placemarks.flatMap((placemark) =>
-          placemark.lines.map((line, index) => {
-            const points = line.map(project);
-            return (
-              <SvgPolyline
-                key={`${placemark.id}-line-${index}`}
-                points={pointsText(points)}
-                fill='none'
-                stroke={placemark.style.lineColor}
-                strokeWidth={placemark.style.lineWidth}
-                strokeLinecap='round'
-                strokeLinejoin='round'
-              />
-            );
-          }),
-        )}
-
-        {document.placemarks.flatMap((placemark) =>
-          placemark.points.map((point, index) => {
-            const screen = project(point);
-            return (
-              <G key={`${placemark.id}-point-${index}`}>
-                <Circle cx={screen.x} cy={screen.y} r={7} fill='#dc2626' stroke='#ffffff' strokeWidth={2} />
-                {placemark.name ? (
-                  <SvgText
-                    x={screen.x + 10}
-                    y={screen.y - 8}
-                    fill='#0f172a'
-                    stroke='#ffffff'
-                    strokeWidth={2.5}
-                    fontSize={11}
-                    fontWeight='700'
-                  >
-                    {placemark.name}
-                  </SvgText>
-                ) : null}
-              </G>
-            );
-          }),
-        )}
-      </Svg>
-    </View>
+      {document.placemarks.flatMap((placemark) =>
+        placemark.points.map((coordinate, index) => (
+          <Marker
+            key={`${placemark.id}-point-${index}`}
+            coordinate={coordinate}
+            title={placemark.name || undefined}
+            description={placemark.description}
+            pinColor='#dc2626'
+          />
+        )),
+      )}
+    </>
   );
 });

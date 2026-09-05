@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  LayoutChangeEvent,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -11,6 +10,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { type Region } from 'react-native-maps';
 import * as DocumentPicker from 'expo-document-picker';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import {
   ArrowLeft,
@@ -20,6 +20,7 @@ import {
   LocateFixed,
   Map,
   Minus,
+  Navigation,
   Plus,
   Satellite,
 } from 'lucide-react-native';
@@ -48,35 +49,36 @@ export default function KmzViewerScreen() {
   const colors = Colors[theme];
   const mapRef = useRef<MapView>(null);
   const documentRef = useRef<KmzDocument | null>(null);
-  const regionFrameRef = useRef<number | null>(null);
-  const pendingRegionRef = useRef<Region>(INITIAL_REGION);
 
   const [document, setDocument] = useState<KmzDocument | null>(null);
   const [loading, setLoading] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [locationGranted, setLocationGranted] = useState(false);
   const [mapStyle, setMapStyle] = useState<'hybrid' | 'standard'>('hybrid');
   const [overlayOpacity, setOverlayOpacity] = useState(1);
-  const [region, setRegion] = useState<Region>(INITIAL_REGION);
-  const [viewport, setViewport] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     documentRef.current = document;
   }, [document]);
 
-  useEffect(
-    () => () => {
-      if (regionFrameRef.current !== null) cancelAnimationFrame(regionFrameRef.current);
-      void cleanupKmzDocument(documentRef.current);
-    },
-    [],
-  );
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        let permission = await Location.getForegroundPermissionsAsync();
+        if (!permission.granted && permission.canAskAgain) {
+          permission = await Location.requestForegroundPermissionsAsync();
+        }
+        if (active) setLocationGranted(permission.granted);
+      } catch {
+        if (active) setLocationGranted(false);
+      }
+    })();
 
-  const scheduleRegionUpdate = useCallback((nextRegion: Region) => {
-    pendingRegionRef.current = nextRegion;
-    if (regionFrameRef.current !== null) return;
-    regionFrameRef.current = requestAnimationFrame(() => {
-      regionFrameRef.current = null;
-      setRegion(pendingRegionRef.current);
-    });
+    return () => {
+      active = false;
+      void cleanupKmzDocument(documentRef.current);
+    };
   }, []);
 
   const fitDocument = useCallback((nextDocument?: KmzDocument | null) => {
@@ -101,11 +103,50 @@ export default function KmzViewerScreen() {
         { latitude: maxLat, longitude: maxLng },
       ],
       {
-        edgePadding: { top: 90, right: 45, bottom: 180, left: 45 },
+        edgePadding: { top: 70, right: 36, bottom: 190, left: 36 },
         animated: true,
       },
     );
   }, []);
+
+  const goToMyLocation = useCallback(async () => {
+    if (locating) return;
+    setLocating(true);
+    try {
+      let permission = await Location.getForegroundPermissionsAsync();
+      if (!permission.granted) {
+        permission = await Location.requestForegroundPermissionsAsync();
+      }
+      if (!permission.granted) {
+        setLocationGranted(false);
+        Alert.alert('Location permission দরকার', 'আপনি কোন প্লটের উপর আছেন দেখাতে Location permission Allow করুন।');
+        return;
+      }
+
+      setLocationGranted(true);
+      const lastKnown = await Location.getLastKnownPositionAsync({
+        maxAge: 15_000,
+        requiredAccuracy: 80,
+      });
+      const position = lastKnown ?? await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      mapRef.current?.animateToRegion(
+        {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          latitudeDelta: 0.0025,
+          longitudeDelta: 0.0025,
+        },
+        450,
+      );
+    } catch {
+      Alert.alert('Location পাওয়া যায়নি', 'GPS চালু আছে কিনা দেখে আবার চেষ্টা করুন।');
+    } finally {
+      setLocating(false);
+    }
+  }, [locating]);
 
   const openKmz = useCallback(async () => {
     if (loading) return;
@@ -139,11 +180,6 @@ export default function KmzViewerScreen() {
       setLoading(false);
     }
   }, [fitDocument, loading]);
-
-  const onLayout = (event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    setViewport({ width, height });
-  };
 
   const placemarkGeometryCount = document
     ? document.placemarks.reduce(
@@ -183,7 +219,7 @@ export default function KmzViewerScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.mapWrap} onLayout={onLayout}>
+      <View style={styles.mapWrap}>
         <MapView
           ref={mapRef}
           style={StyleSheet.absoluteFill}
@@ -193,36 +229,46 @@ export default function KmzViewerScreen() {
           pitchEnabled={false}
           toolbarEnabled={false}
           showsCompass
+          showsUserLocation={locationGranted}
+          showsMyLocationButton={false}
           loadingEnabled
-          onRegionChange={scheduleRegionUpdate}
-          onRegionChangeComplete={(nextRegion) => {
-            pendingRegionRef.current = nextRegion;
-            setRegion(nextRegion);
-          }}
-        />
+        >
+          {document ? (
+            <KmzMapOverlayLayer document={document} overlayOpacity={overlayOpacity} />
+          ) : null}
+        </MapView>
 
-        {document ? (
-          <KmzMapOverlayLayer
-            document={document}
-            region={region}
-            viewport={viewport}
-            overlayOpacity={overlayOpacity}
-          />
-        ) : (
+        {!document ? (
           <View pointerEvents='box-none' style={styles.emptyWrap}>
             <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
               <View style={styles.emptyIcon}>
                 <Globe2 size={28} color='#16a34a' />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text }]}>Google Earth KMZ এখানে দেখুন</Text>
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>KMZ বা KML import করলে image overlay, point, line ও polygon সরাসরি map-এর উপর দেখা যাবে।</Text>
+              <Text style={[styles.emptyText, { color: colors.textMuted }]}>KMZ বা KML import করলে overlay, point, line ও polygon সরাসরি map-এর সাথে locked থাকবে।</Text>
               <TouchableOpacity style={styles.primaryButton} onPress={openKmz} disabled={loading}>
                 {loading ? <ActivityIndicator size='small' color='#fff' /> : <FileUp size={17} color='#fff' />}
                 <Text style={styles.primaryButtonText}>KMZ Import করুন</Text>
               </TouchableOpacity>
             </View>
           </View>
-        )}
+        ) : null}
+
+        <TouchableOpacity
+          style={[
+            styles.locationFab,
+            {
+              backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.96)' : 'rgba(255,255,255,0.97)',
+              borderColor: locationGranted ? 'rgba(37,99,235,0.45)' : colors.border,
+            },
+          ]}
+          onPress={goToMyLocation}
+          disabled={locating}
+        >
+          {locating
+            ? <ActivityIndicator size='small' color='#2563eb' />
+            : <Navigation size={19} color={locationGranted ? '#2563eb' : colors.textMuted} />}
+        </TouchableOpacity>
 
         {document ? (
           <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 10 }]}>
@@ -232,7 +278,7 @@ export default function KmzViewerScreen() {
                 <View style={styles.fileText}>
                   <Text numberOfLines={1} style={[styles.fileName, { color: colors.text }]}>{document.sourceName}</Text>
                   <Text style={[styles.fileMeta, { color: colors.textMuted }]}>
-                    {document.overlays.length} overlay • {placemarkGeometryCount} placemark layer{document.warnings.length ? ` • ${document.warnings.length} warning` : ''}
+                    {document.overlays.length} overlay • {placemarkGeometryCount} placemark layer
                   </Text>
                 </View>
               </View>
@@ -261,8 +307,16 @@ export default function KmzViewerScreen() {
               <Tool
                 icon={mapStyle === 'hybrid' ? <Satellite size={18} color='#16a34a' /> : <Map size={18} color={colors.textMuted} />}
                 label={mapStyle === 'hybrid' ? 'Satellite' : 'Map'}
-                active
+                active={mapStyle === 'hybrid'}
                 onPress={() => setMapStyle((value) => value === 'hybrid' ? 'standard' : 'hybrid')}
+                colors={colors}
+              />
+              <Tool
+                icon={<Navigation size={18} color={locationGranted ? '#2563eb' : colors.textMuted} />}
+                label='My Location'
+                active={locationGranted}
+                activeColor='#2563eb'
+                onPress={goToMyLocation}
                 colors={colors}
               />
               <Tool
@@ -289,19 +343,23 @@ function Tool({
   icon,
   label,
   active,
+  activeColor = '#16a34a',
   onPress,
   colors,
 }: {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
+  activeColor?: string;
   onPress: () => void;
   colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
 }) {
   return (
-    <TouchableOpacity onPress={onPress} style={[styles.tool, active && styles.toolActive]}>
+    <TouchableOpacity onPress={onPress} style={styles.tool}>
       {icon}
-      <Text style={[styles.toolLabel, { color: active ? '#16a34a' : colors.textMuted }]}>{label}</Text>
+      <Text style={[styles.toolLabel, { color: active ? activeColor : colors.textMuted }]} numberOfLines={1}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 }
@@ -325,6 +383,7 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: Fonts.sansRegular, fontSize: 11, lineHeight: 16, textAlign: 'center' },
   primaryButton: { minHeight: 43, marginTop: 8, paddingHorizontal: 18, borderRadius: 11, backgroundColor: '#16a34a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   primaryButtonText: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 12 },
+  locationFab: { position: 'absolute', top: 12, right: 12, width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 6, elevation: 5 },
   bottomWrap: { position: 'absolute', left: 10, right: 10, gap: 8, zIndex: 50 },
   infoCard: { borderRadius: 14, borderWidth: 1, padding: 10, gap: 9, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 7, elevation: 5 },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
@@ -335,10 +394,9 @@ const styles = StyleSheet.create({
   opacityRow: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   controlLabel: { fontFamily: Fonts.sansMedium, fontSize: 10.5 },
   opacityControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  smallControl: { width: 32, height: 32, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  opacityValue: { minWidth: 38, textAlign: 'center', fontFamily: Fonts.headingBold, fontSize: 10.5 },
-  toolbar: { minHeight: 60, borderRadius: 15, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 4, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 6 },
-  tool: { minWidth: 78, height: 50, borderRadius: 10, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  toolActive: { backgroundColor: 'rgba(22,163,74,0.10)' },
-  toolLabel: { fontFamily: Fonts.sansMedium, fontSize: 8.5 },
+  smallControl: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  opacityValue: { minWidth: 38, textAlign: 'center', fontFamily: Fonts.headingBold, fontSize: 11 },
+  toolbar: { minHeight: 66, borderRadius: 14, borderWidth: 1, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'stretch', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 7, elevation: 5 },
+  tool: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2 },
+  toolLabel: { fontFamily: Fonts.sansMedium, fontSize: 8.5, textAlign: 'center' },
 });
