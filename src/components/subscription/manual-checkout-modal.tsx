@@ -149,16 +149,16 @@ export function ManualCheckoutModal({
           <View style={styles.handle} />
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: colors.text }]}> 
+              <Text style={[styles.title, { color: colors.text }]}>
                 {showStatus ? 'পেমেন্ট ভেরিফিকেশন' : 'ম্যানুয়াল পেমেন্ট'}
               </Text>
-              <Text style={[styles.subtitle, { color: colors.textMuted }]}> 
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
                 {showStatus
                   ? 'অ্যাডমিন যাচাই শেষে আপনার Pro access সক্রিয় হবে।'
                   : 'bKash, Nagad বা Rocket-এ Send Money করে তথ্য জমা দিন।'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { borderColor: colors.border }]}> 
+            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { borderColor: colors.border }]}>
               <X size={17} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
@@ -172,11 +172,11 @@ export function ManualCheckoutModal({
               <View style={styles.statusContent}>
                 <View style={styles.pendingIcon}><Clock size={30} color='#d97706' /></View>
                 <Text style={[styles.statusTitle, { color: colors.text }]}>পেমেন্ট যাচাইাধীন</Text>
-                <Text style={[styles.statusText, { color: colors.textMuted }]}> 
+                <Text style={[styles.statusText, { color: colors.textMuted }]}>
                   {plan.name} (৳{toBengaliDigits(plan.price)}) প্ল্যানের পেমেন্ট রিকোয়েস্ট জমা আছে।
                   অনুমোদনের পর স্বয়ংক্রিয়ভাবে Pro access দেখা যাবে।
                 </Text>
-                <View style={[styles.summaryCard, { backgroundColor: colors.background, borderColor: colors.border }]}> 
+                <View style={[styles.summaryCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
                   <SummaryRow label='প্ল্যান' value={plan.name} colors={colors} />
                   <SummaryRow label='পরিমাণ' value={`৳${toBengaliDigits(plan.price)}`} colors={colors} />
                   {currentTrxId ? <SummaryRow label='TrxID' value={currentTrxId} colors={colors} accent /> : null}
@@ -187,10 +187,10 @@ export function ManualCheckoutModal({
               </View>
             ) : (
               <View style={styles.formContent}>
-                <View style={[styles.planSummary, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}35` }]}> 
+                <View style={[styles.planSummary, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}35` }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.planName, { color: colors.text }]}>{plan.name}</Text>
-                    <Text style={[styles.planDuration, { color: colors.textMuted }]}> 
+                    <Text style={[styles.planDuration, { color: colors.textMuted }]}>
                       {toBengaliDigits(plan.durationDays)} দিনের প্যাকেজ
                     </Text>
                   </View>
@@ -215,7 +215,7 @@ export function ManualCheckoutModal({
                             },
                           ]}
                         >
-                          <Text style={[styles.methodText, { color: selected ? colors.primary : colors.textMuted }]}> 
+                          <Text style={[styles.methodText, { color: selected ? colors.primary : colors.textMuted }]}>
                             {item.label}
                           </Text>
                         </TouchableOpacity>
@@ -223,22 +223,22 @@ export function ManualCheckoutModal({
                     })}
                   </View>
                 ) : (
-                  <Text style={[styles.unavailableText, { color: colors.textMuted }]}> 
+                  <Text style={[styles.unavailableText, { color: colors.textMuted }]}>
                     কোনো পেমেন্ট নম্বর কনফিগার করা নেই। পরে আবার চেষ্টা করুন।
                   </Text>
                 )}
 
                 {targetNumber ? (
-                  <View style={[styles.paymentBox, { backgroundColor: colors.background, borderColor: colors.border }]}> 
+                  <View style={[styles.paymentBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
                     <Text style={[styles.paymentHint, { color: colors.textMuted }]}>Send Money করুন:</Text>
                     <View style={styles.paymentNumberRow}>
                       <Text selectable style={[styles.paymentNumber, { color: colors.text }]}>{targetNumber}</Text>
-                      <TouchableOpacity onPress={copyNumber} style={[styles.copyButton, { borderColor: colors.border }]}> 
+                      <TouchableOpacity onPress={copyNumber} style={[styles.copyButton, { borderColor: colors.border }]}>
                         {copied ? <Check size={14} color={colors.primary} /> : <Copy size={14} color={colors.primary} />}
                         <Text style={[styles.copyText, { color: colors.primary }]}>{copied ? 'কপি হয়েছে' : 'কপি'}</Text>
                       </TouchableOpacity>
                     </View>
-                    <Text style={[styles.amountHint, { color: colors.textMuted }]}> 
+                    <Text style={[styles.amountHint, { color: colors.textMuted }]}>
                       উপরের নম্বরে ঠিক ৳{toBengaliDigits(plan.price)} Send Money করুন, তারপর নিচে sender number ও TrxID দিন।
                     </Text>
                     {paymentNumbers?.instructions ? (
