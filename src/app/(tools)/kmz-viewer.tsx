@@ -315,7 +315,7 @@ function OverlayControl({
           onPress={onDecrease}
           disabled={value <= 0.1}
         >
-          <Minus size={11} color={value <= 0.1 ? colors.textMuted : colors.text} />
+          <Minus size={14} color={value <= 0.1 ? colors.textMuted : colors.text} />
         </TouchableOpacity>
         <Text style={[styles.overlayValue, { color: colors.text }]}>{Math.round(value * 100)}%</Text>
         <TouchableOpacity
@@ -323,7 +323,7 @@ function OverlayControl({
           onPress={onIncrease}
           disabled={value >= 1}
         >
-          <Plus size={11} color={value >= 1 ? colors.textMuted : colors.text} />
+          <Plus size={14} color={value >= 1 ? colors.textMuted : colors.text} />
         </TouchableOpacity>
       </View>
       <Text style={[styles.toolLabel, { color: colors.textMuted }]}>Overlay</Text>
@@ -347,8 +347,8 @@ const styles = StyleSheet.create({
   toolbar: { minHeight: 68, borderRadius: 14, borderWidth: 1, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'stretch', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 7, elevation: 5 },
   tool: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2 },
   toolLabel: { fontFamily: Fonts.sansMedium, fontSize: 8.5, textAlign: 'center' },
-  overlayTool: { flex: 1.12, minWidth: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 1 },
-  overlayMiniRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
-  overlayMiniButton: { width: 23, height: 23, borderRadius: 7, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  overlayValue: { minWidth: 30, textAlign: 'center', fontFamily: Fonts.headingBold, fontSize: 8.5 },
+  overlayTool: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4 },
+  overlayMiniRow: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  overlayMiniButton: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  overlayValue: { minWidth: 38, textAlign: 'center', fontFamily: Fonts.headingBold, fontSize: 10.5 },
 });
