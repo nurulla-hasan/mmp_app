@@ -34,6 +34,7 @@ export default function MouzaGeoScreen() {
   const transform = useMouzaGeoStore((state) => state.transform);
   const mapStyle = useMouzaGeoStore((state) => state.mapStyle);
   const opacity = useMouzaGeoStore((state) => state.opacity);
+  const backgroundMode = useMouzaGeoStore((state) => state.backgroundMode);
   const setActiveView = useMouzaGeoStore((state) => state.setActiveView);
   const captureSource = useMouzaGeoStore((state) => state.captureSource);
   const captureWorld = useMouzaGeoStore((state) => state.captureWorld);
@@ -86,7 +87,7 @@ export default function MouzaGeoScreen() {
     }
     setExporting(true);
     try {
-      await exportMouzaKmz({ image, transform, opacity });
+      await exportMouzaKmz({ image, transform, opacity, backgroundMode });
     } catch (error) {
       Alert.alert('KMZ export failed', error instanceof Error ? error.message : 'Could not create the KMZ file.');
     } finally {
@@ -124,7 +125,15 @@ export default function MouzaGeoScreen() {
               <GeoSourceCanvas ref={sourceRef} image={image} controlPairs={controlPairs} pendingSource={pendingSource} />
             </View>
             <View pointerEvents={activeView === 'world' ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, activeView !== 'world' && styles.hiddenCanvas]}>
-              <GeoWorldMap ref={worldRef} image={image} transform={transform} controlPairs={controlPairs} opacity={opacity} mapStyle={mapStyle} />
+              <GeoWorldMap
+                ref={worldRef}
+                image={image}
+                transform={transform}
+                controlPairs={controlPairs}
+                opacity={opacity}
+                mapStyle={mapStyle}
+                backgroundMode={backgroundMode}
+              />
             </View>
             <GeoTargetCrosshair />
 
