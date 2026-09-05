@@ -1,10 +1,9 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import MapView, { Marker, Overlay, Polygon } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
-import type { ControlPair, GeoBackgroundMode, GeoImage, GeoMapStyle, GeoPoint, GeoTransform } from '../types';
+import { Alert, StyleSheet, View } from 'react-native';
+import type { ControlPair, GeoImage, GeoMapStyle, GeoPoint, GeoTransform } from '../types';
 import { getNativeOverlayPreview, getOverlayCorners } from '../utils/geo-math';
-import { getGeoOverlayImageUri } from '../utils/overlay-image';
 
 export type GeoWorldMapHandle = {
   getCenterCoordinate: () => Promise<GeoPoint | null>;
@@ -18,7 +17,6 @@ type Props = {
   controlPairs: ControlPair[];
   opacity: number;
   mapStyle: GeoMapStyle;
-  backgroundMode: GeoBackgroundMode;
 };
 
 const INITIAL_REGION = {
@@ -29,39 +27,13 @@ const INITIAL_REGION = {
 };
 
 export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorldMap(
-  { image, transform, controlPairs, opacity, mapStyle, backgroundMode },
+  { image, transform, controlPairs, opacity, mapStyle },
   ref,
 ) {
   const mapRef = useRef<MapView>(null);
   const [showsUserLocation, setShowsUserLocation] = useState(false);
-  const [overlayUri, setOverlayUri] = useState(image.uri);
-  const [preparingOverlay, setPreparingOverlay] = useState(false);
   const corners = useMemo(() => transform ? getOverlayCorners(transform, image) : [], [image, transform]);
   const preview = useMemo(() => transform ? getNativeOverlayPreview(transform, image) : null, [image, transform]);
-
-  useEffect(() => {
-    let active = true;
-    setOverlayUri(image.uri);
-
-    if (backgroundMode === 'original') {
-      setPreparingOverlay(false);
-      return () => { active = false; };
-    }
-
-    setPreparingOverlay(true);
-    void getGeoOverlayImageUri(image, backgroundMode)
-      .then((uri) => {
-        if (active) setOverlayUri(uri);
-      })
-      .catch(() => {
-        if (active) setOverlayUri(image.uri);
-      })
-      .finally(() => {
-        if (active) setPreparingOverlay(false);
-      });
-
-    return () => { active = false; };
-  }, [backgroundMode, image]);
 
   const fitAlignment = () => {
     if (!mapRef.current || !corners.length) return;
@@ -109,8 +81,8 @@ export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorl
       >
         {preview && (
           <Overlay
-            key={`${backgroundMode}-${overlayUri}`}
-            image={{ uri: overlayUri }}
+            key={image.uri}
+            image={{ uri: image.uri }}
             bounds={preview.bounds}
             bearing={preview.bearing}
             opacity={opacity}
@@ -136,34 +108,10 @@ export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorl
           />
         ))}
       </MapView>
-
-      {preparingOverlay ? (
-        <View pointerEvents='none' style={styles.processingBadge}>
-          <ActivityIndicator size='small' color='#2563eb' />
-          <Text style={styles.processingText}>Isolating black survey ink…</Text>
-        </View>
-      ) : null}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#dbeafe' },
-  processingBadge: {
-    position: 'absolute',
-    top: 10,
-    alignSelf: 'center',
-    minHeight: 34,
-    paddingHorizontal: 11,
-    borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.94)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 5,
-    elevation: 4,
-  },
-  processingText: { color: '#334155', fontSize: 10, fontWeight: '600' },
 });
