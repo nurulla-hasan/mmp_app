@@ -9,6 +9,7 @@ import {
   type ViewProps,
   type ViewStyle,
 } from 'react-native';
+import { usePathname } from 'expo-router';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -21,6 +22,7 @@ export const PAGE_LAYOUT = {
   horizontal: 14,
   top: 14,
   bottom: 28,
+  floatingNavOverhang: 22,
   gap: 12,
   compactGap: 8,
   sectionGap: 12,
@@ -29,6 +31,28 @@ export const PAGE_LAYOUT = {
   introIconSize: 40,
   introIconRadius: 11,
 } as const;
+
+export const PAGE_BOTTOM_WITH_FLOATING_NAV =
+  PAGE_LAYOUT.bottom + PAGE_LAYOUT.floatingNavOverhang;
+
+export function hasStandaloneFloatingBottomNav(pathname: string) {
+  return (
+    pathname === '/pricing' ||
+    pathname === '/join-as-surveyor' ||
+    pathname === '/surveyor-profile' ||
+    pathname.startsWith('/surveyors/')
+  );
+}
+
+export function hasFloatingBottomNav(pathname: string) {
+  return (
+    pathname === '/' ||
+    pathname === '/surveyors' ||
+    pathname === '/tools' ||
+    pathname === '/profile' ||
+    hasStandaloneFloatingBottomNav(pathname)
+  );
+}
 
 /**
  * Use this for FlatList/FlashList screens that cannot render through PageWrapper.
@@ -56,12 +80,16 @@ export function PageWrapper({
   contentStyle,
   gap = PAGE_LAYOUT.gap,
   topPadding = PAGE_LAYOUT.top,
-  bottomPadding = PAGE_LAYOUT.bottom,
+  bottomPadding,
   showsVerticalScrollIndicator = false,
   ...props
 }: PageWrapperProps) {
+  const pathname = usePathname();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
+  const resolvedBottomPadding =
+    bottomPadding ??
+    (hasFloatingBottomNav(pathname) ? PAGE_BOTTOM_WITH_FLOATING_NAV : PAGE_LAYOUT.bottom);
 
   return (
     <ScrollView
@@ -69,7 +97,7 @@ export function PageWrapper({
       style={[styles.page, { backgroundColor: colors.background }, style]}
       contentContainerStyle={[
         styles.content,
-        { gap, paddingTop: topPadding, paddingBottom: bottomPadding },
+        { gap, paddingTop: topPadding, paddingBottom: resolvedBottomPadding },
         contentContainerStyle,
         contentStyle,
       ]}
