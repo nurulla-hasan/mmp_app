@@ -16,7 +16,6 @@ import {
   ArrowLeft,
   FileUp,
   Globe2,
-  Layers,
   LocateFixed,
   Map,
   Minus,
@@ -103,7 +102,7 @@ export default function KmzViewerScreen() {
         { latitude: maxLat, longitude: maxLng },
       ],
       {
-        edgePadding: { top: 70, right: 36, bottom: 190, left: 36 },
+        edgePadding: { top: 70, right: 36, bottom: 120, left: 36 },
         animated: true,
       },
     );
@@ -181,13 +180,6 @@ export default function KmzViewerScreen() {
     }
   }, [fitDocument, loading]);
 
-  const placemarkGeometryCount = document
-    ? document.placemarks.reduce(
-        (sum, item) => sum + item.points.length + item.lines.length + item.polygons.length,
-        0,
-      )
-    : 0;
-
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.surface }]} edges={['top']}>
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -214,8 +206,10 @@ export default function KmzViewerScreen() {
           onPress={openKmz}
           disabled={loading}
         >
-          {loading ? <ActivityIndicator size='small' color='#16a34a' /> : <FileUp size={16} color='#16a34a' />}
-          <Text style={styles.openButtonText}>{document ? 'Open' : 'Import'}</Text>
+          {loading ? <ActivityIndicator size='small' color='#16a34a' /> : <FileUp size={15} color='#16a34a' />}
+          <Text numberOfLines={1} style={styles.openButtonText}>
+            {document ? document.sourceName : 'Import'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -256,37 +250,6 @@ export default function KmzViewerScreen() {
 
         {document ? (
           <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 10 }]}>
-            <View style={[styles.infoCard, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.96)' : 'rgba(255,255,255,0.96)', borderColor: colors.border }]}>
-              <View style={styles.fileRow}>
-                <View style={styles.fileIcon}><Layers size={16} color='#16a34a' /></View>
-                <View style={styles.fileText}>
-                  <Text numberOfLines={1} style={[styles.fileName, { color: colors.text }]}>{document.sourceName}</Text>
-                  <Text style={[styles.fileMeta, { color: colors.textMuted }]}>
-                    {document.overlays.length} overlay • {placemarkGeometryCount} placemark layer
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.opacityRow}>
-                <Text style={[styles.controlLabel, { color: colors.textMuted }]}>Overlay opacity</Text>
-                <View style={styles.opacityControls}>
-                  <TouchableOpacity
-                    style={[styles.smallControl, { borderColor: colors.border }]}
-                    onPress={() => setOverlayOpacity((value) => Math.max(0.1, Math.round((value - 0.1) * 10) / 10))}
-                  >
-                    <Minus size={15} color={colors.text} />
-                  </TouchableOpacity>
-                  <Text style={[styles.opacityValue, { color: colors.text }]}>{Math.round(overlayOpacity * 100)}%</Text>
-                  <TouchableOpacity
-                    style={[styles.smallControl, { borderColor: colors.border }]}
-                    onPress={() => setOverlayOpacity((value) => Math.min(1, Math.round((value + 0.1) * 10) / 10))}
-                  >
-                    <Plus size={15} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
             <View style={[styles.toolbar, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.98)' : 'rgba(255,255,255,0.98)', borderColor: colors.border }]}>
               <Tool
                 icon={mapStyle === 'hybrid' ? <Satellite size={18} color='#16a34a' /> : <Map size={18} color={colors.textMuted} />}
@@ -311,10 +274,10 @@ export default function KmzViewerScreen() {
                 onPress={() => fitDocument()}
                 colors={colors}
               />
-              <Tool
-                icon={<FileUp size={18} color={colors.textMuted} />}
-                label='Open KMZ'
-                onPress={openKmz}
+              <OverlayControl
+                value={overlayOpacity}
+                onDecrease={() => setOverlayOpacity((value) => Math.max(0.1, Math.round((value - 0.1) * 10) / 10))}
+                onIncrease={() => setOverlayOpacity((value) => Math.min(1, Math.round((value + 0.1) * 10) / 10))}
                 colors={colors}
               />
             </View>
@@ -350,6 +313,41 @@ function Tool({
   );
 }
 
+function OverlayControl({
+  value,
+  onDecrease,
+  onIncrease,
+  colors,
+}: {
+  value: number;
+  onDecrease: () => void;
+  onIncrease: () => void;
+  colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
+}) {
+  return (
+    <View style={styles.overlayTool}>
+      <View style={styles.overlayMiniRow}>
+        <TouchableOpacity
+          style={[styles.overlayMiniButton, { borderColor: colors.border }]}
+          onPress={onDecrease}
+          disabled={value <= 0.1}
+        >
+          <Minus size={11} color={value <= 0.1 ? colors.textMuted : colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.overlayValue, { color: colors.text }]}>{Math.round(value * 100)}%</Text>
+        <TouchableOpacity
+          style={[styles.overlayMiniButton, { borderColor: colors.border }]}
+          onPress={onIncrease}
+          disabled={value >= 1}
+        >
+          <Plus size={11} color={value >= 1 ? colors.textMuted : colors.text} />
+        </TouchableOpacity>
+      </View>
+      <Text style={[styles.toolLabel, { color: colors.textMuted }]}>Overlay</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   header: { height: 60, borderBottomWidth: 1, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 100 },
@@ -359,8 +357,8 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   title: { fontFamily: Fonts.headingBold, fontSize: 16 },
   subtitle: { fontFamily: Fonts.sansRegular, fontSize: 10, marginTop: -1 },
-  openButton: { minWidth: 76, height: 35, borderRadius: 9, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginLeft: 8 },
-  openButtonText: { color: '#16a34a', fontFamily: Fonts.headingBold, fontSize: 10.5 },
+  openButton: { minWidth: 82, maxWidth: 142, height: 35, borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginLeft: 8 },
+  openButtonText: { flexShrink: 1, color: '#16a34a', fontFamily: Fonts.headingSemiBold, fontSize: 9.5 },
   mapWrap: { flex: 1, position: 'relative', overflow: 'hidden' },
   emptyWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
   emptyCard: { width: '100%', maxWidth: 360, borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center', gap: 8, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, elevation: 5 },
@@ -369,19 +367,12 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: Fonts.sansRegular, fontSize: 11, lineHeight: 16, textAlign: 'center' },
   primaryButton: { minHeight: 43, marginTop: 8, paddingHorizontal: 18, borderRadius: 11, backgroundColor: '#16a34a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   primaryButtonText: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 12 },
-  bottomWrap: { position: 'absolute', left: 10, right: 10, gap: 8, zIndex: 50 },
-  infoCard: { borderRadius: 14, borderWidth: 1, padding: 10, gap: 9, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 7, elevation: 5 },
-  fileRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  fileIcon: { width: 34, height: 34, borderRadius: 9, backgroundColor: 'rgba(22,163,74,0.12)', alignItems: 'center', justifyContent: 'center' },
-  fileText: { flex: 1, minWidth: 0 },
-  fileName: { fontFamily: Fonts.headingSemiBold, fontSize: 11.5 },
-  fileMeta: { fontFamily: Fonts.sansRegular, fontSize: 9.5, marginTop: 1 },
-  opacityRow: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  controlLabel: { fontFamily: Fonts.sansMedium, fontSize: 10.5 },
-  opacityControls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  smallControl: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  opacityValue: { minWidth: 38, textAlign: 'center', fontFamily: Fonts.headingBold, fontSize: 11 },
-  toolbar: { minHeight: 66, borderRadius: 14, borderWidth: 1, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'stretch', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 7, elevation: 5 },
+  bottomWrap: { position: 'absolute', left: 10, right: 10, zIndex: 50 },
+  toolbar: { minHeight: 68, borderRadius: 14, borderWidth: 1, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'stretch', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 7, elevation: 5 },
   tool: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2 },
   toolLabel: { fontFamily: Fonts.sansMedium, fontSize: 8.5, textAlign: 'center' },
+  overlayTool: { flex: 1.12, minWidth: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 1 },
+  overlayMiniRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 },
+  overlayMiniButton: { width: 23, height: 23, borderRadius: 7, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  overlayValue: { minWidth: 30, textAlign: 'center', fontFamily: Fonts.headingBold, fontSize: 8.5 },
 });
