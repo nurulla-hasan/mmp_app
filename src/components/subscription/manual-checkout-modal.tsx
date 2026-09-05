@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +11,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { Check, Clock, Copy, Receipt, X } from 'lucide-react-native';
 import { Button } from '../ui/button';
+import { KeyboardSafeView, useModalSafeBottomPadding } from '../common/keyboard-safe-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -60,6 +59,7 @@ export function ManualCheckoutModal({
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const mutation = useSubmitManualCheckout();
+  const bottomPadding = useModalSafeBottomPadding();
 
   const [method, setMethod] = useState<PaymentMethod>('BKASH');
   const [senderPhone, setSenderPhone] = useState('');
@@ -143,12 +143,9 @@ export function ManualCheckoutModal({
 
   return (
     <Modal visible={visible} transparent animationType='slide' onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
-      >
+      <KeyboardSafeView style={styles.overlay}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: bottomPadding }]}>
           <View style={styles.handle} />
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
@@ -166,7 +163,11 @@ export function ManualCheckoutModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps='handled'>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps='handled'
+            keyboardDismissMode='on-drag'
+          >
             {showStatus ? (
               <View style={styles.statusContent}>
                 <View style={styles.pendingIcon}><Clock size={30} color='#d97706' /></View>
@@ -268,6 +269,10 @@ export function ManualCheckoutModal({
                     placeholder='যেমন: BL92XK8291'
                     placeholderTextColor={colors.textMuted}
                     maxLength={50}
+                    returnKeyType='done'
+                    onSubmitEditing={() => {
+                      if (!mutation.isPending && targetNumber) void submit();
+                    }}
                     style={[styles.input, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }]}
                   />
                 </View>
@@ -284,7 +289,7 @@ export function ManualCheckoutModal({
             )}
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </Modal>
   );
 }
@@ -319,7 +324,7 @@ function SummaryRow({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2,6,23,.58)' },
-  sheet: { maxHeight: '88%', borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, padding: 16, paddingBottom: 24 },
+  sheet: { maxHeight: '88%', borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, paddingHorizontal: 16, paddingTop: 16 },
   handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: '#94a3b8', opacity: 0.45, alignSelf: 'center', marginBottom: 12 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 14 },
   title: { fontSize: 17, fontFamily: Fonts.headingBold },

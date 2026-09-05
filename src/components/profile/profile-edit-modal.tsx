@@ -7,8 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Image,
 } from 'react-native';
 import {
@@ -23,6 +21,7 @@ import {
 } from 'lucide-react-native';
 import { Input } from '../ui/input';
 import { ProAvatarRing } from '../ui/pro-avatar-ring';
+import { KeyboardSafeView, useModalSafeBottomPadding } from '../common/keyboard-safe-layout';
 import { useThemeStore } from '../../stores/theme-store';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
@@ -45,6 +44,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const isDark = theme === 'dark';
+  const pickerBottomPadding = useModalSafeBottomPadding(24);
 
   const [name, setName] = useState(user.name || '');
   const [imageUrl, setImageUrl] = useState(user.imageUrl || '');
@@ -119,10 +119,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
       animationType='fade'
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.modalOverlay}
-      >
+      <KeyboardSafeView style={styles.modalOverlay}>
         <View
           style={[
             styles.modalContent,
@@ -148,6 +145,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.formScroll}
             keyboardShouldPersistTaps='handled'
+            keyboardDismissMode='on-drag'
           >
             <View
               style={[
@@ -342,7 +340,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             </View>
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
 
       <Modal
         visible={districtPickerOpen}
@@ -357,6 +355,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               {
                 backgroundColor: isDark ? '#111827' : '#ffffff',
                 borderColor: isDark ? '#1f2937' : '#e2e8f0',
+                paddingBottom: pickerBottomPadding,
               },
             ]}
           >
@@ -410,6 +409,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               {
                 backgroundColor: isDark ? '#111827' : '#ffffff',
                 borderColor: isDark ? '#1f2937' : '#e2e8f0',
+                paddingBottom: pickerBottomPadding,
               },
             ]}
           >
@@ -628,7 +628,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderWidth: 1,
-    paddingBottom: 24,
   },
   pickerModalHeader: {
     flexDirection: 'row',

@@ -3,6 +3,7 @@ import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { ArrowUpDown, Award, MapPin, RotateCcw, SlidersHorizontal, Star, X } from 'lucide-react-native';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
+import { useModalSafeBottomPadding } from '../common/keyboard-safe-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -55,6 +56,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 export function SurveyorFilterModal({ visible, value, districts, services, totalResults, onClose, onApply }: Props) {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
+  const footerBottomPadding = useModalSafeBottomPadding(12);
   const [draft, setDraft] = useState<FilterState>(value);
 
   useEffect(() => {
@@ -144,7 +146,7 @@ export function SurveyorFilterModal({ visible, value, districts, services, total
             </View>
           </ScrollView>
 
-          <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.card }]}>
+          <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.card, paddingBottom: footerBottomPadding }]}>
             <Text style={[styles.smallText, { color: colors.textMuted }]}>{totalResults == null ? '' : `${totalResults} জন পাওয়া গেছে`}</Text>
             <Button title='ফলাফল দেখুন' size='md' onPress={() => { onApply(draft); onClose(); }} />
           </View>
@@ -172,6 +174,6 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   chip: { borderWidth: 1, borderRadius: 7, paddingHorizontal: 10, paddingVertical: 6 },
   chipText: { fontSize: 10.5, fontFamily: Fonts.sansMedium },
-  footer: { borderTopWidth: 1, padding: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  footer: { borderTopWidth: 1, paddingHorizontal: 12, paddingTop: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   smallText: { fontSize: 10.5, fontFamily: Fonts.sansRegular },
 });

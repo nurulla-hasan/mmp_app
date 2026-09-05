@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { Check, RotateCcw, Ruler, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { Fonts } from '../../../../constants/typography';
 import { useThemeStore } from '../../../../stores/theme-store';
+import { KeyboardSafeView } from '../../../../components/common/keyboard-safe-layout';
 import { getLandMeasurementToolColors } from '../../utils/tool-theme';
 
 type Props = { visible: boolean; kind: 'distance' | 'manual'; onClose: () => void };
@@ -39,78 +40,88 @@ export function ScaleCalibrationModal({ visible, kind, onClose }: Props) {
 
   return (
     <Modal visible={visible} transparent animationType='fade' onRequestClose={onClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.backdrop, { backgroundColor: colors.overlayStrong }]}>
+      <KeyboardSafeView style={[styles.backdrop, { backgroundColor: colors.overlayStrong }]}>
         <View style={[styles.card, { backgroundColor: colors.panel, borderColor: colors.panelBorder }]}>
-          <View style={styles.header}>
-            <View style={styles.titleRow}>
-              <View style={styles.iconBox}><Ruler size={20} color={colors.success} /></View>
-              <View>
-                <Text style={[styles.title, { color: colors.textStrong }]}>{kind === 'distance' ? 'Enter Known Distance' : 'Manual Scale'}</Text>
-                <Text style={[styles.subtitle, { color: colors.textSoft }]}>{kind === 'distance' ? 'Real length of the selected line' : 'How many feet equal one pixel'}</Text>
+          <ScrollView
+            contentContainerStyle={styles.cardContent}
+            keyboardShouldPersistTaps='handled'
+            keyboardDismissMode='on-drag'
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.header}>
+              <View style={styles.titleRow}>
+                <View style={styles.iconBox}><Ruler size={20} color={colors.success} /></View>
+                <View>
+                  <Text style={[styles.title, { color: colors.textStrong }]}>{kind === 'distance' ? 'Enter Known Distance' : 'Manual Scale'}</Text>
+                  <Text style={[styles.subtitle, { color: colors.textSoft }]}>{kind === 'distance' ? 'Real length of the selected line' : 'How many feet equal one pixel'}</Text>
+                </View>
               </View>
+              <TouchableOpacity onPress={onClose} style={[styles.close, { backgroundColor: colors.panelRaised }]}><X size={18} color={colors.textSoft} /></TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={onClose} style={[styles.close, { backgroundColor: colors.panelRaised }]}><X size={18} color={colors.textSoft} /></TouchableOpacity>
-          </View>
 
-          {kind === 'distance' && (
-            <View style={styles.presets}>
-              {PRESETS.map((preset) => (
-                <TouchableOpacity
-                  key={preset.label}
-                  onPress={() => setValue(String(preset.feet))}
-                  style={[
-                    styles.preset,
-                    { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder },
-                    Number(value) === preset.feet && styles.presetActive,
-                  ]}
-                >
-                  <Text style={[styles.presetLabel, { color: colors.textStrong }]}>{preset.label}</Text>
-                  <Text style={[styles.presetDetail, { color: colors.textSoft }]}>{preset.detail}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          <Text style={[styles.inputLabel, { color: colors.textStrong }]}>{kind === 'distance' ? 'Distance (feet)' : 'Feet per pixel'}</Text>
-          <View style={styles.inputRow}>
-            <TextInput
-              value={value}
-              onChangeText={setValue}
-              keyboardType='decimal-pad'
-              placeholder={kind === 'distance' ? 'e.g. 660' : 'e.g. 0.125'}
-              placeholderTextColor={colors.textSoft}
-              selectTextOnFocus
-              style={[styles.input, { color: colors.textStrong, backgroundColor: colors.input, borderColor: colors.panelBorder }]}
-            />
-            <View style={[styles.unit, { backgroundColor: colors.panelRaised, borderColor: colors.panelBorder }]}><Text style={[styles.unitText, { color: colors.textStrong }]}>{kind === 'distance' ? 'ft' : 'ft/px'}</Text></View>
-          </View>
-          <Text style={[styles.helper, { color: colors.textSoft }]}>{kind === 'distance' ? '1 chain = 66 ft • 100 links = 1 chain' : 'Example: 0.125 means 8 pixels = 1 foot'}</Text>
-
-          <View style={styles.actions}>
-            {kind === 'distance' ? (
-              <TouchableOpacity style={[styles.secondary, { borderColor: colors.panelBorder }]} onPress={retryCalibration}>
-                <RotateCcw size={16} color={colors.textSoft} />
-                <Text style={[styles.secondaryText, { color: colors.textStrong }]}>Pick Again</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity style={[styles.secondary, { borderColor: colors.panelBorder }]} onPress={onClose}><Text style={[styles.secondaryText, { color: colors.textStrong }]}>Cancel</Text></TouchableOpacity>
+            {kind === 'distance' && (
+              <View style={styles.presets}>
+                {PRESETS.map((preset) => (
+                  <TouchableOpacity
+                    key={preset.label}
+                    onPress={() => setValue(String(preset.feet))}
+                    style={[
+                      styles.preset,
+                      { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder },
+                      Number(value) === preset.feet && styles.presetActive,
+                    ]}
+                  >
+                    <Text style={[styles.presetLabel, { color: colors.textStrong }]}>{preset.label}</Text>
+                    <Text style={[styles.presetDetail, { color: colors.textSoft }]}>{preset.detail}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             )}
-            <TouchableOpacity style={styles.primary} onPress={submit}>
-              <Check size={17} color='#fff' />
-              <Text style={styles.primaryText}>Set Scale</Text>
-            </TouchableOpacity>
-          </View>
+
+            <Text style={[styles.inputLabel, { color: colors.textStrong }]}>{kind === 'distance' ? 'Distance (feet)' : 'Feet per pixel'}</Text>
+            <View style={styles.inputRow}>
+              <TextInput
+                value={value}
+                onChangeText={setValue}
+                keyboardType='decimal-pad'
+                placeholder={kind === 'distance' ? 'e.g. 660' : 'e.g. 0.125'}
+                placeholderTextColor={colors.textSoft}
+                selectTextOnFocus
+                returnKeyType='done'
+                onSubmitEditing={submit}
+                style={[styles.input, { color: colors.textStrong, backgroundColor: colors.input, borderColor: colors.panelBorder }]}
+              />
+              <View style={[styles.unit, { backgroundColor: colors.panelRaised, borderColor: colors.panelBorder }]}><Text style={[styles.unitText, { color: colors.textStrong }]}>{kind === 'distance' ? 'ft' : 'ft/px'}</Text></View>
+            </View>
+            <Text style={[styles.helper, { color: colors.textSoft }]}>{kind === 'distance' ? '1 chain = 66 ft • 100 links = 1 chain' : 'Example: 0.125 means 8 pixels = 1 foot'}</Text>
+
+            <View style={styles.actions}>
+              {kind === 'distance' ? (
+                <TouchableOpacity style={[styles.secondary, { borderColor: colors.panelBorder }]} onPress={retryCalibration}>
+                  <RotateCcw size={16} color={colors.textSoft} />
+                  <Text style={[styles.secondaryText, { color: colors.textStrong }]}>Pick Again</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={[styles.secondary, { borderColor: colors.panelBorder }]} onPress={onClose}><Text style={[styles.secondaryText, { color: colors.textStrong }]}>Cancel</Text></TouchableOpacity>
+              )}
+              <TouchableOpacity style={styles.primary} onPress={submit}>
+                <Check size={17} color='#fff' />
+                <Text style={styles.primaryText}>Set Scale</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
-  card: { width: '100%', maxWidth: 430, padding: 17, borderRadius: 18, borderWidth: 1 },
+  card: { width: '100%', maxWidth: 430, maxHeight: '90%', borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
+  cardContent: { padding: 17 },
   header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   iconBox: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: 'rgba(34,197,94,0.12)' },
   title: { fontFamily: Fonts.headingBold, fontSize: 16 },
   subtitle: { marginTop: -2, fontFamily: Fonts.sansRegular, fontSize: 10 },

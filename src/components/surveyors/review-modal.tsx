@@ -21,6 +21,7 @@ import {
 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Button } from '../ui/button';
+import { KeyboardSafeView } from '../common/keyboard-safe-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -118,7 +119,7 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
       />
 
       <Modal visible={visible} transparent animationType='fade' onRequestClose={close}>
-        <View style={styles.overlay}>
+        <KeyboardSafeView style={styles.overlay}>
           <View style={[styles.modal, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.header}>
               <View style={styles.headerText}>
@@ -166,6 +167,7 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={styles.body}
                 keyboardShouldPersistTaps='handled'
+                keyboardDismissMode='on-drag'
               >
                 <View
                   style={[
@@ -195,11 +197,8 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
                   </View>
                 </View>
 
-                {/* Service Dropdown Selection */}
                 <View style={styles.fieldBlock}>
                   <Text style={[styles.label, { color: colors.text }]}>যে সার্ভিসের জন্য রিভিউ দিচ্ছেন</Text>
-                  
-                  {/* Dropdown Trigger */}
                   <TouchableOpacity
                     activeOpacity={0.8}
                     onPress={() => setIsDropdownOpen((prev) => !prev)}
@@ -227,7 +226,6 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
                     />
                   </TouchableOpacity>
 
-                  {/* Dropdown Menu */}
                   {isDropdownOpen && (
                     <View
                       style={[
@@ -349,7 +347,7 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
               </ScrollView>
             )}
           </View>
-        </View>
+        </KeyboardSafeView>
       </Modal>
     </>
   );

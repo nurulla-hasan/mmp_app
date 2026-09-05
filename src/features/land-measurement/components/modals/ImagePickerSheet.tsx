@@ -6,6 +6,7 @@ import { FileImage, FileText, ImagePlus, Trash2, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { Fonts } from '../../../../constants/typography';
 import { useThemeStore } from '../../../../stores/theme-store';
+import { useModalSafeBottomPadding } from '../../../../components/common/keyboard-safe-layout';
 import { getLandMeasurementToolColors } from '../../utils/tool-theme';
 
 type Props = {
@@ -24,6 +25,7 @@ function validateFileSize(size?: number | null) {
 export function ImagePickerSheet({ visible, onClose }: Props) {
   const { theme } = useThemeStore();
   const colors = getLandMeasurementToolColors(theme);
+  const bottomPadding = useModalSafeBottomPadding();
   const mapImage = useMapStore((state) => state.mapImage);
   const setMapImage = useMapStore((state) => state.setMapImage);
   const clearMap = useMapStore((state) => state.clearMap);
@@ -128,7 +130,7 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
     <Modal visible={visible} transparent animationType='slide' onRequestClose={() => !isImportingPdf && onClose()}>
       <View style={[styles.backdrop, { backgroundColor: colors.overlayStrong }]}>
         <TouchableOpacity disabled={isImportingPdf} activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: colors.panel, borderColor: colors.panelBorder }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.panel, borderColor: colors.panelBorder, paddingBottom: bottomPadding }]}>
           <View style={[styles.handle, { backgroundColor: colors.textSoft }]} />
           <View style={styles.header}>
             <View>
@@ -182,7 +184,7 @@ export function ImagePickerSheet({ visible, onClose }: Props) {
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1 },
+  sheet: { paddingHorizontal: 16, paddingTop: 8, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1 },
   handle: { width: 42, height: 4, alignSelf: 'center', marginBottom: 12, borderRadius: 99, opacity: 0.55 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   title: { fontFamily: Fonts.headingBold, fontSize: 17 },
@@ -196,7 +198,7 @@ const styles = StyleSheet.create({
   optionIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
   greenIcon: { backgroundColor: 'rgba(34, 197, 94, 0.12)' },
   pdfIcon: { backgroundColor: 'rgba(239, 68, 68, 0.12)' },
-  redIcon: { backgroundColor: 'rgba(239, 68, 68, 0.12)' },
+  redIcon: { backgroundColor: 'rgba(239, 68, 68,0.12)' },
   disabledOption: { opacity: 0.7 },
   optionText: { flex: 1 },
   optionTitle: { fontFamily: Fonts.headingBold, fontSize: 13 },
