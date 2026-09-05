@@ -15,8 +15,8 @@ import { useRouter } from 'expo-router';
 import {
   ArrowLeft,
   FileUp,
+  Layers,
   LocateFixed,
-  Map,
   Minus,
   Navigation,
   Plus,
@@ -54,6 +54,7 @@ export default function KmzViewerScreen() {
   const [locationGranted, setLocationGranted] = useState(false);
   const [mapStyle, setMapStyle] = useState<'hybrid' | 'standard'>('hybrid');
   const [overlayOpacity, setOverlayOpacity] = useState(1);
+  const [isOpacityOpen, setIsOpacityOpen] = useState(false);
 
   useEffect(() => {
     documentRef.current = document;
@@ -225,6 +226,8 @@ export default function KmzViewerScreen() {
           showsUserLocation={locationGranted}
           showsMyLocationButton={false}
           loadingEnabled
+          onPress={() => setIsOpacityOpen(false)}
+          onPanDrag={() => setIsOpacityOpen(false)}
         >
           {document ? (
             <KmzMapOverlayLayer document={document} overlayOpacity={overlayOpacity} />
@@ -232,36 +235,218 @@ export default function KmzViewerScreen() {
         </MapView>
 
         {document ? (
-          <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 10 }]}>
-            <View style={[styles.toolbar, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.98)' : 'rgba(255,255,255,0.98)', borderColor: colors.border }]}>
+          <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 12 }]}>
+            {/* ─── Opacity Popover Panel ─── */}
+            {isOpacityOpen && (
+              <View
+                style={[
+                  styles.opacityPanel,
+                  {
+                    backgroundColor:
+                      theme === 'dark' ? 'rgba(15,23,42,0.98)' : 'rgba(255,255,255,0.98)',
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.opacityHeader}>
+                  <View style={styles.opacityTitleRow}>
+                    <View
+                      style={[
+                        styles.opacityIconBadge,
+                        {
+                          backgroundColor:
+                            theme === 'dark'
+                              ? 'rgba(34,197,94,0.18)'
+                              : 'rgba(22,163,74,0.12)',
+                        },
+                      ]}
+                    >
+                      <Layers size={14} color={colors.primary} />
+                    </View>
+                    <Text style={[styles.opacityTitle, { color: colors.text }]}>
+                      Overlay Opacity
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.opacityValuePill,
+                      {
+                        backgroundColor:
+                          theme === 'dark'
+                            ? 'rgba(34,197,94,0.16)'
+                            : 'rgba(22,163,74,0.12)',
+                        borderColor:
+                          theme === 'dark'
+                            ? 'rgba(34,197,94,0.3)'
+                            : 'rgba(22,163,74,0.25)',
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.opacityValueText, { color: colors.primary }]}>
+                      {Math.round(overlayOpacity * 100)}%
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Quick Presets */}
+                <View style={styles.presetRow}>
+                  {[0.25, 0.5, 0.75, 1.0].map((preset) => {
+                    const isSelected = Math.abs(overlayOpacity - preset) < 0.05;
+                    return (
+                      <TouchableOpacity
+                        key={preset}
+                        activeOpacity={0.7}
+                        onPress={() => setOverlayOpacity(preset)}
+                        style={[
+                          styles.presetChip,
+                          {
+                            borderColor: isSelected ? colors.primary : colors.border,
+                            backgroundColor: isSelected
+                              ? colors.primary
+                              : theme === 'dark'
+                              ? 'rgba(30,41,59,0.7)'
+                              : 'rgba(241,245,249,0.9)',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.presetText,
+                            {
+                              color: isSelected ? '#ffffff' : colors.textMuted,
+                              fontFamily: isSelected ? Fonts.headingBold : Fonts.sansMedium,
+                            },
+                          ]}
+                        >
+                          {Math.round(preset * 100)}%
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Fine Adjustment Stepper */}
+                <View style={styles.stepperRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      setOverlayOpacity((v) =>
+                        Math.max(0.1, Math.round((v - 0.1) * 10) / 10)
+                      )
+                    }
+                    disabled={overlayOpacity <= 0.1}
+                    style={[
+                      styles.stepperButton,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor:
+                          theme === 'dark'
+                            ? 'rgba(30,41,59,0.7)'
+                            : 'rgba(241,245,249,0.9)',
+                        opacity: overlayOpacity <= 0.1 ? 0.35 : 1,
+                      },
+                    ]}
+                  >
+                    <Minus size={15} color={colors.text} />
+                  </TouchableOpacity>
+
+                  <View style={styles.stepperCenter}>
+                    <Text style={[styles.stepperHint, { color: colors.textMuted }]}>
+                      -10% অথবা +10% সমন্বয়
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() =>
+                      setOverlayOpacity((v) =>
+                        Math.min(1.0, Math.round((v + 0.1) * 10) / 10)
+                      )
+                    }
+                    disabled={overlayOpacity >= 1.0}
+                    style={[
+                      styles.stepperButton,
+                      {
+                        borderColor: colors.border,
+                        backgroundColor:
+                          theme === 'dark'
+                            ? 'rgba(30,41,59,0.7)'
+                            : 'rgba(241,245,249,0.9)',
+                        opacity: overlayOpacity >= 1.0 ? 0.35 : 1,
+                      },
+                    ]}
+                  >
+                    <Plus size={15} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* ─── Floating Dock Toolbar ─── */}
+            <View
+              style={[
+                styles.toolbar,
+                {
+                  backgroundColor:
+                    theme === 'dark' ? 'rgba(15,23,42,0.96)' : 'rgba(255,255,255,0.98)',
+                  borderColor: colors.border,
+                },
+              ]}
+            >
               <Tool
-                icon={mapStyle === 'hybrid' ? <Satellite size={18} color='#16a34a' /> : <Map size={18} color={colors.textMuted} />}
+                icon={
+                  <Satellite
+                    size={18}
+                    color={mapStyle === 'hybrid' ? colors.primary : colors.textMuted}
+                  />
+                }
                 label={mapStyle === 'hybrid' ? 'Satellite' : 'Map'}
                 active={mapStyle === 'hybrid'}
-                onPress={() => setMapStyle((value) => value === 'hybrid' ? 'standard' : 'hybrid')}
+                onPress={() =>
+                  setMapStyle((value) => (value === 'hybrid' ? 'standard' : 'hybrid'))
+                }
                 colors={colors}
+                theme={theme}
               />
+
               <Tool
-                icon={locating
-                  ? <ActivityIndicator size='small' color='#2563eb' />
-                  : <Navigation size={18} color={locationGranted ? '#2563eb' : colors.textMuted} />}
-                label='My Location'
+                icon={
+                  locating ? (
+                    <ActivityIndicator size='small' color={colors.primary} />
+                  ) : (
+                    <Navigation
+                      size={18}
+                      color={locationGranted ? colors.primary : colors.textMuted}
+                    />
+                  )
+                }
+                label='Location'
                 active={locationGranted || locating}
-                activeColor='#2563eb'
                 onPress={goToMyLocation}
                 colors={colors}
+                theme={theme}
               />
+
               <Tool
                 icon={<LocateFixed size={18} color={colors.textMuted} />}
                 label='Fit KMZ'
                 onPress={() => fitDocument()}
                 colors={colors}
+                theme={theme}
               />
-              <OverlayControl
-                value={overlayOpacity}
-                onDecrease={() => setOverlayOpacity((value) => Math.max(0.1, Math.round((value - 0.1) * 10) / 10))}
-                onIncrease={() => setOverlayOpacity((value) => Math.min(1, Math.round((value + 0.1) * 10) / 10))}
+
+              <Tool
+                icon={
+                  <Layers
+                    size={18}
+                    color={isOpacityOpen ? colors.primary : colors.textMuted}
+                  />
+                }
+                label={`${Math.round(overlayOpacity * 100)}%`}
+                active={isOpacityOpen}
+                onPress={() => setIsOpacityOpen((prev) => !prev)}
                 colors={colors}
+                theme={theme}
               />
             </View>
           </View>
@@ -275,59 +460,54 @@ function Tool({
   icon,
   label,
   active,
-  activeColor = '#16a34a',
   onPress,
   colors,
+  theme,
 }: {
   icon: React.ReactNode;
   label: string;
   active?: boolean;
-  activeColor?: string;
   onPress: () => void;
   colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
+  theme: 'light' | 'dark';
 }) {
+  const isDark = theme === 'dark';
   return (
-    <TouchableOpacity onPress={onPress} style={styles.tool}>
-      {icon}
-      <Text style={[styles.toolLabel, { color: active ? activeColor : colors.textMuted }]} numberOfLines={1}>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={[
+        styles.tool,
+        {
+          backgroundColor: active
+            ? isDark
+              ? 'rgba(34,197,94,0.18)'
+              : 'rgba(22,163,74,0.12)'
+            : isDark
+            ? 'rgba(30,41,59,0.55)'
+            : 'rgba(241,245,249,0.85)',
+          borderColor: active
+            ? isDark
+              ? 'rgba(34,197,94,0.45)'
+              : 'rgba(22,163,74,0.4)'
+            : colors.border,
+        },
+      ]}
+    >
+      <View style={styles.iconBox}>{icon}</View>
+      <Text
+        style={[
+          styles.toolLabel,
+          {
+            color: active ? colors.primary : colors.textMuted,
+            fontFamily: active ? Fonts.headingBold : Fonts.sansMedium,
+          },
+        ]}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </TouchableOpacity>
-  );
-}
-
-function OverlayControl({
-  value,
-  onDecrease,
-  onIncrease,
-  colors,
-}: {
-  value: number;
-  onDecrease: () => void;
-  onIncrease: () => void;
-  colors: (typeof Colors)['light'] | (typeof Colors)['dark'];
-}) {
-  return (
-    <View style={styles.overlayTool}>
-      <View style={styles.overlayMiniRow}>
-        <TouchableOpacity
-          style={[styles.overlayMiniButton, { borderColor: colors.border }]}
-          onPress={onDecrease}
-          disabled={value <= 0.1}
-        >
-          <Minus size={14} color={value <= 0.1 ? colors.textMuted : colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.overlayValue, { color: colors.text }]}>{Math.round(value * 100)}%</Text>
-        <TouchableOpacity
-          style={[styles.overlayMiniButton, { borderColor: colors.border }]}
-          onPress={onIncrease}
-          disabled={value >= 1}
-        >
-          <Plus size={14} color={value >= 1 ? colors.textMuted : colors.text} />
-        </TouchableOpacity>
-      </View>
-      <Text style={[styles.toolLabel, { color: colors.textMuted }]}>Overlay</Text>
-    </View>
   );
 }
 
@@ -343,12 +523,127 @@ const styles = StyleSheet.create({
   openButton: { minWidth: 82, maxWidth: 142, height: 35, borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginLeft: 8 },
   openButtonText: { flexShrink: 1, color: '#16a34a', fontFamily: Fonts.headingSemiBold, fontSize: 9.5 },
   mapWrap: { flex: 1, position: 'relative', overflow: 'hidden' },
-  bottomWrap: { position: 'absolute', left: 10, right: 10, zIndex: 50 },
-  toolbar: { minHeight: 68, borderRadius: 14, borderWidth: 1, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'stretch', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 7, elevation: 5 },
-  tool: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2 },
-  toolLabel: { fontFamily: Fonts.sansMedium, fontSize: 8.5, textAlign: 'center' },
-  overlayTool: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 4 },
-  overlayMiniRow: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  overlayMiniButton: { width: 30, height: 30, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  overlayValue: { minWidth: 38, textAlign: 'center', fontFamily: Fonts.headingBold, fontSize: 10.5 },
+  bottomWrap: { position: 'absolute', left: 12, right: 12, zIndex: 50 },
+  toolbar: {
+    minHeight: 64,
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  tool: {
+    flex: 1,
+    minHeight: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 5,
+    paddingHorizontal: 2,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  iconBox: {
+    width: 26,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolLabel: {
+    fontFamily: Fonts.sansMedium,
+    fontSize: 9.5,
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  opacityPanel: {
+    marginBottom: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 12,
+  },
+  opacityHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  opacityTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  opacityIconBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  opacityTitle: {
+    fontFamily: Fonts.headingSemiBold,
+    fontSize: 12,
+  },
+  opacityValuePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 99,
+    borderWidth: 1,
+  },
+  opacityValueText: {
+    fontFamily: Fonts.headingBold,
+    fontSize: 11,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
+    marginBottom: 10,
+  },
+  presetChip: {
+    flex: 1,
+    height: 32,
+    borderRadius: 9,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetText: {
+    fontSize: 11,
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  stepperButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  stepperHint: {
+    fontFamily: Fonts.sansRegular,
+    fontSize: 10,
+    textAlign: 'center',
+  },
 });
