@@ -5,10 +5,13 @@ import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronUp, Printer, Ruler, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { DECIMALS } from '../../utils/calculations';
 import { formatFeetInches } from '../../utils/canvas';
+import { groupPolygonSegments } from '../../utils/geometry';
+import type { Point } from '../../types/map';
 import { Fonts } from '../../../../constants/typography';
 import { useThemeStore } from '../../../../stores/theme-store';
 import { getLandMeasurementToolColors } from '../../utils/tool-theme';
@@ -17,8 +20,17 @@ import { buildWebPrintHtmlWithBrandLogo } from '../print/buildWebPrintHtmlWithBr
 const PDF_DIRECTORY_KEY = 'mmp_pdf_download_root_v3';
 const LEGACY_PDF_DIRECTORY_KEY = 'mmp_pdf_download_directory';
 const OLD_MMP_DIRECTORY_KEY = 'mmp_pdf_documents_directory_v2';
+const CANVAS_TOOLBAR_SCREEN_GAP = 10;
+const CANVAS_TOOLBAR_HEIGHT = 64;
+const RESULTS_TOOLBAR_GAP = 8;
 
 const formatMeasurement = (value: number) => value.toFixed(DECIMALS);
+
+const getGroupedSideLengths = (points: Point[], lengths: number[]) => (
+  groupPolygonSegments(points)
+    .map((group) => group.reduce((sum, segment) => sum + (lengths[segment.i] ?? 0), 0))
+    .filter((length) => Number.isFinite(length) && length > 0)
+);
 
 const buildPdfFileName = (mapName: string | undefined, plotCount: number) => {
   const sourceName = (mapName || 'mouza-map')
@@ -101,10 +113,12 @@ const savePdfWithSaf = async (sourceUri: string, fileName: string) => {
 export function MobileResultsBar() {
   const mode = useMapStore((state) => state.mode);
   const plots = useMapStore((state) => state.plots);
+  const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const colors = getLandMeasurementToolColors(theme);
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const resultsBottom = insets.bottom + CANVAS_TOOLBAR_SCREEN_GAP + CANVAS_TOOLBAR_HEIGHT + RESULTS_TOOLBAR_GAP;
   const totals = useMemo(
     () => plots.reduce(
       (sum, plot) => ({
@@ -171,7 +185,10 @@ export function MobileResultsBar() {
     <>
       <TouchableOpacity
         activeOpacity={0.82}
-        style={[styles.wrapper, { backgroundColor: colors.overlay, borderColor: colors.panelBorder }]}
+        style={[
+          styles.wrapper,
+          { bottom: resultsBottom, backgroundColor: colors.overlay, borderColor: colors.panelBorder },
+        ]}
         onPress={() => setOpen(true)}
       >
         <View style={styles.icon}><Ruler size={17} color={colors.success} /></View>
@@ -226,40 +243,31 @@ export function MobileResultsBar() {
             </View>
 
             <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-              {plots.map((plot) => (
-                <View key={plot.id} style={[styles.plotCard, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
-                  <View style={styles.plotHeader}>
-                    <View style={[styles.colorDot, { backgroundColor: plot.color ?? '#0f766e' }]} />
-                    <Text style={[styles.plotName, { color: colors.textStrong }]}>{plot.name}</Text>
-                    <Text style={[styles.plotArea, { color: colors.success }]}>{formatMeasurement(plot.results.shotok)} shotok</Text>
+              {plots.map((plot) => {
+                const groupedLengths = getGroupedSideLengths(plot.points, plot.results.lengths);
+                return (
+                  <View key={plot.id} style={[styles.plotCard, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
+                    <View style={styles.plotHeader}>
+                      <View style={[styles.colorDot, { backgroundColor: plot.color ?? '#0f766e' }]} />
+                      <Text style={[styles.plotName, { color: colors.textStrong }]}>{plot.name}</Text>
+                      <Text style={[styles.plotArea, { color: colors.success }]}>{formatMeasurement(plot.results.shotok)} shotok</Text>
+                    </View>
+                    <View style={styles.metrics}>
+                      <Text style={[styles.metric, { color: colors.textSoft }]}>Katha: {formatMeasurement(plot.results.katha)}</Text>
+                      <Text style={[styles.metric, { color: colors.textSoft }]}>Sq ft: {formatMeasurement(plot.results.sqft)}</Text>
+                      <Text style={[styles.metric, { color: colors.textSoft }]}>Perimeter: {formatFeetInches(plot.results.perimeter)}</Text>
+                    </View>
+                    <Text style={[styles.sideTitle, { color: colors.textSoft }]}>Side lengths</Text>
+                    <View style={styles.chips}>
+                      {groupedLengths.map((length, index) => (
+                        <View key={`${plot.id}-side-${index}`} style={[styles.chip, { backgroundColor: colors.panelRaised }]}>
+                          <Text style={[styles.chipText, { color: colors.textStrong }]}>{formatFeetInches(length)}</Text>
+                        </View>
+                      ))}
+                    </View>
                   </View>
-                  <View style={styles.metrics}>
-                    <Text style={[styles.metric, { color: colors.textSoft }]}>Katha: {formatMeasurement(plot.results.katha)}</Text>
-                    <Text style={[styles.metric, { color: colors.textSoft }]}>Sq ft: {formatMeasurement(plot.results.sqft)}</Text>
-                    <Text style={[styles.metric, { color: colors.textSoft }]}>Perimeter: {formatFeetInches(plot.results.perimeter)}</Text>
-                  </View>
-                  <Text style={[styles.sideTitle, { color: colors.textSoft }]}>Side lengths</Text>
-                  <View style={styles.chips}>
-                    {plot.results.lengths.map((length, index) => (
-                      <View key={`${plot.id}-length-${index}`} style={[styles.chip, { backgroundColor: colors.panelRaised }]}>
-                        <Text style={[styles.chipText, { color: colors.textStrong }]}>{index + 1}. {formatFeetInches(length)}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  {plot.results.diagonals && plot.results.diagonals.length > 0 && (
-                    <>
-                      <Text style={[styles.sideTitle, { color: colors.textSoft }]}>Diagonals</Text>
-                      <View style={styles.chips}>
-                        {plot.results.diagonals.map((diagonal, index) => (
-                          <View key={`${plot.id}-diagonal-${index}`} style={[styles.chip, { backgroundColor: colors.blueBg }]}>
-                            <Text style={[styles.chipText, { color: colors.blueText }]}>{index + 1}. {formatFeetInches(diagonal.lengthFt)}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </>
-                  )}
-                </View>
-              ))}
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -269,7 +277,7 @@ export function MobileResultsBar() {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { position: 'absolute', bottom: 82, left: 10, right: 10, zIndex: 19, minHeight: 57, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 13, borderWidth: 1 },
+  wrapper: { position: 'absolute', left: 10, right: 10, zIndex: 19, minHeight: 57, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 13, borderWidth: 1 },
   icon: { width: 34, height: 34, marginRight: 9, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: 'rgba(34,197,94,0.12)' },
   total: { flex: 1 },
   label: { fontFamily: Fonts.headingMedium, fontSize: 9.5 },
@@ -302,6 +310,6 @@ const styles = StyleSheet.create({
   metric: { fontFamily: Fonts.sansRegular, fontSize: 10.5 },
   sideTitle: { marginTop: 9, marginBottom: 5, fontFamily: Fonts.headingSemiBold, fontSize: 9.5 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  chip: { paddingHorizontal: 7, paddingVertical: 4, borderRadius: 6 },
-  chipText: { fontFamily: Fonts.headingMedium, fontSize: 9.5 },
+  chip: { paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7 },
+  chipText: { fontFamily: Fonts.headingSemiBold, fontSize: 9.5 },
 });
