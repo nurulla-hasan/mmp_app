@@ -3,8 +3,8 @@ import { Image as SvgImage } from 'react-native-svg';
 import type { GeoImage, Point2D } from '../types';
 import { getGeoSourceTileUri } from '../utils/overlay-image';
 
-const TILE_SIZE = 512;
-const TILE_MARGIN = 1;
+const TILE_SIZE = 1024;
+const TILE_MARGIN = 0;
 
 type Size = { width: number; height: number };
 type Tile = {
@@ -44,12 +44,12 @@ function getVisibleCoords(
   const startCol = Math.max(0, Math.floor(left / TILE_SIZE) - TILE_MARGIN);
   const endCol = Math.min(
     Math.ceil(image.width / TILE_SIZE) - 1,
-    Math.floor(right / TILE_SIZE) + TILE_MARGIN,
+    Math.floor(Math.max(left, right - 0.001) / TILE_SIZE) + TILE_MARGIN,
   );
   const startRow = Math.max(0, Math.floor(top / TILE_SIZE) - TILE_MARGIN);
   const endRow = Math.min(
     Math.ceil(image.height / TILE_SIZE) - 1,
-    Math.floor(bottom / TILE_SIZE) + TILE_MARGIN,
+    Math.floor(Math.max(top, bottom - 0.001) / TILE_SIZE) + TILE_MARGIN,
   );
   const result: TileCoord[] = [];
 
@@ -71,11 +71,10 @@ function getVisibleCoords(
 }
 
 /**
- * Android may decode one very large SVG image source at a reduced texture size.
- * Once the user zooms beyond the fitted overview, render only the visible source
- * pixels as 512px lossless PNG tiles. This mirrors the proven Land Measurement
- * strategy while avoiding its JPEG preview pass, so Mouza Geo adds no lossy
- * recompression to the zoomed source view.
+ * The bounded preview stays underneath during interaction. Once the user zooms
+ * far enough to need native source detail, only visible 1024px lossless crops
+ * are layered on top. The crops arrive progressively instead of blocking the
+ * whole sharp view behind a large batch of tile work.
  */
 export const GeoSourceTiledImage = memo(function GeoSourceTiledImage({
   sourceImage,
@@ -92,8 +91,8 @@ export const GeoSourceTiledImage = memo(function GeoSourceTiledImage({
   const sensitivity = backgroundRemoved ? Math.max(0, Math.min(100, Math.round(backgroundSensitivity))) : null;
   const renderKey = `${sourceImage.uri}|${sourceImage.width}x${sourceImage.height}|${sensitivity === null ? 'original' : `clean-${sensitivity}`}`;
   const shouldTile =
-    sourceImage.width * sourceImage.height >= 500_000 &&
-    stageScale >= Math.max(0.06, fitScale * 1.15);
+    sourceImage.width * sourceImage.height >= 1_000_000 &&
+    stageScale >= Math.max(0.08, fitScale * 1.8);
   const coords = useMemo(
     () => shouldTile
       ? getVisibleCoords(sourceImage, viewport, stageScale, stagePos, renderKey)
@@ -101,11 +100,6 @@ export const GeoSourceTiledImage = memo(function GeoSourceTiledImage({
     [renderKey, shouldTile, sourceImage, stagePos, stageScale, viewport],
   );
   const coordKey = coords.map((coord) => coord.key).join('|');
-  const hasCompleteTileSet =
-    shouldTile &&
-    coords.length > 0 &&
-    tiles.length === coords.length &&
-    tiles.every((tile) => coords.some((coord) => coord.key === tile.key));
 
   useEffect(() => {
     const ticket = ++ticketRef.current;
@@ -115,10 +109,10 @@ export const GeoSourceTiledImage = memo(function GeoSourceTiledImage({
       return;
     }
 
-    setTiles((current) => current.filter((tile) => coords.some((coord) => coord.key === tile.key)));
+    const visibleKeys = new Set(coords.map((coord) => coord.key));
+    setTiles((current) => current.filter((tile) => visibleKeys.has(tile.key)));
 
     void (async () => {
-      const nextTiles: Tile[] = [];
       try {
         for (const coord of coords) {
           if (ticket !== ticketRef.current) return;
@@ -132,10 +126,18 @@ export const GeoSourceTiledImage = memo(function GeoSourceTiledImage({
             },
             sensitivity,
           );
-          nextTiles.push({ ...coord, uri });
-        }
+          if (ticket !== ticketRef.current) return;
 
-        if (ticket === ticketRef.current) setTiles(nextTiles);
+          setTiles((current) => {
+            const stillVisible = current.filter((tile) => visibleKeys.has(tile.key));
+            const existing = stillVisible.find((tile) => tile.key === coord.key);
+            if (existing?.uri === uri) return stillVisible;
+            return [
+              ...stillVisible.filter((tile) => tile.key !== coord.key),
+              { ...coord, uri },
+            ];
+          });
+        }
       } catch {
         if (ticket === ticketRef.current) setTiles([]);
       }
@@ -150,16 +152,14 @@ export const GeoSourceTiledImage = memo(function GeoSourceTiledImage({
 
   return (
     <>
-      {!hasCompleteTileSet ? (
-        <SvgImage
-          href={{ uri: previewImage.uri }}
-          x={0}
-          y={0}
-          width={sourceImage.width}
-          height={sourceImage.height}
-          preserveAspectRatio='none'
-        />
-      ) : null}
+      <SvgImage
+        href={{ uri: previewImage.uri }}
+        x={0}
+        y={0}
+        width={sourceImage.width}
+        height={sourceImage.height}
+        preserveAspectRatio='none'
+      />
 
       {tiles.map((tile) => (
         <SvgImage

@@ -1,7 +1,7 @@
 import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import MapView, { Marker, Overlay, Polygon } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import type { ControlPair, GeoImage, GeoMapStyle, GeoPoint, GeoTransform } from '../types';
 import { getNativeOverlayPreview, getOverlayCorners } from '../utils/geo-math';
 
@@ -17,6 +17,7 @@ type Props = {
   controlPairs: ControlPair[];
   opacity: number;
   mapStyle: GeoMapStyle;
+  targetOffsetY?: number;
 };
 
 const INITIAL_REGION = {
@@ -27,11 +28,12 @@ const INITIAL_REGION = {
 };
 
 export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorldMap(
-  { image, transform, controlPairs, opacity, mapStyle },
+  { image, transform, controlPairs, opacity, mapStyle, targetOffsetY = 0 },
   ref,
 ) {
   const mapRef = useRef<MapView>(null);
   const [showsUserLocation, setShowsUserLocation] = useState(false);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const corners = useMemo(() => transform ? getOverlayCorners(transform, image) : [], [image, transform]);
   const preview = useMemo(() => transform ? getNativeOverlayPreview(transform, image) : null, [image, transform]);
 
@@ -46,6 +48,20 @@ export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorl
   useImperativeHandle(ref, () => ({
     fitAlignment,
     getCenterCoordinate: async () => {
+      if (mapRef.current && viewport.width > 0 && viewport.height > 0) {
+        try {
+          const coordinate = await mapRef.current.coordinateForPoint({
+            x: viewport.width / 2,
+            y: viewport.height / 2 + targetOffsetY,
+          });
+          if (coordinate) {
+            return { lat: coordinate.latitude, lng: coordinate.longitude };
+          }
+        } catch {
+          // Fall back to the camera center if point conversion is unavailable.
+        }
+      }
+
       const camera = await mapRef.current?.getCamera();
       if (!camera?.center) return null;
       return { lat: camera.center.latitude, lng: camera.center.longitude };
@@ -62,10 +78,15 @@ export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorl
       mapRef.current?.animateCamera({ center: { latitude: point.lat, longitude: point.lng }, zoom: 18 }, { duration: 450 });
       return point;
     },
-  }), [corners]);
+  }), [corners, targetOffsetY, viewport.height, viewport.width]);
+
+  const onLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setViewport({ width, height });
+  };
 
   return (
-    <View style={styles.root}>
+    <View style={styles.root} onLayout={onLayout}>
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}

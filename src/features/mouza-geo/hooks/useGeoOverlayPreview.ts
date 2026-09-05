@@ -2,19 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import type { GeoImage } from '../types';
 import { getGeoOverlayPreviewUri } from '../utils/overlay-image';
 
+type PreviewState = {
+  sourceUri: string;
+  uri: string;
+};
+
 export function useGeoOverlayPreview(
   image: GeoImage | null,
   backgroundRemoved: boolean,
   backgroundSensitivity: number,
 ) {
-  const [processedUri, setProcessedUri] = useState<string | null>(null);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    if (!image || !backgroundRemoved) {
-      setProcessedUri(null);
+    if (!image) {
+      setPreview(null);
       setProcessing(false);
       return () => {
         active = false;
@@ -22,12 +27,15 @@ export function useGeoOverlayPreview(
     }
 
     setProcessing(true);
-    void getGeoOverlayPreviewUri(image, backgroundSensitivity)
+    void getGeoOverlayPreviewUri(
+      image,
+      backgroundRemoved ? backgroundSensitivity : null,
+    )
       .then((uri) => {
-        if (active) setProcessedUri(uri);
+        if (active) setPreview({ sourceUri: image.uri, uri });
       })
       .catch(() => {
-        if (active) setProcessedUri(null);
+        if (active) setPreview(null);
       })
       .finally(() => {
         if (active) setProcessing(false);
@@ -40,9 +48,9 @@ export function useGeoOverlayPreview(
 
   const displayImage = useMemo<GeoImage | null>(() => {
     if (!image) return null;
-    if (!backgroundRemoved || !processedUri) return image;
-    return { ...image, uri: processedUri };
-  }, [backgroundRemoved, image, processedUri]);
+    if (!preview || preview.sourceUri !== image.uri) return image;
+    return { ...image, uri: preview.uri };
+  }, [image, preview]);
 
   return { displayImage, processing };
 }

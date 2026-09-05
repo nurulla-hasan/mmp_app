@@ -16,6 +16,8 @@ import { useGeoOverlayPreview } from '../../features/mouza-geo/hooks/useGeoOverl
 import { useMouzaGeoStore } from '../../features/mouza-geo/store/useMouzaGeoStore';
 import { exportMouzaKmz } from '../../features/mouza-geo/utils/kmz';
 
+const TARGET_OFFSET_Y = -64;
+
 export default function MouzaGeoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -47,6 +49,15 @@ export default function MouzaGeoScreen() {
     backgroundRemoved,
     backgroundSensitivity,
   );
+
+  // The web studio avoids constructing its world map until it is actually
+  // needed. Do the same here so the hidden native MapView does not compete with
+  // source-map gestures before the first world interaction.
+  const worldReady =
+    activeView === 'world' ||
+    Boolean(pendingSource) ||
+    controlPairs.length > 0 ||
+    Boolean(transform);
 
   const pointNumber = controlPairs.length + 1;
   const instruction = useMemo(() => {
@@ -81,6 +92,8 @@ export default function MouzaGeoScreen() {
     if (!image) return;
     setActiveView('world');
     try {
+      // Give the lazily-created MapView one frame to mount on the first GPS use.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
       await worldRef.current?.focusUserLocation();
     } catch {
       Alert.alert('Location unavailable', 'Could not get your current GPS location.');
@@ -135,24 +148,35 @@ export default function MouzaGeoScreen() {
         ) : (
           <>
             <View pointerEvents={activeView === 'source' ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, activeView !== 'source' && styles.hiddenCanvas]}>
-              <GeoSourceCanvas ref={sourceRef} image={displayImage} controlPairs={controlPairs} pendingSource={pendingSource} />
-            </View>
-            <View pointerEvents={activeView === 'world' ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, activeView !== 'world' && styles.hiddenCanvas]}>
-              <GeoWorldMap
-                ref={worldRef}
+              <GeoSourceCanvas
+                ref={sourceRef}
                 image={displayImage}
-                transform={transform}
                 controlPairs={controlPairs}
-                opacity={opacity}
-                mapStyle={mapStyle}
+                pendingSource={pendingSource}
+                targetOffsetY={TARGET_OFFSET_Y}
               />
             </View>
-            <GeoTargetCrosshair />
+            {worldReady ? (
+              <View pointerEvents={activeView === 'world' ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, activeView !== 'world' && styles.hiddenCanvas]}>
+                <GeoWorldMap
+                  ref={worldRef}
+                  image={displayImage}
+                  transform={transform}
+                  controlPairs={controlPairs}
+                  opacity={opacity}
+                  mapStyle={mapStyle}
+                  targetOffsetY={TARGET_OFFSET_Y}
+                />
+              </View>
+            ) : null}
+            <GeoTargetCrosshair offsetY={TARGET_OFFSET_Y} />
 
             {processingOverlay ? (
               <View pointerEvents='none' style={styles.processingBadge}>
                 <ActivityIndicator size='small' color='#2563eb' />
-                <Text style={styles.processingText}>Updating background preview…</Text>
+                <Text style={styles.processingText}>
+                  {backgroundRemoved ? 'Updating background preview…' : 'Optimizing map preview…'}
+                </Text>
               </View>
             ) : null}
 

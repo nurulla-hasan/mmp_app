@@ -22,6 +22,7 @@ type Props = {
   image: GeoImage;
   controlPairs: ControlPair[];
   pendingSource: Point2D | null;
+  targetOffsetY?: number;
 };
 
 type Size = { width: number; height: number };
@@ -73,7 +74,7 @@ function SourcePin({ point, label, pending, stageScale }: PinProps) {
 }
 
 export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function GeoSourceCanvas(
-  { image, controlPairs, pendingSource },
+  { image, controlPairs, pendingSource, targetOffsetY = 0 },
   ref,
 ) {
   const originalImage = useMouzaGeoStore((state) => state.image);
@@ -144,7 +145,7 @@ export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function
       if (!viewport.width || !viewport.height || current.scale <= 0) return null;
       const point = {
         x: (viewport.width / 2 - current.pos.x) / current.scale,
-        y: (viewport.height / 2 - current.pos.y) / current.scale,
+        y: (viewport.height / 2 + targetOffsetY - current.pos.y) / current.scale,
       };
       if (
         point.x < 0 ||
@@ -154,7 +155,7 @@ export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function
       ) return null;
       return point;
     },
-  }), [resetView, sourceImage.height, sourceImage.width, viewport.height, viewport.width]);
+  }), [resetView, sourceImage.height, sourceImage.width, targetOffsetY, viewport.height, viewport.width]);
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
