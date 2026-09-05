@@ -5,10 +5,9 @@ import { Briefcase, Search, SlidersHorizontal, Users } from 'lucide-react-native
 import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import {
-  PAGE_BOTTOM_WITH_FLOATING_NAV,
-  PAGE_CONTENT_INSETS,
   PAGE_LAYOUT,
   PageSectionHeader,
+  usePageContentInsets,
 } from '../../components/common/page-layout';
 import { SurveyorCard } from '../../components/surveyors/surveyor-card';
 import { SurveyorFilterModal } from '../../components/surveyors/surveyor-filter-modal';
@@ -25,6 +24,7 @@ export default function SurveyorsScreen() {
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
+  const pageContentInsets = usePageContentInsets();
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filters, setFilters] = useState<FilterState>({});
@@ -102,7 +102,7 @@ export default function SurveyorsScreen() {
         keyExtractor={(item, index) => item.id || item.slug || String(index)}
         renderItem={({ item }) => <SurveyorCard surveyor={item} />}
         ListHeaderComponent={header}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={pageContentInsets}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         keyboardShouldPersistTaps='handled'
         refreshControl={
@@ -163,7 +163,6 @@ export default function SurveyorsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { ...PAGE_CONTENT_INSETS, paddingBottom: PAGE_BOTTOM_WITH_FLOATING_NAV },
   headerArea: { gap: PAGE_LAYOUT.gap, marginBottom: PAGE_LAYOUT.gap },
   joinButton: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, height: 34 },
   joinText: { fontSize: 11, fontFamily: Fonts.sansMedium },
