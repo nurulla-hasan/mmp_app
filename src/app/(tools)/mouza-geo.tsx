@@ -51,9 +51,6 @@ export default function MouzaGeoScreen() {
     backgroundSensitivity,
   );
 
-  // The web studio avoids constructing its world map until it is actually
-  // needed. Do the same here so the hidden native MapView does not compete with
-  // source-map gestures before the first world interaction.
   const worldReady =
     activeView === 'world' ||
     Boolean(pendingSource) ||
@@ -93,7 +90,6 @@ export default function MouzaGeoScreen() {
     if (!image) return;
     setActiveView('world');
     try {
-      // Give the lazily-created MapView one frame to mount on the first GPS use.
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
       await worldRef.current?.focusUserLocation();
     } catch {
@@ -162,11 +158,14 @@ export default function MouzaGeoScreen() {
               <View pointerEvents={activeView === 'world' ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, activeView !== 'world' && styles.hiddenCanvas]}>
                 <GeoWorldMap
                   ref={worldRef}
-                  image={displayImage}
+                  sourceImage={image}
+                  previewImage={displayImage}
                   transform={transform}
                   controlPairs={controlPairs}
                   opacity={opacity}
                   mapStyle={mapStyle}
+                  backgroundRemoved={backgroundRemoved}
+                  backgroundSensitivity={backgroundSensitivity}
                   targetOffsetY={TARGET_OFFSET_Y}
                 />
               </View>
