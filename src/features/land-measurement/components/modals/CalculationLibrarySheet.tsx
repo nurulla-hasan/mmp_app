@@ -1,6 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookmarkCheck, Calendar, FolderOpen, Layers, Search, Trash2, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { calculatePolygonData } from '../../utils/calculations';
@@ -62,6 +76,7 @@ export function applyServerCalculation(calculation: ServerCalculation) {
 export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }: Props) {
   const { theme } = useThemeStore();
   const colors = getLandMeasurementToolColors(theme);
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const plots = useMapStore((state) => state.plots);
   const scale = useMapStore((state) => state.scale);
@@ -173,108 +188,160 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
 
   return (
     <Modal visible={visible} transparent animationType='slide' onRequestClose={onClose}>
-      <View style={[styles.backdrop, { backgroundColor: colors.overlayStrong }]}>
-        <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: colors.panel, borderColor: colors.panelBorder }]}>
-          <View style={styles.header}>
-            <View style={styles.headerText}>
-              <Text style={[styles.title, { color: colors.textStrong }]}>{mode === 'save' ? 'Save Measurement' : 'Saved Measurements'}</Text>
-              <Text style={[styles.subtitle, { color: colors.textSoft }]}>{mode === 'save' ? 'Save the current map and plots to your profile' : 'Load a previous measurement back onto the canvas'}</Text>
-            </View>
-            <TouchableOpacity style={[styles.close, { backgroundColor: colors.panelRaised }]} onPress={onClose}><X size={18} color={colors.textSoft} /></TouchableOpacity>
-          </View>
-
-          {mode === 'save' ? <>
-            <View style={[styles.summary, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
-              <Text style={[styles.summaryLine, { color: colors.textStrong }]}>Map: {mapImage?.name || 'Map file'}</Text>
-              <Text style={[styles.summaryLine, { color: colors.textStrong }]}>Plots: {plots.length}</Text>
-              <Text style={[styles.total, { borderTopColor: colors.panelBorder, color: colors.success }]}>Total: {totalShotok.toFixed(2)} shotok ({totalKatha.toFixed(2)} katha)</Text>
-            </View>
-            <TextInput value={name} onChangeText={setName} placeholder='Measurement name' placeholderTextColor={colors.textSoft} style={[styles.input, { backgroundColor: colors.input, borderColor: colors.panelBorder, color: colors.textStrong }]} />
-            <TouchableOpacity disabled={saving || !plots.length} style={[styles.primary, (saving || !plots.length) && styles.disabled]} onPress={save}>
-              <BookmarkCheck size={18} color='#fff' />
-              <Text style={styles.primaryText}>{saving ? 'Saving…' : 'Save'}</Text>
-            </TouchableOpacity>
-          </> : <>
-            <View style={[styles.searchBox, { backgroundColor: colors.input, borderColor: colors.panelBorder }]}><Search size={17} color={colors.textSoft} /><TextInput value={search} onChangeText={setSearch} placeholder='Search by measurement or map name' placeholderTextColor={colors.textSoft} style={[styles.searchInput, { color: colors.textStrong }]} /></View>
-
-            {initialLoading ? (
-              <View style={styles.skeletonList}>
-                {[0, 1, 2, 3].map((item) => (
-                  <View key={`saved-skeleton-${item}`} style={[styles.item, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
-                    <View style={styles.itemBody}>
-                      <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonTitle} />
-                      <View style={styles.skeletonMetaRow}>
-                        <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonMeta} />
-                        <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonDate} />
-                      </View>
-                      <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonMap} />
-                    </View>
-                    <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonDelete} />
-                  </View>
-                ))}
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={[styles.backdrop, { backgroundColor: colors.overlayStrong }]}>
+          <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
+          <View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.panel,
+                borderColor: colors.panelBorder,
+                paddingBottom: Math.max(16, insets.bottom + 10),
+              },
+            ]}
+          >
+            <View style={styles.header}>
+              <View style={styles.headerText}>
+                <Text style={[styles.title, { color: colors.textStrong }]}>{mode === 'save' ? 'Save Measurement' : 'Saved Measurements'}</Text>
+                <Text style={[styles.subtitle, { color: colors.textSoft }]}>{mode === 'save' ? 'Save the current map and plots to your profile' : 'Load a previous measurement back onto the canvas'}</Text>
               </View>
-            ) : libraryQuery.isError && items.length === 0 ? (
-              <View style={styles.empty}>
-                <FolderOpen size={30} color={colors.textSoft} />
-                <Text style={[styles.emptyText, { color: colors.textSoft }]}>Could not load saved measurements</Text>
-                <TouchableOpacity style={styles.retry} onPress={() => void libraryQuery.refetch()}>
-                  <Text style={styles.retryText}>Try Again</Text>
+              <TouchableOpacity style={[styles.close, { backgroundColor: colors.panelRaised }]} onPress={onClose}><X size={18} color={colors.textSoft} /></TouchableOpacity>
+            </View>
+
+            {mode === 'save' ? (
+              <ScrollView
+                style={styles.saveScroll}
+                contentContainerStyle={styles.saveContent}
+                keyboardShouldPersistTaps='handled'
+                keyboardDismissMode='on-drag'
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={[styles.summary, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
+                  <Text style={[styles.summaryLine, { color: colors.textStrong }]}>Map: {mapImage?.name || 'Map file'}</Text>
+                  <Text style={[styles.summaryLine, { color: colors.textStrong }]}>Plots: {plots.length}</Text>
+                  <Text style={[styles.total, { borderTopColor: colors.panelBorder, color: colors.success }]}>Total: {totalShotok.toFixed(2)} shotok ({totalKatha.toFixed(2)} katha)</Text>
+                </View>
+                <TextInput
+                  value={name}
+                  onChangeText={setName}
+                  placeholder='Measurement name'
+                  placeholderTextColor={colors.textSoft}
+                  returnKeyType='done'
+                  onSubmitEditing={() => {
+                    if (!saving && plots.length) void save();
+                  }}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.input,
+                      borderColor: colors.panelBorder,
+                      color: colors.textStrong,
+                    },
+                  ]}
+                />
+                <TouchableOpacity
+                  disabled={saving || !plots.length}
+                  style={[styles.primary, (saving || !plots.length) && styles.disabled]}
+                  onPress={save}
+                >
+                  {saving ? (
+                    <ActivityIndicator size='small' color='#fff' />
+                  ) : (
+                    <BookmarkCheck size={18} color='#fff' />
+                  )}
+                  <Text style={styles.primaryText}>{saving ? 'Saving…' : 'Save'}</Text>
                 </TouchableOpacity>
-              </View>
-            ) : (
-              <FlatList
-                data={items}
-                keyExtractor={(item) => item.id}
-                style={styles.list}
-                contentContainerStyle={items.length ? styles.listContent : styles.emptyContent}
-                onEndReached={() => {
-                  if (libraryQuery.hasNextPage && !libraryQuery.isFetchingNextPage) {
-                    void libraryQuery.fetchNextPage();
-                  }
-                }}
-                onEndReachedThreshold={0.35}
-                ListFooterComponent={libraryQuery.isFetchingNextPage ? (
-                  <View style={[styles.item, styles.footerSkeleton, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
-                    <View style={styles.itemBody}>
-                      <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonTitle} />
-                      <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonMap} />
-                    </View>
-                  </View>
-                ) : null}
-                ListEmptyComponent={<View style={styles.empty}><FolderOpen size={30} color={colors.textSoft} /><Text style={[styles.emptyText, { color: colors.textSoft }]}>{search ? 'No results found' : 'No saved measurements yet'}</Text></View>}
-                renderItem={({ item }) => (
-                  <TouchableOpacity style={[styles.item, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]} onPress={() => select(item)}>
-                    <View style={styles.itemBody}>
-                      <Text style={[styles.itemTitle, { color: colors.textStrong }]}>{item.name}</Text>
-                      <View style={styles.meta}>
-                        <Layers size={12} color={colors.success} />
-                        <Text style={[styles.metaText, { color: colors.textSoft }]}>{item.plots?.length || 0} plots</Text>
-                        <Calendar size={12} color={colors.textSoft} />
-                        <Text style={[styles.metaText, { color: colors.textSoft }]}>{new Date(item.createdAt).toLocaleDateString('en-GB')}</Text>
+              </ScrollView>
+            ) : <>
+              <View style={[styles.searchBox, { backgroundColor: colors.input, borderColor: colors.panelBorder }]}><Search size={17} color={colors.textSoft} /><TextInput value={search} onChangeText={setSearch} placeholder='Search by measurement or map name' placeholderTextColor={colors.textSoft} style={[styles.searchInput, { color: colors.textStrong }]} /></View>
+
+              {initialLoading ? (
+                <View style={styles.skeletonList}>
+                  {[0, 1, 2, 3].map((item) => (
+                    <View key={`saved-skeleton-${item}`} style={[styles.item, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
+                      <View style={styles.itemBody}>
+                        <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonTitle} />
+                        <View style={styles.skeletonMetaRow}>
+                          <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonMeta} />
+                          <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonDate} />
+                        </View>
+                        <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonMap} />
                       </View>
-                      <Text numberOfLines={1} style={[styles.mapName, { color: colors.textSoft }]}>🗺️ {item.mapName || 'Map file'}</Text>
+                      <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonDelete} />
                     </View>
-                    <TouchableOpacity style={styles.delete} onPress={(event) => { event.stopPropagation(); remove(item); }}><Trash2 size={17} color='#ef4444' /></TouchableOpacity>
+                  ))}
+                </View>
+              ) : libraryQuery.isError && items.length === 0 ? (
+                <View style={styles.empty}>
+                  <FolderOpen size={30} color={colors.textSoft} />
+                  <Text style={[styles.emptyText, { color: colors.textSoft }]}>Could not load saved measurements</Text>
+                  <TouchableOpacity style={styles.retry} onPress={() => void libraryQuery.refetch()}>
+                    <Text style={styles.retryText}>Try Again</Text>
                   </TouchableOpacity>
-                )}
-              />
-            )}
-          </>}
+                </View>
+              ) : (
+                <FlatList
+                  data={items}
+                  keyExtractor={(item) => item.id}
+                  style={styles.list}
+                  contentContainerStyle={items.length ? styles.listContent : styles.emptyContent}
+                  keyboardShouldPersistTaps='handled'
+                  keyboardDismissMode='on-drag'
+                  onEndReached={() => {
+                    if (libraryQuery.hasNextPage && !libraryQuery.isFetchingNextPage) {
+                      void libraryQuery.fetchNextPage();
+                    }
+                  }}
+                  onEndReachedThreshold={0.35}
+                  ListFooterComponent={libraryQuery.isFetchingNextPage ? (
+                    <View style={[styles.item, styles.footerSkeleton, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]}>
+                      <View style={styles.itemBody}>
+                        <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonTitle} />
+                        <LoadingSkeleton opacity={skeletonOpacity} color={colors.panelRaised} style={styles.skeletonMap} />
+                      </View>
+                    </View>
+                  ) : null}
+                  ListEmptyComponent={<View style={styles.empty}><FolderOpen size={30} color={colors.textSoft} /><Text style={[styles.emptyText, { color: colors.textSoft }]}>{search ? 'No results found' : 'No saved measurements yet'}</Text></View>}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity style={[styles.item, { backgroundColor: colors.panelAlt, borderColor: colors.panelBorder }]} onPress={() => select(item)}>
+                      <View style={styles.itemBody}>
+                        <Text style={[styles.itemTitle, { color: colors.textStrong }]}>{item.name}</Text>
+                        <View style={styles.meta}>
+                          <Layers size={12} color={colors.success} />
+                          <Text style={[styles.metaText, { color: colors.textSoft }]}>{item.plots?.length || 0} plots</Text>
+                          <Calendar size={12} color={colors.textSoft} />
+                          <Text style={[styles.metaText, { color: colors.textSoft }]}>{new Date(item.createdAt).toLocaleDateString('en-GB')}</Text>
+                        </View>
+                        <Text numberOfLines={1} style={[styles.mapName, { color: colors.textSoft }]}>🗺️ {item.mapName || 'Map file'}</Text>
+                      </View>
+                      <TouchableOpacity style={styles.delete} onPress={(event) => { event.stopPropagation(); remove(item); }}><Trash2 size={17} color='#ef4444' /></TouchableOpacity>
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
+            </>}
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: { flex: 1 },
   backdrop: { flex: 1, justifyContent: 'flex-end' },
-  sheet: { maxHeight: '82%', padding: 16, paddingBottom: 28, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1 },
+  sheet: { maxHeight: '82%', padding: 16, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, gap: 12 },
   headerText: { flex: 1 },
   title: { fontFamily: Fonts.headingBold, fontSize: 17 },
   subtitle: { fontFamily: Fonts.sansRegular, fontSize: 10 },
   close: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
+  saveScroll: { flexShrink: 1 },
+  saveContent: { flexGrow: 1 },
   summary: { gap: 5, padding: 13, borderRadius: 11, borderWidth: 1 },
   summaryLine: { fontFamily: Fonts.headingMedium, fontSize: 11 },
   total: { marginTop: 3, paddingTop: 7, borderTopWidth: StyleSheet.hairlineWidth, fontFamily: Fonts.headingBold, fontSize: 12 },
