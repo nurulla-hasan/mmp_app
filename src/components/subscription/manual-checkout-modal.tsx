@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +11,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { Check, Clock, Copy, Receipt, X } from 'lucide-react-native';
 import { Button } from '../ui/button';
+import { KeyboardSafeView, useModalSafeBottomPadding } from '../common/keyboard-safe-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -60,6 +59,7 @@ export function ManualCheckoutModal({
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const mutation = useSubmitManualCheckout();
+  const bottomPadding = useModalSafeBottomPadding();
 
   const [method, setMethod] = useState<PaymentMethod>('BKASH');
   const [senderPhone, setSenderPhone] = useState('');
@@ -143,39 +143,40 @@ export function ManualCheckoutModal({
 
   return (
     <Modal visible={visible} transparent animationType='slide' onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
-      >
+      <KeyboardSafeView style={styles.overlay}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: bottomPadding }]}>
           <View style={styles.handle} />
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.title, { color: colors.text }]}>
+              <Text style={[styles.title, { color: colors.text }]}> 
                 {showStatus ? 'পেমেন্ট ভেরিফিকেশন' : 'ম্যানুয়াল পেমেন্ট'}
               </Text>
-              <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+              <Text style={[styles.subtitle, { color: colors.textMuted }]}> 
                 {showStatus
                   ? 'অ্যাডমিন যাচাই শেষে আপনার Pro access সক্রিয় হবে।'
                   : 'bKash, Nagad বা Rocket-এ Send Money করে তথ্য জমা দিন।'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { borderColor: colors.border }]}>
+            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { borderColor: colors.border }]}> 
               <X size={17} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps='handled'>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps='handled'
+            keyboardDismissMode='on-drag'
+          >
             {showStatus ? (
               <View style={styles.statusContent}>
                 <View style={styles.pendingIcon}><Clock size={30} color='#d97706' /></View>
                 <Text style={[styles.statusTitle, { color: colors.text }]}>পেমেন্ট যাচাইাধীন</Text>
-                <Text style={[styles.statusText, { color: colors.textMuted }]}>
+                <Text style={[styles.statusText, { color: colors.textMuted }]}> 
                   {plan.name} (৳{toBengaliDigits(plan.price)}) প্ল্যানের পেমেন্ট রিকোয়েস্ট জমা আছে।
                   অনুমোদনের পর স্বয়ংক্রিয়ভাবে Pro access দেখা যাবে।
                 </Text>
-                <View style={[styles.summaryCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <View style={[styles.summaryCard, { backgroundColor: colors.background, borderColor: colors.border }]}> 
                   <SummaryRow label='প্ল্যান' value={plan.name} colors={colors} />
                   <SummaryRow label='পরিমাণ' value={`৳${toBengaliDigits(plan.price)}`} colors={colors} />
                   {currentTrxId ? <SummaryRow label='TrxID' value={currentTrxId} colors={colors} accent /> : null}
@@ -186,10 +187,10 @@ export function ManualCheckoutModal({
               </View>
             ) : (
               <View style={styles.formContent}>
-                <View style={[styles.planSummary, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}35` }]}>
+                <View style={[styles.planSummary, { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}35` }]}> 
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.planName, { color: colors.text }]}>{plan.name}</Text>
-                    <Text style={[styles.planDuration, { color: colors.textMuted }]}>
+                    <Text style={[styles.planDuration, { color: colors.textMuted }]}> 
                       {toBengaliDigits(plan.durationDays)} দিনের প্যাকেজ
                     </Text>
                   </View>
@@ -214,7 +215,7 @@ export function ManualCheckoutModal({
                             },
                           ]}
                         >
-                          <Text style={[styles.methodText, { color: selected ? colors.primary : colors.textMuted }]}>
+                          <Text style={[styles.methodText, { color: selected ? colors.primary : colors.textMuted }]}> 
                             {item.label}
                           </Text>
                         </TouchableOpacity>
@@ -222,22 +223,22 @@ export function ManualCheckoutModal({
                     })}
                   </View>
                 ) : (
-                  <Text style={[styles.unavailableText, { color: colors.textMuted }]}>
+                  <Text style={[styles.unavailableText, { color: colors.textMuted }]}> 
                     কোনো পেমেন্ট নম্বর কনফিগার করা নেই। পরে আবার চেষ্টা করুন।
                   </Text>
                 )}
 
                 {targetNumber ? (
-                  <View style={[styles.paymentBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View style={[styles.paymentBox, { backgroundColor: colors.background, borderColor: colors.border }]}> 
                     <Text style={[styles.paymentHint, { color: colors.textMuted }]}>Send Money করুন:</Text>
                     <View style={styles.paymentNumberRow}>
                       <Text selectable style={[styles.paymentNumber, { color: colors.text }]}>{targetNumber}</Text>
-                      <TouchableOpacity onPress={copyNumber} style={[styles.copyButton, { borderColor: colors.border }]}>
+                      <TouchableOpacity onPress={copyNumber} style={[styles.copyButton, { borderColor: colors.border }]}> 
                         {copied ? <Check size={14} color={colors.primary} /> : <Copy size={14} color={colors.primary} />}
                         <Text style={[styles.copyText, { color: colors.primary }]}>{copied ? 'কপি হয়েছে' : 'কপি'}</Text>
                       </TouchableOpacity>
                     </View>
-                    <Text style={[styles.amountHint, { color: colors.textMuted }]}>
+                    <Text style={[styles.amountHint, { color: colors.textMuted }]}> 
                       উপরের নম্বরে ঠিক ৳{toBengaliDigits(plan.price)} Send Money করুন, তারপর নিচে sender number ও TrxID দিন।
                     </Text>
                     {paymentNumbers?.instructions ? (
@@ -268,6 +269,10 @@ export function ManualCheckoutModal({
                     placeholder='যেমন: BL92XK8291'
                     placeholderTextColor={colors.textMuted}
                     maxLength={50}
+                    returnKeyType='done'
+                    onSubmitEditing={() => {
+                      if (!mutation.isPending && targetNumber) void submit();
+                    }}
                     style={[styles.input, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }]}
                   />
                 </View>
@@ -284,7 +289,7 @@ export function ManualCheckoutModal({
             )}
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </Modal>
   );
 }
@@ -319,7 +324,7 @@ function SummaryRow({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(2,6,23,.58)' },
-  sheet: { maxHeight: '88%', borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, padding: 16, paddingBottom: 24 },
+  sheet: { maxHeight: '88%', borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, paddingHorizontal: 16, paddingTop: 16 },
   handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: '#94a3b8', opacity: 0.45, alignSelf: 'center', marginBottom: 12 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 14 },
   title: { fontSize: 17, fontFamily: Fonts.headingBold },
