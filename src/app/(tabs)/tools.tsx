@@ -111,44 +111,221 @@ export default function ToolsHubScreen() {
 
   return (
     <PageWrapper>
-      <TouchableOpacity activeOpacity={0.88} onPress={() => router.push(FEATURED_TOOL.route as any)}>
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={() => router.push(FEATURED_TOOL.route as any)}
+      >
         <View style={[styles.featuredCard, { backgroundColor: colors.card, borderColor: theme === 'dark' ? '#064e3b' : 'rgba(22, 163, 74, 0.35)' }]}>
           <View style={styles.featuredTopRow}>
-            <View style={styles.featuredIconBox}><Map size={24} color='#16a34a' strokeWidth={2.2} /></View>
+            <View style={styles.featuredIconBox}>
+              <Map size={24} color='#16a34a' strokeWidth={2.2} />
+            </View>
             <View style={{ flex: 1, gap: 2 }}>
-              <View style={styles.badgeRow}><Text style={[styles.featuredTitle, { color: colors.text }]}>{FEATURED_TOOL.title}</Text><Badge label='PRO' variant='pro' /><Badge label='প্রধান টুল' variant='free' /></View>
-              <Text style={[styles.featuredDesc, { color: colors.textMuted }]}>{FEATURED_TOOL.description}</Text>
+              <View style={styles.badgeRow}>
+                <Text style={[styles.featuredTitle, { color: colors.text }]}>
+                  {FEATURED_TOOL.title}
+                </Text>
+                <Badge label='PRO' variant='pro' />
+                <Badge label='প্রধান টুল' variant='free' />
+              </View>
+              <Text style={[styles.featuredDesc, { color: colors.textMuted }]}>
+                {FEATURED_TOOL.description}
+              </Text>
             </View>
           </View>
-          <View style={[styles.featurePillsRow, { borderTopColor: colors.border }]}>{FEATURED_TOOL.features?.map((pill) => <View key={pill} style={[styles.featurePill, { backgroundColor: theme === 'dark' ? '#1e293b' : '#f1f5f9', borderColor: colors.border }]}><Text style={[styles.featurePillText, { color: colors.textMuted }]}>{pill}</Text></View>)}</View>
-          <Button title='টুলটি ব্যবহার করুন' size='sm' variant='primary' onPress={() => router.push(FEATURED_TOOL.route as any)} icon={<ArrowRight size={14} color='#fff' />} style={{ marginTop: 4 }} />
+
+          <View style={[styles.featurePillsRow, { borderTopColor: colors.border }]}>
+            {FEATURED_TOOL.features?.map((pill) => (
+              <View
+                key={pill}
+                style={[
+                  styles.featurePill,
+                  { backgroundColor: theme === 'dark' ? '#1e293b' : '#f1f5f9', borderColor: colors.border },
+                ]}
+              >
+                <Text style={[styles.featurePillText, { color: colors.textMuted }]}>{pill}</Text>
+              </View>
+            ))}
+          </View>
+
+          <Button
+            title='টুলটি ব্যবহার করুন'
+            size='sm'
+            variant='primary'
+            onPress={() => router.push(FEATURED_TOOL.route as any)}
+            icon={<ArrowRight size={14} color='#fff' />}
+            style={{ marginTop: 4 }}
+          />
         </View>
       </TouchableOpacity>
 
-      <PageSectionHeader title='বিশেষায়িত ল্যান্ড টুলস' subtitle='ম্যাপ এলাইনমেন্ট, ট্রেসিং, প্যান্টাগ্রাফ ও জিওরেফারেন্স' />
-      <View style={styles.toolsList}>{SPECIALIZED_TOOLS.map((tool) => { const IconComp = tool.icon; return <TouchableOpacity key={tool.id} activeOpacity={0.8} style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} onPress={() => router.push(tool.route as any)}><View style={[styles.toolIconBox, { backgroundColor: tool.bg }]}><IconComp size={20} color={tool.color} strokeWidth={2} /></View><View style={styles.toolTextCol}><View style={styles.toolTitleRow}><Text style={[styles.toolTitle, { color: colors.text }]}>{tool.title}</Text><Badge label={tool.badge} variant={tool.badgeVariant} /></View><Text style={[styles.toolDesc, { color: colors.textMuted }]} numberOfLines={2}>{tool.description}</Text></View><ChevronRight size={16} color={colors.textMuted} /></TouchableOpacity>; })}</View>
+      <PageSectionHeader
+        title='বিশেষায়িত ল্যান্ড টুলস'
+        subtitle='ম্যাপ এলাইনমেন্ট, ট্রেসিং, প্যান্টাগ্রাফ ও জিওরেফারেন্স'
+      />
 
-      <PageSectionHeader title='ভূমি হিসাব ও ইউটিলিটি টুলস' subtitle='একক রূপান্তর, ফারায়েজ হিস্যা বণ্টন ও স্কেল গাইড' />
-      <View style={styles.toolsList}>{CALCULATION_TOOLS.map((tool) => { const IconComp = tool.icon; return <TouchableOpacity key={tool.id} activeOpacity={0.8} style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]} onPress={() => router.push(tool.route as any)}><View style={[styles.toolIconBox, { backgroundColor: tool.bg }]}><IconComp size={20} color={tool.color} strokeWidth={2} /></View><View style={styles.toolTextCol}><View style={styles.toolTitleRow}><Text style={[styles.toolTitle, { color: colors.text }]}>{tool.title}</Text><Badge label={tool.badge} variant={tool.badgeVariant} /></View><Text style={[styles.toolDesc, { color: colors.textMuted }]} numberOfLines={2}>{tool.description}</Text></View><ChevronRight size={16} color={colors.textMuted} /></TouchableOpacity>; })}</View>
+      <View style={styles.toolsList}>
+        {SPECIALIZED_TOOLS.map((tool) => {
+          const IconComp = tool.icon;
+          return (
+            <TouchableOpacity
+              key={tool.id}
+              activeOpacity={0.8}
+              style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+              onPress={() => router.push(tool.route as any)}
+            >
+              <View style={[styles.toolIconBox, { backgroundColor: tool.bg }]}>
+                <IconComp size={20} color={tool.color} strokeWidth={2} />
+              </View>
+
+              <View style={styles.toolTextCol}>
+                <View style={styles.toolTitleRow}>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{tool.title}</Text>
+                  <Badge label={tool.badge} variant={tool.badgeVariant} />
+                </View>
+                <Text style={[styles.toolDesc, { color: colors.textMuted }]} numberOfLines={2}>
+                  {tool.description}
+                </Text>
+              </View>
+
+              <ChevronRight size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <PageSectionHeader
+        title='ভূমি হিসাব ও ইউটিলিটি টুলস'
+        subtitle='একক রূপান্তর, ফারায়েজ হিস্যা বণ্টন ও স্কেল গাইড'
+      />
+
+      <View style={styles.toolsList}>
+        {CALCULATION_TOOLS.map((tool) => {
+          const IconComp = tool.icon;
+          return (
+            <TouchableOpacity
+              key={tool.id}
+              activeOpacity={0.8}
+              style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
+              onPress={() => router.push(tool.route as any)}
+            >
+              <View style={[styles.toolIconBox, { backgroundColor: tool.bg }]}>
+                <IconComp size={20} color={tool.color} strokeWidth={2} />
+              </View>
+
+              <View style={styles.toolTextCol}>
+                <View style={styles.toolTitleRow}>
+                  <Text style={[styles.toolTitle, { color: colors.text }]}>{tool.title}</Text>
+                  <Badge label={tool.badge} variant={tool.badgeVariant} />
+                </View>
+                <Text style={[styles.toolDesc, { color: colors.textMuted }]} numberOfLines={2}>
+                  {tool.description}
+                </Text>
+              </View>
+
+              <ChevronRight size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </PageWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  featuredCard: { borderRadius: 14, padding: 15, borderWidth: 1.5, gap: 12, shadowColor: '#16a34a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 2 },
-  featuredTopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  featuredIconBox: { width: 44, height: 44, borderRadius: 11, backgroundColor: 'rgba(22, 163, 74, 0.12)', borderWidth: 1, borderColor: 'rgba(22, 163, 74, 0.25)', alignItems: 'center', justifyContent: 'center' },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
-  featuredTitle: { fontSize: 15.5, fontFamily: Fonts.headingBold },
-  featuredDesc: { fontSize: 11.5, fontFamily: Fonts.sansRegular, lineHeight: 16, marginTop: 2 },
-  featurePillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, borderTopWidth: 1, paddingTop: 10 },
-  featurePill: { paddingHorizontal: 7.5, paddingVertical: 3, borderRadius: 6, borderWidth: 1 },
-  featurePillText: { fontSize: 10, fontFamily: Fonts.sansMedium },
-  toolsList: { gap: 9 },
-  toolCard: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, borderWidth: 1, gap: 11 },
-  toolIconBox: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  toolTextCol: { flex: 1, gap: 2 },
-  toolTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  toolTitle: { fontSize: 13, fontFamily: Fonts.headingBold },
-  toolDesc: { fontSize: 10.5, fontFamily: Fonts.sansRegular, lineHeight: 14.5 },
+  featuredCard: {
+    borderRadius: 14,
+    padding: 15,
+    borderWidth: 1.5,
+    gap: 12,
+    shadowColor: '#16a34a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  featuredTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  featuredIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 11,
+    backgroundColor: 'rgba(22, 163, 74, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(22, 163, 74, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  featuredTitle: {
+    fontSize: 15.5,
+    fontFamily: Fonts.headingBold,
+  },
+  featuredDesc: {
+    fontSize: 11.5,
+    fontFamily: Fonts.sansRegular,
+    lineHeight: 16,
+    marginTop: 2,
+  },
+  featurePillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    borderTopWidth: 1,
+    paddingTop: 10,
+  },
+  featurePill: {
+    paddingHorizontal: 7.5,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  featurePillText: {
+    fontSize: 10,
+    fontFamily: Fonts.sansMedium,
+  },
+  toolsList: {
+    gap: 9,
+  },
+  toolCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 11,
+  },
+  toolIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  toolTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  toolTitle: {
+    fontSize: 13,
+    fontFamily: Fonts.headingBold,
+  },
+  toolDesc: {
+    fontSize: 10.5,
+    fontFamily: Fonts.sansRegular,
+    lineHeight: 14.5,
+  },
 });
