@@ -1,9 +1,10 @@
-import React, { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import MapView, { Marker, Overlay, Polygon } from 'react-native-maps';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import MapView, { type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Alert, LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import type { ControlPair, GeoImage, GeoMapStyle, GeoPoint, GeoTransform } from '../types';
-import { getNativeOverlayPreview, getOverlayCorners } from '../utils/geo-math';
+import { getOverlayCorners } from '../utils/geo-math';
+import { GeoWorldAffineOverlay } from './GeoWorldAffineOverlay';
 
 export type GeoWorldMapHandle = {
   getCenterCoordinate: () => Promise<GeoPoint | null>;
@@ -12,15 +13,18 @@ export type GeoWorldMapHandle = {
 };
 
 type Props = {
-  image: GeoImage;
+  sourceImage: GeoImage;
+  previewImage: GeoImage;
   transform: GeoTransform | null;
   controlPairs: ControlPair[];
   opacity: number;
   mapStyle: GeoMapStyle;
+  backgroundRemoved: boolean;
+  backgroundSensitivity: number;
   targetOffsetY?: number;
 };
 
-const INITIAL_REGION = {
+const INITIAL_REGION: Region = {
   latitude: 25.6217,
   longitude: 88.6354,
   latitudeDelta: 0.04,
@@ -28,14 +32,29 @@ const INITIAL_REGION = {
 };
 
 export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorldMap(
-  { image, transform, controlPairs, opacity, mapStyle, targetOffsetY = 0 },
+  {
+    sourceImage,
+    previewImage,
+    transform,
+    controlPairs,
+    opacity,
+    mapStyle,
+    backgroundRemoved,
+    backgroundSensitivity,
+    targetOffsetY = 0,
+  },
   ref,
 ) {
   const mapRef = useRef<MapView>(null);
+  const regionFrameRef = useRef<number | null>(null);
+  const pendingRegionRef = useRef<Region>(INITIAL_REGION);
   const [showsUserLocation, setShowsUserLocation] = useState(false);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
-  const corners = useMemo(() => transform ? getOverlayCorners(transform, image) : [], [image, transform]);
-  const preview = useMemo(() => transform ? getNativeOverlayPreview(transform, image) : null, [image, transform]);
+  const [region, setRegion] = useState<Region>(INITIAL_REGION);
+  const corners = useMemo(
+    () => transform ? getOverlayCorners(transform, sourceImage) : [],
+    [sourceImage, transform],
+  );
 
   const fitAlignment = () => {
     if (!mapRef.current || !corners.length) return;
@@ -80,6 +99,22 @@ export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorl
     },
   }), [corners, targetOffsetY, viewport.height, viewport.width]);
 
+  useEffect(
+    () => () => {
+      if (regionFrameRef.current !== null) cancelAnimationFrame(regionFrameRef.current);
+    },
+    [],
+  );
+
+  const scheduleRegionUpdate = (nextRegion: Region) => {
+    pendingRegionRef.current = nextRegion;
+    if (regionFrameRef.current !== null) return;
+    regionFrameRef.current = requestAnimationFrame(() => {
+      regionFrameRef.current = null;
+      setRegion(pendingRegionRef.current);
+    });
+  };
+
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setViewport({ width, height });
@@ -99,36 +134,24 @@ export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorl
         showsCompass={false}
         showsUserLocation={showsUserLocation}
         loadingEnabled
-      >
-        {preview && (
-          <Overlay
-            key={image.uri}
-            image={{ uri: image.uri }}
-            bounds={preview.bounds}
-            bearing={preview.bearing}
-            opacity={opacity}
-          />
-        )}
-        {corners.length === 4 && (
-          <Polygon
-            coordinates={corners.map((point) => ({ latitude: point.lat, longitude: point.lng }))}
-            strokeColor='#2563eb'
-            fillColor='rgba(37,99,235,0.04)'
-            strokeWidth={1.5}
-          />
-        )}
-        {controlPairs.map((pair, index) => (
-          <Marker
-            key={pair.id}
-            identifier={pair.id}
-            coordinate={{ latitude: pair.world.lat, longitude: pair.world.lng }}
-            pinColor='#dc2626'
-            title={`Point ${index + 1}`}
-            description={`${pair.world.lat.toFixed(6)}, ${pair.world.lng.toFixed(6)}`}
-            zIndex={100 + index}
-          />
-        ))}
-      </MapView>
+        onRegionChange={scheduleRegionUpdate}
+        onRegionChangeComplete={(nextRegion) => {
+          pendingRegionRef.current = nextRegion;
+          setRegion(nextRegion);
+        }}
+      />
+
+      <GeoWorldAffineOverlay
+        sourceImage={sourceImage}
+        previewImage={previewImage}
+        transform={transform}
+        controlPairs={controlPairs}
+        opacity={opacity}
+        backgroundRemoved={backgroundRemoved}
+        backgroundSensitivity={backgroundSensitivity}
+        region={region}
+        viewport={viewport}
+      />
     </View>
   );
 });
