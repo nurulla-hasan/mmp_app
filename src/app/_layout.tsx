@@ -20,8 +20,10 @@ import {
   NotoSansBengali_700Bold,
 } from '@expo-google-fonts/noto-sans-bengali';
 import { BroadcastAnnouncementModal } from '../components/broadcasts/broadcast-announcement-modal';
-import { AppBottomNav, type AppBottomNavKey } from '../components/common/app-bottom-nav';
-import { hasStandaloneFloatingBottomNav } from '../components/common/page-layout';
+import {
+  AppBottomNav,
+  getAppBottomNavRouteState,
+} from '../components/common/app-bottom-nav';
 import { StandalonePageHeader } from '../components/common/standalone-page-header';
 import { Colors } from '../constants/colors';
 import { useThemeStore } from '../stores/theme-store';
@@ -60,11 +62,7 @@ export default function RootLayout() {
     return null;
   }
 
-  const standaloneNavActiveKey: AppBottomNavKey | undefined =
-    pathname === '/join-as-surveyor' || pathname === '/surveyor-profile' || pathname.startsWith('/surveyors/')
-      ? 'surveyors'
-      : undefined;
-  const showStandaloneBottomNav = hasStandaloneFloatingBottomNav(pathname);
+  const bottomNavState = getAppBottomNavRouteState(pathname);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -123,7 +121,9 @@ export default function RootLayout() {
                 options={{ headerShown: true, title: 'সার্ভেয়ার প্রোফাইল' }}
               />
             </Stack>
-            {showStandaloneBottomNav ? <AppBottomNav activeKey={standaloneNavActiveKey} /> : null}
+            {bottomNavState.standalone ? (
+              <AppBottomNav activeKey={bottomNavState.activeKey} />
+            ) : null}
           </View>
           <BroadcastAnnouncementModal />
         </SafeAreaProvider>

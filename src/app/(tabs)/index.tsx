@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   RefreshControl,
   type StyleProp,
@@ -30,8 +29,7 @@ import {
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { SurveyorCard } from '../../components/surveyors/surveyor-card';
-import { APP_BOTTOM_NAV_LAYOUT } from '../../components/common/app-bottom-nav';
-import { PAGE_LAYOUT } from '../../components/common/page-layout';
+import { PageWrapper } from '../../components/common/page-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -257,10 +255,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+    <PageWrapper
       refreshControl={
         <RefreshControl
           refreshing={refetchingCalculations || featuredSurveyorsQuery.isRefetching}
@@ -550,17 +545,11 @@ export default function HomeScreen() {
           style={styles.careerButton}
         />
       </View>
-    </ScrollView>
+    </PageWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: {
-    padding: PAGE_LAYOUT.horizontal,
-    gap: PAGE_LAYOUT.gap,
-    paddingBottom: PAGE_LAYOUT.bottom + APP_BOTTOM_NAV_LAYOUT.centerOverhang,
-  },
   flexText: { flex: 1, gap: 2 },
   heroCard: {
     borderRadius: 14,
