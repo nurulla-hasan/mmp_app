@@ -4,6 +4,8 @@ import { StyleSheet, View } from 'react-native';
 export const GeoTargetCrosshair = memo(function GeoTargetCrosshair() {
   return (
     <View pointerEvents='none' style={styles.root}>
+      <View style={[styles.shadowLine, styles.horizontalShadow]} />
+      <View style={[styles.shadowLine, styles.verticalShadow]} />
       <View style={[styles.line, styles.horizontal]} />
       <View style={[styles.line, styles.vertical]} />
       <View style={styles.ring} />
@@ -17,17 +19,43 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: '50%',
     top: '50%',
-    width: 52,
-    height: 52,
-    marginLeft: -26,
-    marginTop: -26,
+    width: 44,
+    height: 44,
+    marginLeft: -22,
+    marginTop: -22,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 30,
   },
-  line: { position: 'absolute', backgroundColor: '#ffffff', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 2, elevation: 2 },
-  horizontal: { width: 46, height: 2 },
-  vertical: { width: 2, height: 46 },
-  ring: { width: 20, height: 20, borderRadius: 10, borderWidth: 2.5, borderColor: '#2563eb', backgroundColor: 'rgba(255,255,255,0.18)' },
-  dot: { position: 'absolute', width: 5, height: 5, borderRadius: 3, backgroundColor: '#dc2626' },
+  shadowLine: {
+    position: 'absolute',
+    borderRadius: 99,
+    backgroundColor: 'rgba(15,23,42,0.48)',
+  },
+  horizontalShadow: { width: 38, height: 4 },
+  verticalShadow: { width: 4, height: 38 },
+  line: {
+    position: 'absolute',
+    borderRadius: 99,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+  },
+  horizontal: { width: 36, height: 1.5 },
+  vertical: { width: 1.5, height: 36 },
+  ring: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#2563eb',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  dot: {
+    position: 'absolute',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#2563eb',
+  },
 });
