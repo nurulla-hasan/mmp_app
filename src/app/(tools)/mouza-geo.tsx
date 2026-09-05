@@ -39,6 +39,7 @@ export default function MouzaGeoScreen() {
   const opacity = useMouzaGeoStore((state) => state.opacity);
   const backgroundRemoved = useMouzaGeoStore((state) => state.backgroundRemoved);
   const backgroundSensitivity = useMouzaGeoStore((state) => state.backgroundSensitivity);
+  const exportQuality = useMouzaGeoStore((state) => state.exportQuality);
   const setActiveView = useMouzaGeoStore((state) => state.setActiveView);
   const captureSource = useMouzaGeoStore((state) => state.captureSource);
   const captureWorld = useMouzaGeoStore((state) => state.captureWorld);
@@ -113,6 +114,7 @@ export default function MouzaGeoScreen() {
         opacity,
         backgroundRemoved,
         backgroundSensitivity,
+        quality: exportQuality,
       });
     } catch (error) {
       Alert.alert('KMZ export failed', error instanceof Error ? error.message : 'Could not create the KMZ file.');

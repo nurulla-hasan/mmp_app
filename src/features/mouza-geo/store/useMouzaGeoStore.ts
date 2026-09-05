@@ -7,6 +7,7 @@ import type {
   GeoPoint,
   GeoTransform,
   GeoView,
+  KmzExportQuality,
   Point2D,
 } from '../types';
 import { solveGeoTransform } from '../utils/geo-math';
@@ -23,6 +24,7 @@ type GeoState = {
   opacity: number;
   backgroundRemoved: boolean;
   backgroundSensitivity: number;
+  exportQuality: KmzExportQuality;
   setImage: (image: GeoImage) => void;
   clear: () => void;
   setActiveView: (view: GeoView) => void;
@@ -30,6 +32,7 @@ type GeoState = {
   setOpacity: (opacity: number) => void;
   setBackgroundRemoved: (removed: boolean) => void;
   setBackgroundSensitivity: (sensitivity: number) => void;
+  setExportQuality: (quality: KmzExportQuality) => void;
   setAlignmentMode: (mode: AlignmentMode) => void;
   captureSource: (point: Point2D) => void;
   captureWorld: (point: GeoPoint) => void;
@@ -65,6 +68,7 @@ const initial = {
   opacity: 0.72,
   backgroundRemoved: false,
   backgroundSensitivity: 75,
+  exportQuality: 'optimized' as KmzExportQuality,
 };
 
 export const useMouzaGeoStore = create<GeoState>((set, get) => ({
@@ -78,6 +82,7 @@ export const useMouzaGeoStore = create<GeoState>((set, get) => ({
   setBackgroundSensitivity: (backgroundSensitivity) => set({
     backgroundSensitivity: Math.max(0, Math.min(100, Math.round(backgroundSensitivity))),
   }),
+  setExportQuality: (exportQuality) => set({ exportQuality }),
   setAlignmentMode: (alignmentMode) => {
     const state = get();
     set({ alignmentMode, transform: fit(state.controlPairs, state.image, alignmentMode) });
