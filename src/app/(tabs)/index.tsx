@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
   RefreshControl,
   type StyleProp,
@@ -30,8 +29,7 @@ import {
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { SurveyorCard } from '../../components/surveyors/surveyor-card';
-import { APP_BOTTOM_NAV_LAYOUT } from '../../components/common/app-bottom-nav';
-import { PAGE_LAYOUT } from '../../components/common/page-layout';
+import { PageWrapper } from '../../components/common/page-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -257,10 +255,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
+    <PageWrapper
       refreshControl={
         <RefreshControl
           refreshing={refetchingCalculations || featuredSurveyorsQuery.isRefetching}
@@ -285,7 +280,7 @@ export default function HomeScreen() {
         </View>
 
         <Text style={[styles.heroTitle, { color: colors.heroTitle }]}>ডিজিটাল মৌজা ম্যাপ ও জমি পরিমাপ</Text>
-        <Text style={[styles.heroSubtitle, { color: colors.heroSubtitle }]}>
+        <Text style={[styles.heroSubtitle, { color: colors.heroSubtitle }]}> 
           ম্যাপে সরাসরি দাগ এঁকে শতক, কাঠা ও একরে নিখুঁত ক্ষেত্রফল হিসাব ও দাগ বণ্টন করুন।
         </Text>
 
@@ -410,7 +405,7 @@ export default function HomeScreen() {
           <FolderKanban size={22} color={colors.textMuted} />
           <View style={styles.flexText}>
             <Text style={[styles.emptyProjectTitle, { color: colors.text }]}>আপনার প্রজেক্ট দেখতে লগইন করুন</Text>
-            <Text style={[styles.metaText, { color: colors.textMuted }]}>
+            <Text style={[styles.metaText, { color: colors.textMuted }]}> 
               ক্লাউডে সংরক্ষিত সমস্ত দাগ ও পরিমাপের হিসাব পেতে সাইন ইন করুন।
             </Text>
           </View>
@@ -425,7 +420,7 @@ export default function HomeScreen() {
           <Calculator size={22} color={colors.primary} />
           <View style={styles.flexText}>
             <Text style={[styles.emptyProjectTitle, { color: colors.text }]}>এখনও কোনো প্রজেক্ট সংরক্ষণ করা হয়নি</Text>
-            <Text style={[styles.metaText, { color: colors.textMuted }]}>
+            <Text style={[styles.metaText, { color: colors.textMuted }]}> 
               ম্যাপে দাগ এঁকে পরিমাপ সংরক্ষণ করতে এখানে ট্যাপ করুন।
             </Text>
           </View>
@@ -461,7 +456,7 @@ export default function HomeScreen() {
                     <View style={styles.savedProjectMeta}>
                       <Text style={[styles.metaText, { color: colors.textMuted }]}>{scaleDisplay}</Text>
                       <Text style={[styles.metaDot, { color: colors.textMuted }]}>•</Text>
-                      <Text style={[styles.metaText, { color: colors.textMuted }]}>
+                      <Text style={[styles.metaText, { color: colors.textMuted }]}> 
                         {toBengaliDigits(plotCount)}টি প্লট
                       </Text>
                     </View>
@@ -470,7 +465,7 @@ export default function HomeScreen() {
 
                 <View style={styles.savedProjectRight}>
                   {totalShotok > 0 ? (
-                    <Text style={[styles.savedProjectArea, { color: colors.text }]}>
+                    <Text style={[styles.savedProjectArea, { color: colors.text }]}> 
                       {toBengaliDigits(totalShotok.toFixed(2))} শতাংশ
                     </Text>
                   ) : null}
@@ -550,17 +545,11 @@ export default function HomeScreen() {
           style={styles.careerButton}
         />
       </View>
-    </ScrollView>
+    </PageWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: {
-    padding: PAGE_LAYOUT.horizontal,
-    gap: PAGE_LAYOUT.gap,
-    paddingBottom: PAGE_LAYOUT.bottom + APP_BOTTOM_NAV_LAYOUT.centerOverhang,
-  },
   flexText: { flex: 1, gap: 2 },
   heroCard: {
     borderRadius: 14,
