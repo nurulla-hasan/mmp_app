@@ -127,24 +127,20 @@ export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorl
         {controlPairs.map((pair, index) => (
           <Marker
             key={pair.id}
+            identifier={pair.id}
             coordinate={{ latitude: pair.world.lat, longitude: pair.world.lng }}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
-          >
-            <View style={styles.markerWrap}>
-              <View style={styles.markerHalo} />
-              <View style={styles.markerCore}>
-                <Text style={styles.markerText}>{index + 1}</Text>
-              </View>
-            </View>
-          </Marker>
+            pinColor='#dc2626'
+            title={`Point ${index + 1}`}
+            description={`${pair.world.lat.toFixed(6)}, ${pair.world.lng.toFixed(6)}`}
+            zIndex={100 + index}
+          />
         ))}
       </MapView>
 
       {preparingOverlay ? (
         <View pointerEvents='none' style={styles.processingBadge}>
           <ActivityIndicator size='small' color='#2563eb' />
-          <Text style={styles.processingText}>Cleaning paper background…</Text>
+          <Text style={styles.processingText}>Isolating black survey ink…</Text>
         </View>
       ) : null}
     </View>
@@ -153,30 +149,6 @@ export const GeoWorldMap = forwardRef<GeoWorldMapHandle, Props>(function GeoWorl
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#dbeafe' },
-  markerWrap: {
-    width: 30,
-    height: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markerHalo: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 15,
-    backgroundColor: 'rgba(220,38,38,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.8)',
-  },
-  markerCore: {
-    width: 19,
-    height: 19,
-    borderRadius: 9.5,
-    backgroundColor: '#dc2626',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markerText: { color: '#fff', fontSize: 9, fontWeight: '800', lineHeight: 11 },
   processingBadge: {
     position: 'absolute',
     top: 10,
