@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Bell, Search, Sun, Moon, LogIn } from 'lucide-react-native';
+import { Bell, Search, LogIn } from 'lucide-react-native';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
 import { useThemeStore } from '../../stores/theme-store';
@@ -24,7 +24,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   showSearch = false,
 }) => {
   const router = useRouter();
-  const { theme, toggleTheme } = useThemeStore();
+  const { theme } = useThemeStore();
   const { user, isAuthenticated } = useAuthStore();
   const colors = Colors[theme];
   const broadcastsQuery = useActiveBroadcasts();
@@ -32,6 +32,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const displaySubtitle = subtitle || (title === 'মৌজা ম্যাপ প্রো' ? 'ডিজিটাল ল্যান্ড প্ল্যাটফর্ম' : 'মৌজা ম্যাপ প্রো');
+
+  const openNotifications = () => {
+    setNotificationsOpen(true);
+    void broadcastsQuery.refetch();
+  };
 
   return (
     <SafeAreaView
@@ -59,7 +64,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             activeOpacity={0.72}
             accessibilityRole='button'
             accessibilityLabel='নোটিফিকেশন দেখুন'
-            onPress={() => setNotificationsOpen(true)}
+            onPress={openNotifications}
             style={[styles.notificationButton, { backgroundColor: colors.iconBtnBg }]}
           >
             <Bell size={16} color={colors.textMuted} strokeWidth={2} />
@@ -72,31 +77,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             ) : null}
           </TouchableOpacity>
 
-          <Button
-            variant='ghost'
-            size='icon'
-            onPress={toggleTheme}
-            icon={
-              theme === 'light' ? (
-                <Moon size={16} color='#475569' strokeWidth={2} />
-              ) : (
-                <Sun size={16} color='#f59e0b' strokeWidth={2} />
-              )
-            }
-          />
-
           {isAuthenticated && user ? (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => router.push('/(tabs)/profile')}
             >
-              <ProAvatarRing size={32} strokeWidth={1.75} isPro={user.isSubscribed}>
-                <View
-                  style={[
-                    styles.headerAvatarBtn,
-                    user.isSubscribed && { borderWidth: 0, width: 28, height: 28 },
-                  ]}
-                >
+              <ProAvatarRing size={36} strokeWidth={1.75} isPro={user.isSubscribed}>
+                <View style={styles.headerAvatarBtn}>
                   {user.imageUrl ? (
                     <Image
                       source={{ uri: user.imageUrl }}
@@ -193,7 +180,7 @@ const styles = StyleSheet.create({
   actionGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 7,
   },
   notificationButton: {
     width: 28,
