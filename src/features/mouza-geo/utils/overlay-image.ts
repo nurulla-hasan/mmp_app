@@ -118,7 +118,7 @@ async function buildCleanOverlay(
   mode: Exclude<GeoBackgroundMode, 'original'>,
 ) {
   const maxEdge = Math.max(image.width, image.height, 1);
-  const actions: ImageManipulator.Action[] = [];
+  const actions: Parameters<typeof ImageManipulator.manipulateAsync>[1] = [];
   if (maxEdge > MAX_OVERLAY_EDGE) {
     if (image.width >= image.height) {
       actions.push({ resize: { width: MAX_OVERLAY_EDGE } });
