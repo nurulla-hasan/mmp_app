@@ -16,6 +16,7 @@ export type MercatorPoint = {
 export type AlignmentMode = 'similarity' | 'affine';
 export type GeoView = 'source' | 'world';
 export type GeoMapStyle = 'satellite' | 'standard';
+export type KmzExportQuality = 'optimized' | 'original';
 
 export type GeoImage = {
   uri: string;
