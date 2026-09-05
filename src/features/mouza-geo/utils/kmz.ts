@@ -1,7 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { strToU8, zipSync } from 'fflate';
-import type { GeoImage, GeoTransform } from '../types';
+import type { GeoImage, GeoTransform, KmzExportQuality } from '../types';
 import { applyGeoTransform, fromMercator } from './geo-math';
 import { getGeoExportTileBase64 } from './overlay-image';
 
@@ -51,7 +51,11 @@ function base64ToBytes(base64: string) {
   return bytes;
 }
 
-function createTileDescriptors(width: number, height: number) {
+function createTileDescriptors(
+  width: number,
+  height: number,
+  extension: 'jpg' | 'png',
+) {
   const columns = Math.ceil(width / TILE_SIZE);
   const rows = Math.ceil(height / TILE_SIZE);
   const tiles: OverlayTile[] = [];
@@ -67,7 +71,7 @@ function createTileDescriptors(width: number, height: number) {
         y,
         width: Math.min(TILE_SIZE, width - x),
         height: Math.min(TILE_SIZE, height - y),
-        path: `files/tile-${row}-${column}.png`,
+        path: `files/tile-${row}-${column}.${extension}`,
       });
     }
   }
@@ -90,16 +94,23 @@ export async function exportMouzaKmz({
   opacity,
   backgroundRemoved,
   backgroundSensitivity,
+  quality,
 }: {
   image: GeoImage;
   transform: GeoTransform;
   opacity: number;
   backgroundRemoved: boolean;
   backgroundSensitivity: number;
+  quality: KmzExportQuality;
 }) {
   const name = sanitizeName(image.name);
   const kmlName = escapeXml(name);
-  const tiles = createTileDescriptors(image.width, image.height);
+
+  // Match the web exporter exactly: optimized opaque exports use 0.94 JPEG;
+  // original quality and transparent/background-removed exports use PNG.
+  const extension: 'jpg' | 'png' =
+    backgroundRemoved || quality === 'original' ? 'png' : 'jpg';
+  const tiles = createTileDescriptors(image.width, image.height, extension);
   const alpha = Math.round(Math.max(0, Math.min(1, opacity)) * 255)
     .toString(16)
     .padStart(2, '0');
@@ -119,7 +130,7 @@ export async function exportMouzaKmz({
   <Document>
     <name>${kmlName}</name>
     <Folder>
-      <name>${kmlName} original-quality tiles</name>${overlays}
+      <name>${kmlName} high-resolution tiles</name>${overlays}
     </Folder>
   </Document>
 </kml>`;
@@ -128,18 +139,20 @@ export async function exportMouzaKmz({
     'doc.kml': strToU8(kml),
   };
 
-  // Match the web app's Original Quality path: keep the source pixel grid and
-  // export 2048px PNG tiles. PNG is lossless; background removal, when enabled,
-  // runs on each full-resolution tile instead of on the smaller preview image.
   for (const tile of tiles) {
     const base64 = await getGeoExportTileBase64(
       image,
       tile,
       backgroundRemoved ? backgroundSensitivity : null,
+      extension === 'jpg'
+        ? { format: 'jpeg', quality: 0.94 }
+        : { format: 'png' },
     );
     files[tile.path] = base64ToBytes(base64);
   }
 
+  // Web uses stored ZIP entries too; the size win comes from JPEG tile encoding,
+  // not recompressing already-compressed PNG/JPEG bytes inside the KMZ archive.
   const archive = zipSync(files, { level: 0 });
   const cacheDirectory = FileSystem.cacheDirectory;
   if (!cacheDirectory) throw new Error('App cache is unavailable');
