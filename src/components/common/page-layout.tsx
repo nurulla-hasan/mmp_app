@@ -11,6 +11,10 @@ import {
 } from 'react-native';
 import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  APP_BOTTOM_NAV_LAYOUT,
+  hasAppBottomNav,
+} from './app-bottom-nav';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -23,7 +27,6 @@ export const PAGE_LAYOUT = {
   horizontal: 14,
   top: 14,
   bottom: 28,
-  floatingNavOverhang: 22,
   gap: 12,
   compactGap: 8,
   sectionGap: 12,
@@ -33,32 +36,15 @@ export const PAGE_LAYOUT = {
   introIconRadius: 11,
 } as const;
 
-export const PAGE_BOTTOM_WITH_FLOATING_NAV =
-  PAGE_LAYOUT.bottom + PAGE_LAYOUT.floatingNavOverhang;
-
-export function hasStandaloneFloatingBottomNav(pathname: string) {
-  return (
-    pathname === '/pricing' ||
-    pathname === '/join-as-surveyor' ||
-    pathname === '/surveyor-profile' ||
-    pathname.startsWith('/surveyors/')
-  );
-}
-
-export function hasFloatingBottomNav(pathname: string) {
-  return (
-    pathname === '/' ||
-    pathname === '/surveyors' ||
-    pathname === '/tools' ||
-    pathname === '/profile' ||
-    hasStandaloneFloatingBottomNav(pathname)
-  );
-}
-
 /**
- * Single source of truth for mobile bottom content clearance.
- * Screens with the app's floating bottom nav reserve its visual overhang.
- * Other normal pages reserve the device system-navigation / gesture inset.
+ * Single source of truth for normal-screen bottom clearance.
+ *
+ * - App bottom nav screens: React Navigation already lays content above the nav,
+ *   so PageWrapper only reserves the floating center button overhang.
+ * - Standalone normal screens: reserve the device bottom safe-area automatically.
+ *
+ * This is the native equivalent of sizing content against the usable viewport;
+ * gesture navigation and Android 3-button navigation adjust without per-page math.
  */
 export function usePageBottomPadding(bottomPadding?: number) {
   const pathname = usePathname();
@@ -66,15 +52,38 @@ export function usePageBottomPadding(bottomPadding?: number) {
 
   if (bottomPadding !== undefined) return bottomPadding;
 
-  return hasFloatingBottomNav(pathname)
-    ? PAGE_BOTTOM_WITH_FLOATING_NAV
-    : PAGE_LAYOUT.bottom + insets.bottom;
+  return PAGE_LAYOUT.bottom +
+    (hasAppBottomNav(pathname) ? APP_BOTTOM_NAV_LAYOUT.centerOverhang : insets.bottom);
+}
+
+type PageContentInsetOptions = {
+  topPadding?: number;
+  bottomPadding?: number;
+};
+
+/**
+ * Shared content insets for list screens that cannot render through PageWrapper.
+ * Ordinary ScrollView screens should use PageWrapper directly.
+ */
+export function usePageContentInsets({
+  topPadding = PAGE_LAYOUT.top,
+  bottomPadding,
+}: PageContentInsetOptions = {}) {
+  const resolvedBottomPadding = usePageBottomPadding(bottomPadding);
+
+  return React.useMemo(
+    () => ({
+      paddingHorizontal: PAGE_LAYOUT.horizontal,
+      paddingTop: topPadding,
+      paddingBottom: resolvedBottomPadding,
+    }),
+    [resolvedBottomPadding, topPadding],
+  );
 }
 
 /**
- * Use this for FlatList/FlashList screens that cannot render through PageWrapper.
- * Keeping the list insets here prevents list pages from slowly drifting away from
- * the same outer spacing used by ordinary ScrollView pages.
+ * Static base insets retained for non-reactive layout helpers. ScrollView and
+ * FlatList screens should prefer PageWrapper / usePageContentInsets respectively.
  */
 export const PAGE_CONTENT_INSETS = {
   paddingHorizontal: PAGE_LAYOUT.horizontal,
@@ -103,18 +112,17 @@ export function PageWrapper({
 }: PageWrapperProps) {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
-  const resolvedBottomPadding = usePageBottomPadding(bottomPadding);
+  const contentInsets = usePageContentInsets({ topPadding, bottomPadding });
 
   return (
     <ScrollView
       {...props}
       style={[styles.page, { backgroundColor: colors.background }, style]}
       contentContainerStyle={[
-        styles.content,
-        { gap, paddingTop: topPadding },
+        { gap, ...contentInsets },
         contentContainerStyle,
         contentStyle,
-        { paddingBottom: resolvedBottomPadding },
+        contentInsets,
       ]}
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
     >
@@ -247,9 +255,6 @@ export function PageSectionHeader({
 
 const styles = StyleSheet.create({
   page: { flex: 1 },
-  content: {
-    paddingHorizontal: PAGE_LAYOUT.horizontal,
-  },
   section: {
     borderRadius: PAGE_LAYOUT.radius,
     gap: PAGE_LAYOUT.sectionGap,
