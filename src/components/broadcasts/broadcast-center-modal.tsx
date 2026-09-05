@@ -45,7 +45,7 @@ function typeConfig(type: BroadcastType) {
   switch (type) {
     case 'PROMO':
       return {
-        label: 'Special Announcement',
+        label: 'Promo',
         Icon: Sparkles,
         color: '#16a34a',
         background: 'rgba(22,163,74,.10)',
