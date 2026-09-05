@@ -146,7 +146,18 @@ async function buildCleanOverlay(
     colorType: ColorType.RGBA_8888,
     alphaType: AlphaType.Unpremul,
   };
-  const rawPixels = sourceImage.readPixels(0, 0, imageInfo);
+
+  // Decoded JPG/opaque PNG images can carry an Opaque alpha type, which Skia
+  // does not always convert directly to Unpremul during readPixels. Drawing the
+  // source onto a CPU raster surface first gives us a predictable RGBA buffer.
+  const surface = Skia.Surface.Make(width, height);
+  if (!surface) throw new Error('Could not create a map cleanup surface.');
+  const canvas = surface.getCanvas();
+  canvas.clear(Skia.Color('transparent'));
+  canvas.drawImage(sourceImage, 0, 0);
+  surface.flush();
+  const rasterImage = surface.makeImageSnapshot();
+  const rawPixels = rasterImage.readPixels(0, 0, imageInfo);
   if (!(rawPixels instanceof Uint8Array)) {
     throw new Error('Could not access map pixels for background cleanup.');
   }
