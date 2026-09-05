@@ -3,7 +3,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Layers, MapPin, Ruler, User, type LucideIcon } from 'lucide-react-native';
-import { PAGE_LAYOUT } from './page-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -13,9 +12,53 @@ export type AppBottomNavKey = 'index' | 'surveyors' | 'tools' | 'profile';
 export const APP_BOTTOM_NAV_LAYOUT = {
   baseHeight: 58,
   baseBottomPadding: 4,
-  centerOverhang: PAGE_LAYOUT.floatingNavOverhang,
+  centerOverhang: 22,
   centerSlotWidth: 80,
 } as const;
+
+export type AppBottomNavRouteState = {
+  visible: boolean;
+  standalone: boolean;
+  activeKey?: AppBottomNavKey;
+};
+
+/**
+ * Single source of truth for routes that render the floating app bottom nav.
+ * Tabs and standalone screens both use this state, so nav visibility, active
+ * item and PageWrapper spacing cannot drift apart.
+ */
+export function getAppBottomNavRouteState(pathname: string): AppBottomNavRouteState {
+  if (pathname === '/') {
+    return { visible: true, standalone: false, activeKey: 'index' };
+  }
+  if (pathname === '/surveyors') {
+    return { visible: true, standalone: false, activeKey: 'surveyors' };
+  }
+  if (pathname === '/tools') {
+    return { visible: true, standalone: false, activeKey: 'tools' };
+  }
+  if (pathname === '/profile') {
+    return { visible: true, standalone: false, activeKey: 'profile' };
+  }
+
+  if (pathname === '/pricing') {
+    return { visible: true, standalone: true };
+  }
+
+  if (
+    pathname === '/join-as-surveyor' ||
+    pathname === '/surveyor-profile' ||
+    pathname.startsWith('/surveyors/')
+  ) {
+    return { visible: true, standalone: true, activeKey: 'surveyors' };
+  }
+
+  return { visible: false, standalone: false };
+}
+
+export function hasAppBottomNav(pathname: string) {
+  return getAppBottomNavRouteState(pathname).visible;
+}
 
 type Props = {
   activeKey?: AppBottomNavKey;
