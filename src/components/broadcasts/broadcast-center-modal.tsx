@@ -86,15 +86,20 @@ function mapInternalRoute(linkUrl: string) {
   return `${WEB_TO_APP_ROUTES[path] ?? path}${query}`;
 }
 
+const BENGALI_DIGITS = '০১২৩৪৫৬৭৮৯';
+const BENGALI_MONTHS = [
+  'জানু', 'ফেব', 'মার্চ', 'এপ্রি', 'মে', 'জুন',
+  'জুল', 'আগ', 'সেপ্টে', 'অক্টো', 'নভে', 'ডিসে',
+] as const;
+
+function toBengaliDigits(value: number) {
+  return String(value).replace(/\d/g, (digit) => BENGALI_DIGITS[Number(digit)]);
+}
+
 function formatBroadcastDate(value: string) {
-  try {
-    return new Date(value).toLocaleDateString('bn-BD', {
-      day: 'numeric',
-      month: 'short',
-    });
-  } catch {
-    return '';
-  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${toBengaliDigits(date.getDate())} ${BENGALI_MONTHS[date.getMonth()]} ${toBengaliDigits(date.getFullYear())}`;
 }
 
 type Props = {
