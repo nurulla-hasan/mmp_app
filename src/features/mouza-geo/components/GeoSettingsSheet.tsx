@@ -52,13 +52,13 @@ export function GeoSettingsSheet({ visible, onClose, onOpenImport }: Props) {
               </View>
             </Section>
 
-            <Section title='Paper background' color={colors.textMuted}>
+            <Section title='Map background' color={colors.textMuted}>
               <View style={styles.row}>
                 <Chip label='Original' active={backgroundMode === 'original'} onPress={() => setBackgroundMode('original')} colors={colors} />
-                <Chip label='Light clean' active={backgroundMode === 'soft'} onPress={() => setBackgroundMode('soft')} colors={colors} />
-                <Chip label='Remove BG' active={backgroundMode === 'strong'} onPress={() => setBackgroundMode('strong')} colors={colors} />
+                <Chip label='Black ink' active={backgroundMode === 'soft'} onPress={() => setBackgroundMode('soft')} colors={colors} />
+                <Chip label='Black ink only' active={backgroundMode === 'strong'} onPress={() => setBackgroundMode('strong')} colors={colors} />
               </View>
-              <Text style={[styles.help, { color: colors.textMuted }]}>Light clean fades the paper color. Remove BG makes matching paper pixels transparent in the world overlay and exported KMZ while keeping dark survey lines visible.</Text>
+              <Text style={[styles.help, { color: colors.textMuted }]}>Background removal keeps dark black survey lines and labels, converts them to clean black, and makes the paper and other colors transparent.</Text>
             </Section>
 
             <Section title='Overlay opacity' color={colors.textMuted}>
