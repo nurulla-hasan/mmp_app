@@ -81,13 +81,31 @@ const DARK_MAP_STYLE = [
   },
 ];
 
-// Tile cache directory — once a tile is downloaded it lives here.
-// On subsequent zooms / revisits those tiles load from disk (instant),
-// so there is no white flash for any area that has been viewed before.
-const MAP_TILE_CACHE_DIR = (FileSystem.cacheDirectory ?? '')
+const DARK_STANDARD_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0f172a' }] },
+  { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#cbd5e1' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#334155' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#090d16' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+];
+
+// Tile cache directory — separated by map style so hybrid and standard tiles
+// don't overwrite or read each other's cached images from disk.
+const MAP_TILE_CACHE_BASE = (FileSystem.cacheDirectory ?? '')
   .replace(/^file:\/\//, '')          // strip file:// scheme
   .replace(/\/$/, '')                 // strip trailing slash
-  + '/mmp-map-tiles';
+  + '/mmp-map-tiles-v2';
+
+const MAP_TILE_CACHE_DIR = {
+  hybrid: `${MAP_TILE_CACHE_BASE}/hybrid`,
+  standard: `${MAP_TILE_CACHE_BASE}/standard`,
+};
 
 const INITIAL_REGION: Region = {
   latitude: 25.6217,
@@ -294,8 +312,12 @@ export default function KmzViewerScreen() {
           provider={PROVIDER_GOOGLE}
           style={[StyleSheet.absoluteFill, { backgroundColor: '#0a0f1d' }]}
           initialRegion={INITIAL_REGION}
-          mapType="standard"
-          customMapStyle={DARK_MAP_STYLE}
+          mapType={mapStyle === 'hybrid' ? 'hybrid' : 'standard'}
+          customMapStyle={
+            mapStyle === 'standard' && theme === 'dark'
+              ? DARK_STANDARD_STYLE
+              : undefined
+          }
           rotateEnabled={false}
           pitchEnabled={false}
           toolbarEnabled={false}
@@ -311,7 +333,7 @@ export default function KmzViewerScreen() {
           onPress={() => setIsOpacityOpen(false)}
         >
           <UrlTile
-            key={mapStyle}
+            key={`url-tile-${mapStyle}`}
             urlTemplate={
               mapStyle === 'hybrid'
                 ? 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&scale=2'
@@ -322,7 +344,7 @@ export default function KmzViewerScreen() {
             maximumZ={22}
             flipY={false}
             zIndex={-1}
-            tileCachePath={MAP_TILE_CACHE_DIR}
+            tileCachePath={MAP_TILE_CACHE_DIR[mapStyle]}
             tileCacheMaxAge={60 * 60 * 24 * 30}
           />
           {document ? (
