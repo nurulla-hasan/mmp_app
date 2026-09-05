@@ -88,10 +88,6 @@ export const KmzMapOverlayLayer = memo(function KmzMapOverlayLayer({
             predictedLowerRight.y - lowerRight.y,
           );
 
-          // KML ground overlays exported by Google Earth and MMP are normally
-          // affine quads. The fourth corner is used as a consistency check; the
-          // image is mapped from its full-resolution unit square using the other
-          // three corners, so it stays sharp and does not need a generated preview.
           return (
             <G
               key={overlay.id}
@@ -164,7 +160,6 @@ export const KmzMapOverlayLayer = memo(function KmzMapOverlayLayer({
                     fill='#0f172a'
                     stroke='#ffffff'
                     strokeWidth={2.5}
-                    paintOrder='stroke'
                     fontSize={11}
                     fontWeight='700'
                   >
