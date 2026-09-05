@@ -3,8 +3,6 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import type { GeoImage } from '../types';
 
-const PREVIEW_MAX_DIMENSION = 2560;
-const PREVIEW_MAX_PIXELS = 4_000_000;
 const previewCache = new Map<string, Promise<string>>();
 const sourceTileCache = new Map<string, Promise<string>>();
 
@@ -98,23 +96,6 @@ function processPngBase64(base64: string, sensitivity: number) {
   return cleanedImage.encodeToBase64();
 }
 
-function getPreviewActions(image: GeoImage) {
-  const sourceWidth = Math.max(1, image.width);
-  const sourceHeight = Math.max(1, image.height);
-  const scale = Math.min(
-    1,
-    PREVIEW_MAX_DIMENSION / Math.max(sourceWidth, sourceHeight),
-    Math.sqrt(PREVIEW_MAX_PIXELS / Math.max(1, sourceWidth * sourceHeight)),
-  );
-
-  if (scale >= 0.9999) return [] as Parameters<typeof ImageManipulator.manipulateAsync>[1];
-
-  if (sourceWidth >= sourceHeight) {
-    return [{ resize: { width: Math.max(1, Math.round(sourceWidth * scale)) } }];
-  }
-  return [{ resize: { height: Math.max(1, Math.round(sourceHeight * scale)) } }];
-}
-
 async function preparePngBase64(
   image: GeoImage,
   actions: Parameters<typeof ImageManipulator.manipulateAsync>[1],
@@ -129,17 +110,18 @@ async function preparePngBase64(
 }
 
 /**
- * Interactive overlay preview. Like the web version, this may use a smaller
- * lossless PNG solely for smooth map interaction; export never uses this file.
+ * Interactive overlay preview keeps the source image's original pixel
+ * dimensions. Background cleanup may change alpha/color data, but no resize or
+ * lossy JPEG pass is applied.
  */
 export function getGeoOverlayPreviewUri(image: GeoImage, sensitivity: number) {
   const safeSensitivity = clampSensitivity(sensitivity);
-  const key = `${image.uri}|${image.width}x${image.height}|web-sensitivity-v1|${safeSensitivity}`;
+  const key = `${image.uri}|${image.width}x${image.height}|full-resolution-v1|${safeSensitivity}`;
   const cached = previewCache.get(key);
   if (cached) return cached;
 
   const task = (async () => {
-    const base64 = await preparePngBase64(image, getPreviewActions(image));
+    const base64 = await preparePngBase64(image, []);
     const cleanedBase64 = processPngBase64(base64, safeSensitivity);
     const cacheDirectory = FileSystem.cacheDirectory;
     if (!cacheDirectory) throw new Error('App cache is unavailable.');
