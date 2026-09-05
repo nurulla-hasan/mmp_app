@@ -41,13 +41,9 @@ export function ProAccessGate({ children }: ProAccessGateProps) {
   useEffect(() => {
     if (!isProTool || authLoading) return;
 
-    // Web parity: Pro routes are private. Guests go to login with a safe
-    // callback route, then return to the originally requested tool after auth.
+    // Unauthenticated or non-pro users are redirected to /pricing
     if (!isAuthenticated) {
-      router.replace({
-        pathname: '/(auth)/login',
-        params: { callbackUrl: `/(tools)/${currentScreen}` },
-      });
+      router.replace('/pricing');
       return;
     }
 
@@ -55,7 +51,6 @@ export function ProAccessGate({ children }: ProAccessGateProps) {
     // /my-subscription request is still resolving.
     if (!liveSubscriptionResolved) return;
 
-    // Web parity: authenticated Free users are redirected to /pricing.
     if (!hasProAccess) {
       router.replace('/pricing');
     }

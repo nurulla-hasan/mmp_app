@@ -293,7 +293,7 @@ export default function KmzViewerScreen() {
           <View style={styles.headerText}>
             <View style={styles.titleRow}>
               <Text style={[styles.title, { color: colors.text }]}>KMZ Viewer</Text>
-              <Badge label='PRO' variant='pro' />
+              <Badge label='ফ্রি' variant='free' />
             </View>
             <Text numberOfLines={1} style={[styles.subtitle, { color: colors.textMuted }]}>
               {document ? document.name : 'Google Earth KMZ / KML viewer'}

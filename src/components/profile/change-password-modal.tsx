@@ -60,19 +60,17 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
     if (!validate()) return;
 
     try {
-      const res = await changePassword({
+      await changePassword({
         oldPassword: hasPassword ? oldPassword.trim() : undefined,
         newPassword: newPassword.trim(),
         confirmPassword: confirmPassword.trim(),
       });
 
-      if (res.success) {
-        setOldPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        setErrors({});
-        onClose();
-      }
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setErrors({});
+      onClose();
     } catch {
       // Mutation hook owns user-facing error feedback.
     }

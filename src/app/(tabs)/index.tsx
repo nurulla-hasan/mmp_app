@@ -10,6 +10,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import {
   Sparkles,
   Map,
@@ -25,6 +27,8 @@ import {
   Plus,
   Wrench,
   BadgeCheck,
+  MoveDiagonal,
+  Ruler,
 } from 'lucide-react-native';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -32,11 +36,11 @@ import { SurveyorCard } from '../../components/surveyors/surveyor-card';
 import { PageWrapper } from '../../components/common/page-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
-import { isToolComingSoon } from '../../constants/tools';
 import { useThemeStore } from '../../stores/theme-store';
 import { useAuthStore } from '../../stores/auth-store';
 import { useCalculations } from '../../hooks/queries/use-calculations';
 import { useSurveyors } from '../../hooks/queries/use-surveyors';
+import { useMySubscription } from '../../hooks/queries/use-subscriptions';
 import { useMapStore } from '../../features/land-measurement/store/useMapStore';
 import { calculatePolygonData } from '../../features/land-measurement/utils/calculations';
 import { PLOT_COLOR_PALETTE } from '../../features/land-measurement/utils/canvas';
@@ -167,13 +171,91 @@ function SurveyorsSkeleton({
   );
 }
 
+const HOME_TOOLS = [
+  {
+    id: 'mouza-geo-studio',
+    title: 'মৌজা জিও স্টুডিও',
+    routeOrUrl: 'https://mouzamappro.com/tools/mouza-geo-studio',
+    isExternal: true,
+    isPro: true,
+    badge: 'PRO',
+    badgeVariant: 'pro' as const,
+    secondaryBadge: 'বেটা',
+    secondaryBadgeVariant: 'warning' as const,
+    icon: Globe,
+    color: '#10b981',
+    bg: 'rgba(16, 185, 129, 0.12)',
+  },
+  {
+    id: 'kmz-viewer',
+    title: 'KMZ ভিউয়ার',
+    routeOrUrl: '/(tools)/kmz-viewer',
+    isExternal: false,
+    isPro: false,
+    badge: 'ফ্রি',
+    badgeVariant: 'free' as const,
+    secondaryBadge: 'নতুন',
+    secondaryBadgeVariant: 'warning' as const,
+    icon: Globe,
+    color: '#16a34a',
+    bg: 'rgba(22, 163, 74, 0.12)',
+  },
+  {
+    id: 'pantagraph',
+    title: 'প্যান্টাগ্রাফ',
+    routeOrUrl: 'https://mouzamappro.com/tools/pantagraph',
+    isExternal: true,
+    isPro: true,
+    badge: 'PRO',
+    badgeVariant: 'pro' as const,
+    secondaryBadge: 'নতুন',
+    secondaryBadgeVariant: 'warning' as const,
+    icon: Scaling,
+    color: '#0891b2',
+    bg: 'rgba(6, 182, 212, 0.12)',
+  },
+  {
+    id: 'inheritance-calculator',
+    title: 'জমি বণ্টন',
+    routeOrUrl: '/(tools)/inheritance',
+    isExternal: false,
+    isPro: false,
+    badge: 'ফ্রি',
+    badgeVariant: 'free' as const,
+    icon: Calculator,
+    color: '#e11d48',
+    bg: 'rgba(225, 29, 72, 0.12)',
+  },
+  {
+    id: 'unit-converter',
+    title: 'একক রূপান্তর',
+    routeOrUrl: '/(tools)/unit-converter',
+    isExternal: false,
+    isPro: false,
+    badge: 'ফ্রি',
+    badgeVariant: 'free' as const,
+    icon: MoveDiagonal,
+    color: '#9333ea',
+    bg: 'rgba(147, 51, 234, 0.12)',
+  },
+  {
+    id: 'scale-guide',
+    title: 'স্কেল গাইড',
+    routeOrUrl: '/(tools)/scale-guide',
+    isExternal: false,
+    isPro: false,
+    badge: 'ফ্রি',
+    badgeVariant: 'free' as const,
+    icon: Ruler,
+    color: '#4f46e5',
+    bg: 'rgba(79, 70, 229, 0.12)',
+  },
+];
+
 export default function HomeScreen() {
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
-  const mapStudioComingSoon = isToolComingSoon('mouza-map-studio');
-  const pantagraphComingSoon = isToolComingSoon('pantagraph');
-  const tracerComingSoon = isToolComingSoon('tracer');
 
   const {
     data: allCalculations = [],
@@ -185,7 +267,11 @@ export default function HomeScreen() {
 
   const featuredSurveyorsQuery = useSurveyors({ limit: 2 });
   const featuredSurveyors = featuredSurveyorsQuery.data?.surveyors ?? [];
-  const { isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
+  const subscriptionQuery = useMySubscription();
+  const hasProAccess = subscriptionQuery.data
+    ? subscriptionQuery.data.isSubscribed
+    : user?.isSubscribed === true;
 
   const skeletonOpacity = React.useRef(new Animated.Value(0.48)).current;
 
@@ -220,6 +306,11 @@ export default function HomeScreen() {
   };
 
   const handleOpenCalculation = (calculation: TCalculation) => {
+    if (!hasProAccess) {
+      router.push('/pricing');
+      return;
+    }
+
     const scaleValue = calculation.scalePxPerUnit || null;
     if (scaleValue) {
       useMapStore.getState().setScale(scaleValue);
@@ -258,6 +349,30 @@ export default function HomeScreen() {
     router.push('/land-measurement');
   };
 
+  const handleOpenTool = async (routeOrUrl: string, isExternal = false, isPro = true) => {
+    if (isPro) {
+      if (!hasProAccess) {
+        router.push('/pricing');
+        return;
+      }
+    }
+
+    if (isExternal) {
+      try {
+        await WebBrowser.openBrowserAsync(routeOrUrl, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+          toolbarColor: '#0f172a',
+          controlsColor: '#22c55e',
+        });
+      } catch {
+        await Linking.openURL(routeOrUrl);
+      }
+      return;
+    }
+
+    router.push(routeOrUrl as any);
+  };
+
   return (
     <PageWrapper
       refreshControl={
@@ -280,7 +395,10 @@ export default function HomeScreen() {
             <Sparkles size={12} color={colors.primary} />
             <Text style={[styles.proTagText, { color: colors.primary }]}>MOUZA MAP PRO</Text>
           </View>
-          <Badge label='v2.0 LIVE' variant='pro' />
+          <View style={styles.badgeRow}>
+            <Badge label='PRO' variant='pro' />
+            <Badge label='v2.0' variant='neutral' />
+          </View>
         </View>
 
         <Text style={[styles.heroTitle, { color: colors.heroTitle }]}>ডিজিটাল মৌজা ম্যাপ ও জমি পরিমাপ</Text>
@@ -292,7 +410,7 @@ export default function HomeScreen() {
           <Button
             title='ম্যাপে জমি মাপুন'
             size='md'
-            onPress={() => router.push('/(tools)/land-measurement')}
+            onPress={() => handleOpenTool('/(tools)/land-measurement', false, true)}
             style={styles.heroBtn}
             icon={<Map size={15} color='#fff' />}
           />
@@ -300,7 +418,7 @@ export default function HomeScreen() {
             title='স্কেল গাইড'
             variant='outline'
             size='md'
-            onPress={() => router.push('/(tools)/scale-guide')}
+            onPress={() => handleOpenTool('/(tools)/scale-guide', false, false)}
             style={[
               styles.heroBtnOutline,
               {
@@ -323,80 +441,45 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.grid}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          disabled={mapStudioComingSoon}
-          style={[
-            styles.toolCard,
-            { backgroundColor: colors.card, borderColor: colors.cardBorder },
-            mapStudioComingSoon && styles.comingSoonToolCard,
-          ]}
-          onPress={() => router.push('/(tools)/land-measurement')}
-        >
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.12)' }]}>
-            <Layers size={19} color='#059669' strokeWidth={2} />
+      {Array.from({ length: Math.ceil(HOME_TOOLS.length / 2) }).map((_, rowIndex) => {
+        const pair = HOME_TOOLS.slice(rowIndex * 2, rowIndex * 2 + 2);
+        return (
+          <View key={`home-tool-row-${rowIndex}`} style={styles.grid}>
+            {pair.map((tool) => {
+              const IconComp = tool.icon;
+              return (
+                <TouchableOpacity
+                  key={tool.id}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.toolCard,
+                    { backgroundColor: colors.card, borderColor: colors.cardBorder },
+                  ]}
+                  onPress={() => handleOpenTool(tool.routeOrUrl, tool.isExternal, tool.isPro)}
+                >
+                  <View style={[styles.iconBox, { backgroundColor: tool.bg }]}>
+                    <IconComp size={19} color={tool.color} strokeWidth={2} />
+                  </View>
+                  <View style={styles.toolTextCol}>
+                    <Text style={[styles.toolTitle, { color: colors.text }]} numberOfLines={1}>
+                      {tool.title}
+                    </Text>
+                    <View style={styles.badgeRow}>
+                      <Badge label={tool.badge} variant={tool.badgeVariant} />
+                      {tool.secondaryBadge && (
+                        <Badge
+                          label={tool.secondaryBadge}
+                          variant={tool.secondaryBadgeVariant}
+                        />
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          <View style={styles.toolTextCol}>
-            <Text style={[styles.toolTitle, { color: colors.text }]}>ম্যাপ স্টুডিও</Text>
-            <Badge label='Coming Soon' variant='neutral' />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-          onPress={() => router.push('/(tools)/kmz-viewer')}
-        >
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}>
-            <Globe size={19} color='#16a34a' strokeWidth={2} />
-          </View>
-          <View style={styles.toolTextCol}>
-            <Text style={[styles.toolTitle, { color: colors.text }]}>KMZ ভিউয়ার</Text>
-            <Badge label='নতুন' variant='pro' />
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.grid}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          disabled={pantagraphComingSoon}
-          style={[
-            styles.toolCard,
-            { backgroundColor: colors.card, borderColor: colors.cardBorder },
-            pantagraphComingSoon && styles.comingSoonToolCard,
-          ]}
-          onPress={() => router.push('/(tools)/pantagraph')}
-        >
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(6, 182, 212, 0.12)' }]}>
-            <Scaling size={19} color='#0891b2' strokeWidth={2} />
-          </View>
-          <View style={styles.toolTextCol}>
-            <Text style={[styles.toolTitle, { color: colors.text }]}>প্যান্টাগ্রাফ</Text>
-            <Badge label='Coming Soon' variant='neutral' />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          disabled={tracerComingSoon}
-          style={[
-            styles.toolCard,
-            { backgroundColor: colors.card, borderColor: colors.cardBorder },
-            tracerComingSoon && styles.comingSoonToolCard,
-          ]}
-          onPress={() => router.push('/(tools)/tracer')}
-        >
-          <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
-            <PenLine size={19} color='#d97706' strokeWidth={2} />
-          </View>
-          <View style={styles.toolTextCol}>
-            <Text style={[styles.toolTitle, { color: colors.text }]}>ম্যাপ ট্রেসিং</Text>
-            <Badge label='Coming Soon' variant='neutral' />
-          </View>
-        </TouchableOpacity>
-      </View>
+        );
+      })}
 
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleRow}>
@@ -654,6 +737,7 @@ const styles = StyleSheet.create({
   },
   toolTextCol: { flex: 1, gap: 3, alignItems: 'flex-start' },
   toolTitle: { fontSize: 12.5, fontFamily: Fonts.headingBold },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   savedProjectsList: { gap: 8 },
   emptyProjectCard: {
     flexDirection: 'row',

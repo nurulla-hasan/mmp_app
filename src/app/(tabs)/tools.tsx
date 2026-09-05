@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import {
   Map,
   Layers,
@@ -11,6 +13,7 @@ import {
   Calculator,
   Ruler,
   ChevronRight,
+  ExternalLink,
   ArrowRight,
 } from 'lucide-react-native';
 import { Badge } from '../../components/ui/badge';
@@ -19,6 +22,8 @@ import { PageSectionHeader, PageWrapper } from '../../components/common/page-lay
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
+import { useAuthStore } from '../../stores/auth-store';
+import { useMySubscription } from '../../hooks/queries/use-subscriptions';
 import { FEATURED_TOOL, isToolComingSoon } from '../../constants/tools';
 
 const SPECIALIZED_TOOLS = [
@@ -27,10 +32,27 @@ const SPECIALIZED_TOOLS = [
     title: 'মৌজা ম্যাপ স্টুডিও',
     description: 'C.S ও B.S ম্যাপ align করে cleanup, text/mark edit করুন এবং শেষে ব্যবহারযোগ্য sheet তৈরি করুন।',
     route: '/(tools)/land-measurement',
-    badge: 'বেটা',
-    badgeVariant: 'warning' as const,
+    externalUrl: 'https://mouzamappro.com/tools/mouza-map-studio',
+    badge: 'PRO',
+    badgeVariant: 'pro' as const,
+    secondaryBadge: 'বেটা',
+    secondaryBadgeVariant: 'warning' as const,
     icon: Layers,
     color: '#059669',
+    bg: 'rgba(16, 185, 129, 0.12)',
+  },
+  {
+    id: 'mouza-geo-studio',
+    title: 'মৌজা জিও স্টুডিও',
+    description: 'মৌজা ম্যাপকে বাস্তব পৃথিবীর অবস্থানের সঙ্গে align করে Google Earth-এর জন্য KMZ তৈরি করুন।',
+    route: '/(tools)/land-measurement',
+    externalUrl: 'https://mouzamappro.com/tools/mouza-geo-studio',
+    badge: 'PRO',
+    badgeVariant: 'pro' as const,
+    secondaryBadge: 'বেটা',
+    secondaryBadgeVariant: 'warning' as const,
+    icon: Globe,
+    color: '#10b981',
     bg: 'rgba(16, 185, 129, 0.12)',
   },
   {
@@ -38,8 +60,10 @@ const SPECIALIZED_TOOLS = [
     title: 'KMZ ভিউয়ার',
     description: 'Google Earth-এর KMZ/KML import করে image overlay, point, line ও polygon map-এ দেখুন।',
     route: '/(tools)/kmz-viewer',
-    badge: 'নতুন',
-    badgeVariant: 'pro' as const,
+    badge: 'ফ্রি',
+    badgeVariant: 'free' as const,
+    secondaryBadge: 'নতুন',
+    secondaryBadgeVariant: 'warning' as const,
     icon: Globe,
     color: '#16a34a',
     bg: 'rgba(22, 163, 74, 0.12)',
@@ -49,8 +73,11 @@ const SPECIALIZED_TOOLS = [
     title: 'ম্যাপ তুলনা ও প্যান্টাগ্রাফ',
     description: 'সাবেক ও হাল ম্যাপ আপলোড করে matching point বসিয়ে অবস্থান, rotation ও scale মিলিয়ে তুলনা করুন।',
     route: '/(tools)/pantagraph',
-    badge: 'নতুন',
+    externalUrl: 'https://mouzamappro.com/tools/pantagraph',
+    badge: 'PRO',
     badgeVariant: 'pro' as const,
+    secondaryBadge: 'নতুন',
+    secondaryBadgeVariant: 'warning' as const,
     icon: Scaling,
     color: '#0891b2',
     bg: 'rgba(6, 182, 212, 0.12)',
@@ -60,8 +87,11 @@ const SPECIALIZED_TOOLS = [
     title: 'ডিজিটাল ম্যাপ ট্রেসিং',
     description: 'পুরানো মৌজা ম্যাপের দাগের সীমানা ও দাগ নম্বর ট্রেস করে পরিষ্কার digital vector map তৈরি করুন।',
     route: '/(tools)/tracer',
-    badge: 'নতুন',
+    externalUrl: 'https://mouzamappro.com/tools/tracer',
+    badge: 'PRO',
     badgeVariant: 'pro' as const,
+    secondaryBadge: 'নতুন',
+    secondaryBadgeVariant: 'warning' as const,
     icon: PenLine,
     color: '#d97706',
     bg: 'rgba(217, 119, 6, 0.12)',
@@ -72,7 +102,7 @@ const CALCULATION_TOOLS = [
   {
     id: 'unit-converter',
     title: 'জমির একক রূপান্তর',
-    description: 'শতক, কাঠা, বিঘা, একর, বর্গফুট, বর্গমিটার ও হেক্টরে জমির পরিমাণ নিখুঁত রূপান্তর করুন।',
+    description: 'শতক, কাঠা, বিঘা, একর, বর্গফুট, বর্গমিটার ও হেক্টরে জমির পরিমাণ রূপান্তর করুন।',
     route: '/(tools)/unit-converter',
     badge: 'ফ্রি',
     badgeVariant: 'free' as const,
@@ -110,10 +140,44 @@ export default function ToolsHubScreen() {
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
+  const { user, isAuthenticated } = useAuthStore();
+  const subscriptionQuery = useMySubscription();
+  const hasProAccess = subscriptionQuery.data
+    ? subscriptionQuery.data.isSubscribed
+    : user?.isSubscribed === true;
+
+  const handleOpenTool = async (tool: ToolCardData | typeof FEATURED_TOOL) => {
+    const isPro = 'badge' in tool ? tool.badge === 'PRO' : Boolean(tool.isPro);
+
+    if (isPro) {
+      if (!hasProAccess) {
+        router.push('/pricing');
+        return;
+      }
+    }
+
+    if ('externalUrl' in tool && tool.externalUrl) {
+      try {
+        await WebBrowser.openBrowserAsync(tool.externalUrl, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+          toolbarColor: '#0f172a',
+          controlsColor: '#22c55e',
+        });
+      } catch {
+        await Linking.openURL(tool.externalUrl);
+      }
+      return;
+    }
+    router.push(tool.route as any);
+  };
 
   const renderTool = (tool: ToolCardData) => {
     const IconComp = tool.icon;
     const comingSoon = isToolComingSoon(tool.id);
+    const isExternal = 'externalUrl' in tool && Boolean(tool.externalUrl);
+    const secondaryBadge = 'secondaryBadge' in tool ? tool.secondaryBadge : undefined;
+    const secondaryBadgeVariant = 'secondaryBadgeVariant' in tool ? tool.secondaryBadgeVariant : undefined;
+
     return (
       <TouchableOpacity
         key={tool.id}
@@ -124,7 +188,7 @@ export default function ToolsHubScreen() {
           { backgroundColor: colors.card, borderColor: colors.cardBorder },
           comingSoon && styles.comingSoonCard,
         ]}
-        onPress={() => router.push(tool.route as any)}
+        onPress={() => handleOpenTool(tool)}
       >
         <View style={[styles.toolIconBox, { backgroundColor: tool.bg }]}>
           <IconComp size={20} color={tool.color} strokeWidth={2} />
@@ -132,23 +196,35 @@ export default function ToolsHubScreen() {
         <View style={styles.toolTextCol}>
           <View style={styles.toolTitleRow}>
             <Text style={[styles.toolTitle, { color: colors.text }]}>{tool.title}</Text>
-            <Badge
-              label={comingSoon ? 'Coming Soon' : tool.badge}
-              variant={comingSoon ? 'neutral' : tool.badgeVariant}
-            />
+            <View style={styles.badgeGroup}>
+              <Badge
+                label={comingSoon ? 'Coming Soon' : tool.badge}
+                variant={comingSoon ? 'neutral' : tool.badgeVariant}
+              />
+              {!comingSoon && secondaryBadge && (
+                <Badge
+                  label={secondaryBadge}
+                  variant={secondaryBadgeVariant || 'warning'}
+                />
+              )}
+            </View>
           </View>
           <Text style={[styles.toolDesc, { color: colors.textMuted }]} numberOfLines={2}>
             {tool.description}
           </Text>
         </View>
-        {comingSoon ? null : <ChevronRight size={16} color={colors.textMuted} />}
+        {comingSoon ? null : isExternal ? (
+          <ExternalLink size={15} color={colors.primary} />
+        ) : (
+          <ChevronRight size={16} color={colors.textMuted} />
+        )}
       </TouchableOpacity>
     );
   };
 
   return (
     <PageWrapper>
-      <TouchableOpacity activeOpacity={0.88} onPress={() => router.push(FEATURED_TOOL.route as any)}>
+      <TouchableOpacity activeOpacity={0.88} onPress={() => handleOpenTool(FEATURED_TOOL as any)}>
         <View
           style={[
             styles.featuredCard,
@@ -188,7 +264,7 @@ export default function ToolsHubScreen() {
             title='টুলটি ব্যবহার করুন'
             size='sm'
             variant='primary'
-            onPress={() => router.push(FEATURED_TOOL.route as any)}
+            onPress={() => handleOpenTool(FEATURED_TOOL as any)}
             icon={<ArrowRight size={14} color='#fff' />}
           />
         </View>
@@ -226,6 +302,7 @@ const styles = StyleSheet.create({
   toolIconBox: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   toolTextCol: { flex: 1, gap: 2 },
   toolTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  badgeGroup: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   toolTitle: { flex: 1, fontSize: 13, fontFamily: Fonts.headingBold },
   toolDesc: { fontSize: 10.5, fontFamily: Fonts.sansRegular, lineHeight: 15 },
 });

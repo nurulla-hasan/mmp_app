@@ -38,7 +38,7 @@ export function KeyboardSafeView({ children, style }: KeyboardSafeViewProps) {
  * The base padding preserves the visual rhythm when the device inset is small.
  */
 export function useModalSafeBottomPadding(
-  basePadding = KEYBOARD_SAFE_LAYOUT.modalBottomPadding,
+  basePadding: number = KEYBOARD_SAFE_LAYOUT.modalBottomPadding,
 ) {
   const { bottom } = useSafeAreaInsets();
   return Math.max(basePadding, bottom + KEYBOARD_SAFE_LAYOUT.safeAreaGap);

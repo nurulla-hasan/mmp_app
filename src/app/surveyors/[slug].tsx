@@ -26,7 +26,7 @@ import { Button } from '../../components/ui/button';
 import { ProAvatarRing } from '../../components/ui/pro-avatar-ring';
 import { ReviewModal } from '../../components/surveyors/review-modal';
 import { SurveyorDetailSkeleton } from '../../components/common/page-loading-skeletons';
-import { PAGE_BOTTOM_WITH_FLOATING_NAV } from '../../components/common/page-layout';
+import { PAGE_LAYOUT } from '../../components/common/page-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -405,7 +405,7 @@ export default function SurveyorDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 14, paddingBottom: PAGE_BOTTOM_WITH_FLOATING_NAV, gap: 12 },
+  content: { padding: 14, paddingBottom: PAGE_LAYOUT.bottom + 24, gap: 12 },
   backButton: {
     alignSelf: 'flex-start',
     flexDirection: 'row',

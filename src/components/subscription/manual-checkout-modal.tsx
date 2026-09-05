@@ -135,7 +135,7 @@ export function ManualCheckoutModal({
       transactionId: cleanTrxId,
     });
 
-    if (result.success) {
+    if (result) {
       setSubmittedTrxId(cleanTrxId);
       setSubmitted(true);
     }

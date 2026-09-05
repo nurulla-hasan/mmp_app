@@ -103,7 +103,7 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
       },
       {
         onSuccess: (result) => {
-          if (result.success) close();
+          if (result) close();
         },
       },
     );
