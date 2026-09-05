@@ -6,91 +6,19 @@ import type { GeoBackgroundMode, GeoImage } from '../types';
 const MAX_OVERLAY_EDGE = 1800;
 const overlayCache = new Map<string, Promise<string>>();
 
-type Rgb = { r: number; g: number; b: number; luma: number };
-
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const getLuma = (r: number, g: number, b: number) => 0.299 * r + 0.587 * g + 0.114 * b;
 
-function forEachBorderSample(
+function isolateBlackInk(
   pixels: Uint8Array,
-  width: number,
-  height: number,
-  callback: (r: number, g: number, b: number) => void,
-) {
-  const step = Math.max(2, Math.floor(Math.max(width, height) / 320));
-  const bandX = Math.max(4, Math.round(width * 0.045));
-  const bandY = Math.max(4, Math.round(height * 0.045));
-
-  for (let y = 0; y < height; y += step) {
-    for (let x = 0; x < width; x += step) {
-      if (x > bandX && x < width - bandX && y > bandY && y < height - bandY) continue;
-      const index = (y * width + x) * 4;
-      callback(pixels[index], pixels[index + 1], pixels[index + 2]);
-    }
-  }
-}
-
-function estimatePaperColor(pixels: Uint8Array, width: number, height: number): Rgb {
-  const histogram = new Uint32Array(256);
-  let sampleCount = 0;
-
-  forEachBorderSample(pixels, width, height, (r, g, b) => {
-    const luma = Math.max(0, Math.min(255, Math.round(getLuma(r, g, b))));
-    histogram[luma] += 1;
-    sampleCount += 1;
-  });
-
-  const targetBrightSamples = Math.max(1, Math.round(sampleCount * 0.38));
-  let brightCount = 0;
-  let lumaCutoff = 150;
-  for (let value = 255; value >= 0; value -= 1) {
-    brightCount += histogram[value];
-    if (brightCount >= targetBrightSamples) {
-      lumaCutoff = Math.max(120, value);
-      break;
-    }
-  }
-
-  let rSum = 0;
-  let gSum = 0;
-  let bSum = 0;
-  let count = 0;
-  forEachBorderSample(pixels, width, height, (r, g, b) => {
-    const luma = getLuma(r, g, b);
-    const chroma = Math.max(r, g, b) - Math.min(r, g, b);
-    if (luma < lumaCutoff || chroma > 125) return;
-    rSum += r;
-    gSum += g;
-    bSum += b;
-    count += 1;
-  });
-
-  if (!count) {
-    forEachBorderSample(pixels, width, height, (r, g, b) => {
-      rSum += r;
-      gSum += g;
-      bSum += b;
-      count += 1;
-    });
-  }
-
-  const r = count ? rSum / count : 235;
-  const g = count ? gSum / count : 230;
-  const b = count ? bSum / count : 215;
-  return { r, g, b, luma: getLuma(r, g, b) };
-}
-
-function removePaperBackground(
-  pixels: Uint8Array,
-  width: number,
-  height: number,
   mode: Exclude<GeoBackgroundMode, 'original'>,
 ) {
-  const paper = estimatePaperColor(pixels, width, height);
-  const threshold = mode === 'soft' ? 38 : 68;
-  const low = threshold * 0.48;
-  const high = threshold * 1.28;
-  const inkProtectionRange = mode === 'soft' ? 72 : 56;
+  // Mouza plot lines and labels are dark ink. Background-removal mode should
+  // therefore keep only dark, near-neutral pixels and make every paper/color
+  // tone transparent instead of trying to key out one sampled background color.
+  const cutoff = mode === 'soft' ? 165 : 125;
+  const fullInk = mode === 'soft' ? 72 : 58;
+  const chromaLimit = mode === 'soft' ? 92 : 64;
 
   for (let index = 0; index < pixels.length; index += 4) {
     const r = pixels[index];
@@ -99,16 +27,22 @@ function removePaperBackground(
     const originalAlpha = pixels[index + 3];
     if (!originalAlpha) continue;
 
-    const dr = r - paper.r;
-    const dg = g - paper.g;
-    const db = b - paper.b;
-    const distance = Math.sqrt(dr * dr + dg * dg + db * db);
     const luma = getLuma(r, g, b);
-    const inkContrast = paper.luma - luma;
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b);
 
-    const similarityAlpha = clamp01((distance - low) / Math.max(1, high - low));
-    const inkAlpha = clamp01((inkContrast - 18) / inkProtectionRange);
-    const alphaFactor = Math.max(similarityAlpha, inkAlpha);
+    const darkness = luma <= fullInk
+      ? 1
+      : clamp01((cutoff - luma) / Math.max(1, cutoff - fullInk));
+    const neutrality = chroma <= chromaLimit * 0.45
+      ? 1
+      : clamp01((chromaLimit - chroma) / Math.max(1, chromaLimit * 0.55));
+    const alphaFactor = darkness * neutrality;
+
+    // Render the retained survey ink as true black so it stays readable over
+    // satellite imagery. Everything else fades to transparent.
+    pixels[index] = 0;
+    pixels[index + 1] = 0;
+    pixels[index + 2] = 0;
     pixels[index + 3] = Math.round(originalAlpha * alphaFactor);
   }
 }
@@ -147,8 +81,6 @@ async function buildCleanOverlay(
     alphaType: AlphaType.Unpremul,
   };
 
-  // Draw onto an offscreen raster surface first so JPG/opaque PNG inputs are
-  // converted into a predictable RGBA buffer before alpha cleanup.
   const surface = Skia.Surface.MakeOffscreen(width, height);
   if (!surface) throw new Error('Could not create a map cleanup surface.');
   const canvas = surface.getCanvas();
@@ -161,17 +93,17 @@ async function buildCleanOverlay(
     throw new Error('Could not access map pixels for background cleanup.');
   }
 
-  removePaperBackground(rawPixels, width, height, mode);
+  isolateBlackInk(rawPixels, mode);
   const cleanedImage = Skia.Image.MakeImage(
     imageInfo,
     Skia.Data.fromBytes(rawPixels),
     width * 4,
   );
-  if (!cleanedImage) throw new Error('Could not create the cleaned map overlay.');
+  if (!cleanedImage) throw new Error('Could not create the black-ink overlay.');
 
   const cacheDirectory = FileSystem.cacheDirectory;
   if (!cacheDirectory) throw new Error('App cache is unavailable.');
-  const uri = `${cacheDirectory}mouza-geo-overlay-${mode}-${Date.now()}.png`;
+  const uri = `${cacheDirectory}mouza-geo-black-ink-${mode}-${Date.now()}.png`;
   await FileSystem.writeAsStringAsync(uri, cleanedImage.encodeToBase64(), {
     encoding: FileSystem.EncodingType.Base64,
   });
@@ -181,7 +113,7 @@ async function buildCleanOverlay(
 export function getGeoOverlayImageUri(image: GeoImage, mode: GeoBackgroundMode) {
   if (mode === 'original') return Promise.resolve(image.uri);
 
-  const key = `${image.uri}|${image.width}x${image.height}|${mode}`;
+  const key = `${image.uri}|${image.width}x${image.height}|black-ink-v2|${mode}`;
   const existing = overlayCache.get(key);
   if (existing) return existing;
 
