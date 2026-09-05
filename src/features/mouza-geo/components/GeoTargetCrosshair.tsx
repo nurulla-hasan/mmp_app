@@ -8,8 +8,6 @@ export const GeoTargetCrosshair = memo(function GeoTargetCrosshair() {
       <View style={[styles.shadowLine, styles.verticalShadow]} />
       <View style={[styles.line, styles.horizontal]} />
       <View style={[styles.line, styles.vertical]} />
-      <View style={styles.ring} />
-      <View style={styles.dot} />
     </View>
   );
 });
@@ -41,21 +39,4 @@ const styles = StyleSheet.create({
   },
   horizontal: { width: 36, height: 1.5 },
   vertical: { width: 1.5, height: 36 },
-  ring: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#2563eb',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  dot: {
-    position: 'absolute',
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#ffffff',
-    borderWidth: 1.5,
-    borderColor: '#2563eb',
-  },
 });
