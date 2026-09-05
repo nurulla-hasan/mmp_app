@@ -15,7 +15,6 @@ import { useRouter } from 'expo-router';
 import {
   ArrowLeft,
   FileUp,
-  Globe2,
   LocateFixed,
   Map,
   Minus,
@@ -232,22 +231,6 @@ export default function KmzViewerScreen() {
           ) : null}
         </MapView>
 
-        {!document ? (
-          <View pointerEvents='box-none' style={styles.emptyWrap}>
-            <View style={[styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}>
-              <View style={styles.emptyIcon}>
-                <Globe2 size={28} color='#16a34a' />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>Google Earth KMZ এখানে দেখুন</Text>
-              <Text style={[styles.emptyText, { color: colors.textMuted }]}>KMZ বা KML import করলে overlay, point, line ও polygon সরাসরি map-এর সাথে locked থাকবে।</Text>
-              <TouchableOpacity style={styles.primaryButton} onPress={openKmz} disabled={loading}>
-                {loading ? <ActivityIndicator size='small' color='#fff' /> : <FileUp size={17} color='#fff' />}
-                <Text style={styles.primaryButtonText}>KMZ Import করুন</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
         {document ? (
           <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 10 }]}>
             <View style={[styles.toolbar, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.98)' : 'rgba(255,255,255,0.98)', borderColor: colors.border }]}>
@@ -360,13 +343,6 @@ const styles = StyleSheet.create({
   openButton: { minWidth: 82, maxWidth: 142, height: 35, borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginLeft: 8 },
   openButtonText: { flexShrink: 1, color: '#16a34a', fontFamily: Fonts.headingSemiBold, fontSize: 9.5 },
   mapWrap: { flex: 1, position: 'relative', overflow: 'hidden' },
-  emptyWrap: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20 },
-  emptyCard: { width: '100%', maxWidth: 360, borderRadius: 18, borderWidth: 1, padding: 20, alignItems: 'center', gap: 8, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 10, elevation: 5 },
-  emptyIcon: { width: 58, height: 58, borderRadius: 18, backgroundColor: 'rgba(22,163,74,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
-  emptyTitle: { fontFamily: Fonts.headingBold, fontSize: 16, textAlign: 'center' },
-  emptyText: { fontFamily: Fonts.sansRegular, fontSize: 11, lineHeight: 16, textAlign: 'center' },
-  primaryButton: { minHeight: 43, marginTop: 8, paddingHorizontal: 18, borderRadius: 11, backgroundColor: '#16a34a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  primaryButtonText: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 12 },
   bottomWrap: { position: 'absolute', left: 10, right: 10, zIndex: 50 },
   toolbar: { minHeight: 68, borderRadius: 14, borderWidth: 1, paddingHorizontal: 4, flexDirection: 'row', alignItems: 'stretch', shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 7, elevation: 5 },
   tool: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 2 },
