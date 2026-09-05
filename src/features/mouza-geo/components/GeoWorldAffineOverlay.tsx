@@ -1,18 +1,33 @@
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import type { Region } from 'react-native-maps';
-import Svg, { Circle, G, Image as SvgImage, Path, Text as SvgText } from 'react-native-svg';
-import type { ControlPair, GeoImage, GeoTransform, Point2D } from '../types';
+import { StyleSheet, Text, View } from 'react-native';
+import {
+  Canvas,
+  CubicSampling,
+  Group,
+  Image as SkiaImage,
+  Paint,
+  Skia,
+  useImage,
+} from '@shopify/react-native-skia';
+import type { ControlPair, GeoImage, Point2D } from '../types';
 import { getGeoSourceTileUri } from '../utils/overlay-image';
 
 const TILE_SIZE = 1024;
 const TILE_MARGIN = 1;
 const PREVIEW_MAX_DIMENSION = 2560;
 const PREVIEW_MAX_PIXELS = 4_000_000;
-const MAX_LATITUDE = 85.05112878;
 
 type Size = { width: number; height: number };
-type Matrix2D = { a: number; b: number; c: number; d: number; e: number; f: number };
+
+export type WorldScreenMatrix = {
+  a: number;
+  b: number;
+  c: number;
+  d: number;
+  e: number;
+  f: number;
+};
+
 type TileCoord = {
   key: string;
   x: number;
@@ -20,79 +35,21 @@ type TileCoord = {
   width: number;
   height: number;
 };
+
 type Tile = TileCoord & { uri: string };
 
 type Props = {
   sourceImage: GeoImage;
   previewImage: GeoImage;
-  transform: GeoTransform | null;
+  matrix: WorldScreenMatrix | null;
   controlPairs: ControlPair[];
   opacity: number;
   backgroundRemoved: boolean;
   backgroundSensitivity: number;
-  region: Region;
   viewport: Size;
 };
 
-function clampLatitude(latitude: number) {
-  return Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latitude));
-}
-
-function mercatorV(latitude: number) {
-  const lat = clampLatitude(latitude);
-  const sinLatitude = Math.sin((lat * Math.PI) / 180);
-  return 0.5 - Math.log((1 + sinLatitude) / (1 - sinLatitude)) / (4 * Math.PI);
-}
-
-function longitudeU(longitude: number) {
-  return (longitude + 180) / 360;
-}
-
-function getMapProjection(region: Region, viewport: Size) {
-  const west = longitudeU(region.longitude - region.longitudeDelta / 2);
-  const east = longitudeU(region.longitude + region.longitudeDelta / 2);
-  const north = mercatorV(region.latitude + region.latitudeDelta / 2);
-  const south = mercatorV(region.latitude - region.latitudeDelta / 2);
-  const spanU = Math.max(1e-12, east - west);
-  const spanV = Math.max(1e-12, south - north);
-
-  return {
-    west,
-    north,
-    scaleX: viewport.width / spanU,
-    scaleY: viewport.height / spanV,
-  };
-}
-
-function getSourceToScreenMatrix(
-  transform: GeoTransform,
-  region: Region,
-  viewport: Size,
-): Matrix2D {
-  const projection = getMapProjection(region, viewport);
-  return {
-    a: transform.a * projection.scaleX,
-    b: transform.c * projection.scaleY,
-    c: transform.b * projection.scaleX,
-    d: transform.d * projection.scaleY,
-    e: (transform.tx - projection.west) * projection.scaleX,
-    f: (transform.ty - projection.north) * projection.scaleY,
-  };
-}
-
-function projectWorldPoint(
-  point: { lat: number; lng: number },
-  region: Region,
-  viewport: Size,
-) {
-  const projection = getMapProjection(region, viewport);
-  return {
-    x: (longitudeU(point.lng) - projection.west) * projection.scaleX,
-    y: (mercatorV(point.lat) - projection.north) * projection.scaleY,
-  };
-}
-
-function invertPoint(matrix: Matrix2D, point: Point2D): Point2D | null {
+function invertPoint(matrix: WorldScreenMatrix, point: Point2D): Point2D | null {
   const determinant = matrix.a * matrix.d - matrix.b * matrix.c;
   if (Math.abs(determinant) < 1e-12) return null;
   const x = point.x - matrix.e;
@@ -100,6 +57,13 @@ function invertPoint(matrix: Matrix2D, point: Point2D): Point2D | null {
   return {
     x: (matrix.d * x - matrix.c * y) / determinant,
     y: (-matrix.b * x + matrix.a * y) / determinant,
+  };
+}
+
+function projectSourcePoint(matrix: WorldScreenMatrix, point: Point2D) {
+  return {
+    x: matrix.a * point.x + matrix.c * point.y + matrix.e,
+    y: matrix.b * point.x + matrix.d * point.y + matrix.f,
   };
 }
 
@@ -116,7 +80,7 @@ function getPreviewScale(image: GeoImage) {
 function getVisibleTileCoords(
   image: GeoImage,
   viewport: Size,
-  matrix: Matrix2D,
+  matrix: WorldScreenMatrix,
   renderKey: string,
 ): TileCoord[] {
   const corners = [
@@ -161,62 +125,65 @@ function getVisibleTileCoords(
   return coords;
 }
 
+function SourceTile({ tile }: { tile: Tile }) {
+  const image = useImage(tile.uri);
+  if (!image) return null;
+  return (
+    <SkiaImage
+      image={image}
+      x={tile.x}
+      y={tile.y}
+      width={tile.width}
+      height={tile.height}
+      fit='fill'
+      sampling={CubicSampling}
+    />
+  );
+}
+
 function PointPin({ x, y, label }: { x: number; y: number; label: number }) {
   return (
-    <G transform={`translate(${x} ${y}) translate(-12 -27)`}>
-      <Path
-        d='M12 1C6.48 1 2 5.48 2 11c0 7.55 10 16 10 16s10-8.45 10-16C22 5.48 17.52 1 12 1Z'
-        fill='#dc2626'
-        stroke='#ffffff'
-        strokeWidth={1.8}
-      />
-      <Circle cx={12} cy={11} r={5.25} fill='#ffffff' />
-      <SvgText
-        x={12}
-        y={14.2}
-        fill='#dc2626'
-        fontSize={9.5}
-        fontWeight='800'
-        textAnchor='middle'
-      >
-        {label}
-      </SvgText>
-    </G>
+    <View
+      style={[
+        styles.pin,
+        {
+          transform: [
+            { translateX: x - 12 },
+            { translateY: y - 29 },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.pinHead}>
+        <Text style={styles.pinText}>{label}</Text>
+      </View>
+      <View style={styles.pinTip} />
+    </View>
   );
 }
 
 /**
- * Native equivalent of the web WorldMapCanvas overlay path.
+ * Native counterpart of the web WorldMapCanvas image pass.
  *
- * The web studio projects source (0,0), (w,0), and (0,h) into map-screen
- * coordinates and draws the image with that affine matrix on a viewport-sized
- * canvas. react-native-maps' GroundOverlay only supports bounds + bearing and
- * Android may additionally downsample the bitmap, which is why the old mobile
- * world view could look stretched/soft. Here the Google map remains native, but
- * the mouza sheet is rendered in a separate SVG viewport with the same full
- * affine source->screen transform. A bounded preview keeps gestures light and
- * visible source tiles progressively replace it when zoom requires native detail.
+ * GeoWorldMap provides the exact source->screen affine matrix by asking the
+ * native MapView to project source (0,0), (w,0), and (0,h). This component only
+ * paints that matrix on a viewport-sized Skia canvas. Cubic sampling mirrors the
+ * browser canvas' high-quality image smoothing and avoids the nearest-neighbour
+ * look the previous SVG renderer produced on Android.
  */
 export const GeoWorldAffineOverlay = memo(function GeoWorldAffineOverlay({
   sourceImage,
   previewImage,
-  transform,
+  matrix,
   controlPairs,
   opacity,
   backgroundRemoved,
   backgroundSensitivity,
-  region,
   viewport,
 }: Props) {
+  const preview = useImage(previewImage.uri);
   const [tiles, setTiles] = useState<Tile[]>([]);
   const ticketRef = useRef(0);
-
-  const matrix = useMemo(
-    () => transform && viewport.width > 0 && viewport.height > 0
-      ? getSourceToScreenMatrix(transform, region, viewport)
-      : null,
-    [region, transform, viewport],
-  );
 
   const sensitivity = backgroundRemoved
     ? Math.max(0, Math.min(100, Math.round(backgroundSensitivity)))
@@ -226,10 +193,15 @@ export const GeoWorldAffineOverlay = memo(function GeoWorldAffineOverlay({
   const screenScale = matrix
     ? Math.max(Math.hypot(matrix.a, matrix.b), Math.hypot(matrix.c, matrix.d))
     : 0;
+
+  // The web background-removed image is itself a bounded high-quality preview.
+  // Keep that exact behavior. For the normal opaque sheet, progressively replace
+  // the preview with native-resolution source crops only when screen zoom needs it.
   const shouldTile = Boolean(
     matrix &&
+    !backgroundRemoved &&
     sourceImage.width * sourceImage.height >= 500_000 &&
-    screenScale >= previewScale * 0.7,
+    screenScale >= previewScale * 0.85,
   );
 
   const coords = useMemo(
@@ -260,7 +232,7 @@ export const GeoWorldAffineOverlay = memo(function GeoWorldAffineOverlay({
             width: coord.width,
             height: coord.height,
           },
-          sensitivity,
+          null,
         );
         if (ticket !== ticketRef.current) return;
         setTiles((current) => {
@@ -275,45 +247,95 @@ export const GeoWorldAffineOverlay = memo(function GeoWorldAffineOverlay({
     return () => {
       ticketRef.current += 1;
     };
-    // coordKey is the stable visible tile window; matrix changes during a pan
-    // should move the existing SVG tiles without re-cropping until that window changes.
+    // coordKey is the visible source tile window; cached tiles move with the
+    // affine matrix without being regenerated on every map gesture frame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coordKey, renderKey, shouldTile, sourceImage.uri]);
 
-  if (!matrix || !transform || viewport.width <= 0 || viewport.height <= 0) return null;
+  const skiaMatrix = useMemo(() => {
+    if (!matrix) return null;
+    return Skia.Matrix([
+      matrix.a,
+      matrix.c,
+      matrix.e,
+      matrix.b,
+      matrix.d,
+      matrix.f,
+      0,
+      0,
+      1,
+    ]);
+  }, [matrix]);
 
-  const transformText = `matrix(${matrix.a} ${matrix.b} ${matrix.c} ${matrix.d} ${matrix.e} ${matrix.f})`;
+  if (
+    !matrix ||
+    !skiaMatrix ||
+    !preview ||
+    viewport.width <= 0 ||
+    viewport.height <= 0
+  ) return null;
 
   return (
     <View pointerEvents='none' style={StyleSheet.absoluteFill}>
-      <Svg width={viewport.width} height={viewport.height}>
-        <G opacity={opacity} transform={transformText}>
-          <SvgImage
-            href={{ uri: previewImage.uri }}
+      <Canvas style={StyleSheet.absoluteFill}>
+        <Group
+          matrix={skiaMatrix}
+          layer={<Paint opacity={opacity} />}
+        >
+          <SkiaImage
+            image={preview}
             x={0}
             y={0}
             width={sourceImage.width}
             height={sourceImage.height}
-            preserveAspectRatio='none'
+            fit='fill'
+            sampling={CubicSampling}
           />
-          {tiles.map((tile) => (
-            <SvgImage
-              key={tile.key}
-              href={{ uri: tile.uri }}
-              x={tile.x}
-              y={tile.y}
-              width={tile.width}
-              height={tile.height}
-              preserveAspectRatio='none'
-            />
-          ))}
-        </G>
+          {tiles.map((tile) => <SourceTile key={tile.key} tile={tile} />)}
+        </Group>
+      </Canvas>
 
+      <View pointerEvents='none' style={StyleSheet.absoluteFill}>
         {controlPairs.map((pair, index) => {
-          const point = projectWorldPoint(pair.world, region, viewport);
+          const point = projectSourcePoint(matrix, pair.source);
           return <PointPin key={pair.id} x={point.x} y={point.y} label={index + 1} />;
         })}
-      </Svg>
+      </View>
     </View>
   );
+});
+
+const styles = StyleSheet.create({
+  pin: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    width: 24,
+    height: 31,
+    alignItems: 'center',
+  },
+  pinHead: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    backgroundColor: '#dc2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  pinTip: {
+    width: 10,
+    height: 10,
+    marginTop: -6,
+    backgroundColor: '#dc2626',
+    transform: [{ rotate: '45deg' }],
+  },
+  pinText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
 });
