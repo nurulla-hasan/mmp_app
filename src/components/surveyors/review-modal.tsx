@@ -120,13 +120,13 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
 
       <Modal visible={visible} transparent animationType='fade' onRequestClose={close}>
         <KeyboardSafeView style={styles.overlay}>
-          <View style={[styles.modal, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+          <View style={[styles.modal, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.header}>
               <View style={styles.headerText}>
-                <Text style={[styles.title, { color: colors.text }]}> 
+                <Text style={[styles.title, { color: colors.text }]}>
                   {isAuthenticated ? 'রিভিউ লিখুন' : 'রিভিউ দিতে লগইন করুন'}
                 </Text>
-                <Text style={[styles.subtitle, { color: colors.textMuted }]}> 
+                <Text style={[styles.subtitle, { color: colors.textMuted }]}>
                   {isAuthenticated
                     ? 'আপনার কাজের অভিজ্ঞতা শেয়ার করুন। রিভিউটি অ্যাডমিন যাচাইয়ের পর প্রকাশ হবে।'
                     : 'স্প্যামমুক্ত ও নির্ভরযোগ্য রিভিউ রাখতে শুধুমাত্র রেজিস্টার্ড ব্যবহারকারীরা রিভিউ দিতে পারবেন।'}
@@ -149,11 +149,11 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
                   ]}
                 >
                   <ShieldAlert size={20} color='#d97706' />
-                  <Text style={[styles.authNoticeText, { color: theme === 'dark' ? '#fbbf24' : '#92400e' }]}> 
+                  <Text style={[styles.authNoticeText, { color: theme === 'dark' ? '#fbbf24' : '#92400e' }]}>
                     আপনি বর্তমানে লগআউট অবস্থায় আছেন। রিভিউ লিখতে এবং আপনার অভিজ্ঞতা শেয়ার করতে প্রথমে লগইন করুন।
                   </Text>
                 </View>
-                <View style={[styles.authActions, { borderTopColor: colors.border }]}> 
+                <View style={[styles.authActions, { borderTopColor: colors.border }]}>
                   <Button title='বাতিল' variant='outline' onPress={close} />
                   <Button
                     title='লগইন করতে এগিয়ে যান'
@@ -178,8 +178,8 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
                   {user?.imageUrl ? (
                     <Image source={{ uri: user.imageUrl }} style={styles.userAvatar} />
                   ) : (
-                    <View style={[styles.userAvatar, styles.userAvatarFallback, { backgroundColor: `${colors.primary}18` }]}> 
-                      <Text style={[styles.userInitial, { color: colors.primary }]}> 
+                    <View style={[styles.userAvatar, styles.userAvatarFallback, { backgroundColor: `${colors.primary}18` }]}>
+                      <Text style={[styles.userInitial, { color: colors.primary }]}>
                         {(user?.name || 'U').trim().charAt(0).toUpperCase()}
                       </Text>
                     </View>
@@ -191,7 +191,7 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
                       </Text>
                       <UserCheck size={14} color={colors.primary} />
                     </View>
-                    <Text style={[styles.userHint, { color: colors.textMuted }]}> 
+                    <Text style={[styles.userHint, { color: colors.textMuted }]}>
                       পাবলিক প্রোফাইলে এই নামে রিভিউ দেখানো হবে
                     </Text>
                   </View>
@@ -276,7 +276,7 @@ export function ReviewModal({ surveyorProfileId, surveyorSlug, services }: Props
                           })
                         ) : (
                           <View style={styles.emptyDropdownItem}>
-                            <Text style={[styles.emptyDropdownText, { color: colors.textMuted }]}> 
+                            <Text style={[styles.emptyDropdownText, { color: colors.textMuted }]}>
                               কোনো সার্ভিস পাওয়া যায়নি
                             </Text>
                           </View>
