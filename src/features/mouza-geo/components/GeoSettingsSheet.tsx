@@ -20,9 +20,11 @@ export function GeoSettingsSheet({ visible, onClose, onOpenImport }: Props) {
   const alignmentMode = useMouzaGeoStore((state) => state.alignmentMode);
   const mapStyle = useMouzaGeoStore((state) => state.mapStyle);
   const opacity = useMouzaGeoStore((state) => state.opacity);
+  const backgroundMode = useMouzaGeoStore((state) => state.backgroundMode);
   const setAlignmentMode = useMouzaGeoStore((state) => state.setAlignmentMode);
   const setMapStyle = useMouzaGeoStore((state) => state.setMapStyle);
   const setOpacity = useMouzaGeoStore((state) => state.setOpacity);
+  const setBackgroundMode = useMouzaGeoStore((state) => state.setBackgroundMode);
   const removePair = useMouzaGeoStore((state) => state.removePair);
   const resetAlignment = useMouzaGeoStore((state) => state.resetAlignment);
   const residual = transform ? calculateResidualMeters(transform, pairs) : null;
@@ -48,6 +50,15 @@ export function GeoSettingsSheet({ visible, onClose, onOpenImport }: Props) {
                 <Chip label='Satellite' active={mapStyle === 'satellite'} onPress={() => setMapStyle('satellite')} colors={colors} />
                 <Chip label='Street' active={mapStyle === 'standard'} onPress={() => setMapStyle('standard')} colors={colors} />
               </View>
+            </Section>
+
+            <Section title='Paper background' color={colors.textMuted}>
+              <View style={styles.row}>
+                <Chip label='Original' active={backgroundMode === 'original'} onPress={() => setBackgroundMode('original')} colors={colors} />
+                <Chip label='Light clean' active={backgroundMode === 'soft'} onPress={() => setBackgroundMode('soft')} colors={colors} />
+                <Chip label='Remove BG' active={backgroundMode === 'strong'} onPress={() => setBackgroundMode('strong')} colors={colors} />
+              </View>
+              <Text style={[styles.help, { color: colors.textMuted }]}>Light clean fades the paper color. Remove BG makes matching paper pixels transparent in the world overlay and exported KMZ while keeping dark survey lines visible.</Text>
             </Section>
 
             <Section title='Overlay opacity' color={colors.textMuted}>
