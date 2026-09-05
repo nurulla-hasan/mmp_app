@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BookmarkCheck, Check, Crosshair, FolderOpen, HardDrive, HelpCircle,
   Image as ImageIcon, Minus, MoreHorizontal, MoveHorizontal, PenTool, Plus, Redo2,
@@ -77,9 +78,12 @@ function PointAction({ label, icon, disabled }: Omit<ActionProps, 'onPress'>) {
 
 export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOpenSave, onOpenLoad }: Props) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const colors = getLandMeasurementToolColors(theme);
   const muted = colors.iconMuted;
+  const toolbarBottom = insets.bottom + 10;
+  const morePanelBottom = toolbarBottom + 72;
 
   const mode = useMapStore((state) => state.mode);
   const hasMapImage = useMapStore((state) => Boolean(state.mapImage));
@@ -112,6 +116,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   const startManualDivide = useMapStore((state) => state.startManualDivide);
 
   const panelStyle = { backgroundColor: colors.overlay, borderColor: colors.panelBorder };
+  const toolbarPositionStyle = { bottom: toolbarBottom };
 
   const beginCalibration = () => {
     if (!hasMapImage) { onOpenImagePicker(); return; }
@@ -132,7 +137,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
 
   if (mode === 'calibrating') {
     return (
-      <View style={[styles.wrapper, panelStyle]}>
+      <View style={[styles.wrapper, panelStyle, toolbarPositionStyle]}>
         <Action label='Cancel' danger icon={<X size={18} color='#ef4444' />} onPress={cancelCalibration} />
         <Action label='Undo' disabled={calibrationPointCount === 0} icon={<Undo2 size={18} color={muted} />} onPress={undoCalibrationPoint} />
         <Action label='Redo' disabled={calibrationFutureCount === 0} icon={<Redo2 size={18} color={muted} />} onPress={redoCalibrationPoint} />
@@ -144,7 +149,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
 
   if (mode === 'drawing_plot') {
     return (
-      <View style={[styles.wrapper, panelStyle]}>
+      <View style={[styles.wrapper, panelStyle, toolbarPositionStyle]}>
         <Action label='Cancel' danger icon={<X size={18} color='#ef4444' />} onPress={cancelActiveMode} />
         <Action label='Undo' disabled={plotPointCount === 0} icon={<Undo2 size={18} color={muted} />} onPress={undoPlotAction} />
         <Action label='Redo' disabled={plotFutureCount === 0} icon={<Redo2 size={18} color={muted} />} onPress={redoPlotAction} />
@@ -157,7 +162,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   if (mode === 'manual_divide_plot') {
     if (!manualDividePlotId || manualCutPointCount === 0) {
       return (
-        <View style={[styles.wrapper, panelStyle]}>
+        <View style={[styles.wrapper, panelStyle, toolbarPositionStyle]}>
           <Action label='Cancel' danger icon={<X size={18} color='#ef4444' />} onPress={cancelManualDivide} />
           <View style={styles.divideMessage}><Text style={[styles.divideText, { color: colors.textStrong }]}>Tap the plot to divide</Text></View>
         </View>
@@ -168,7 +173,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
     const targetLabel = nudgeTarget === 'all' ? 'Full line' : nudgeTarget === 'start' ? 'Start point' : 'End point';
 
     return (
-      <View style={[styles.divideWrapper, panelStyle]}>
+      <View style={[styles.divideWrapper, panelStyle, toolbarPositionStyle]}>
         <View style={[styles.divideTop, { backgroundColor: colors.panelAlt, borderBottomColor: colors.panelBorder }]}>
           <View style={styles.divideTopInfo}>
             <Text style={[styles.divideHeading, { color: colors.textStrong }]}>Adjust cut line</Text>
@@ -192,13 +197,13 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
   }
 
   return <>
-    {isMoreOpen && <View style={[styles.morePanel, panelStyle]}>
+    {isMoreOpen && <View style={[styles.morePanel, panelStyle, { bottom: morePanelBottom }]}>
       {plotCount > 0 && <Action label='Save' active icon={<BookmarkCheck size={18} color='#fff' />} onPress={() => { setIsMoreOpen(false); onOpenSave(); }} />}
       <Action label='Drive' icon={<HardDrive size={18} color={muted} />} onPress={() => void Linking.openURL('https://drive.google.com/drive/folders/1r0ryb1SyCeYV-41CM1WweokGDKT5t9RB')} />
       <Action label='Help' icon={<HelpCircle size={18} color={muted} />} onPress={() => Alert.alert('How to use', 'Add map → set scale → move the crosshair to a corner → add points → finish the plot.')} />
       <Action label='Reset' danger disabled={!hasMapImage} icon={<RotateCcw size={18} color='#ef4444' />} onPress={resetMap} />
     </View>}
-    <View style={[styles.wrapper, panelStyle]}>
+    <View style={[styles.wrapper, panelStyle, toolbarPositionStyle]}>
       <Action label='Map' icon={<ImageIcon size={18} color={muted} />} onPress={onOpenImagePicker} />
       <Action label='Saved' icon={<FolderOpen size={18} color={muted} />} onPress={onOpenLoad} />
       <Action label='Scale' icon={<Ruler size={18} color={hasScale ? muted : '#d97706'} />} onPress={beginCalibration} />
@@ -210,7 +215,7 @@ export function MobileCanvasToolbar({ onOpenManualScale, onOpenImagePicker, onOp
 }
 
 const styles = StyleSheet.create({
-  wrapper: { position: 'absolute', bottom: 10, left: 8, right: 8, zIndex: 20, minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 4, paddingVertical: 6, borderRadius: 14, borderWidth: 1, elevation: 12 },
+  wrapper: { position: 'absolute', left: 8, right: 8, zIndex: 20, minHeight: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 4, paddingVertical: 6, borderRadius: 14, borderWidth: 1, elevation: 12 },
   action: { minWidth: 43, minHeight: 49, alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 5, paddingVertical: 5, borderRadius: 9 },
   compactAction: { flex: 1, minWidth: 0, minHeight: 43, paddingHorizontal: 2, paddingVertical: 4, borderRadius: 8 },
   active: { backgroundColor: '#2563eb' },
@@ -222,7 +227,7 @@ const styles = StyleSheet.create({
   danger: { color: '#ef4444' },
   divideMessage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   divideText: { fontFamily: Fonts.headingSemiBold, fontSize: 12 },
-  divideWrapper: { position: 'absolute', bottom: 10, left: 8, right: 8, zIndex: 20, borderRadius: 12, borderWidth: 1, overflow: 'hidden', elevation: 12 },
+  divideWrapper: { position: 'absolute', left: 8, right: 8, zIndex: 20, borderRadius: 12, borderWidth: 1, overflow: 'hidden', elevation: 12 },
   divideTop: { minHeight: 39, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingHorizontal: 10, paddingVertical: 5, borderBottomWidth: StyleSheet.hairlineWidth },
   divideTopInfo: { flex: 1 },
   divideHeading: { fontFamily: Fonts.headingSemiBold, fontSize: 10 },
@@ -230,5 +235,5 @@ const styles = StyleSheet.create({
   targetButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 7 },
   targetText: { fontFamily: Fonts.headingSemiBold, fontSize: 8.5 },
   divideActions: { width: '100%', flexDirection: 'row', alignItems: 'stretch', justifyContent: 'space-between', gap: 2, paddingHorizontal: 5, paddingVertical: 5 },
-  morePanel: { position: 'absolute', bottom: 82, right: 8, zIndex: 21, minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 2, padding: 6, borderRadius: 14, borderWidth: 1, elevation: 14 },
+  morePanel: { position: 'absolute', right: 8, zIndex: 21, minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 2, padding: 6, borderRadius: 14, borderWidth: 1, elevation: 14 },
 });
