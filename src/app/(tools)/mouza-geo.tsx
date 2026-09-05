@@ -12,6 +12,7 @@ import { GeoSettingsSheet } from '../../features/mouza-geo/components/GeoSetting
 import { GeoSourceCanvas, type GeoSourceCanvasHandle } from '../../features/mouza-geo/components/GeoSourceCanvas';
 import { GeoTargetCrosshair } from '../../features/mouza-geo/components/GeoTargetCrosshair';
 import { GeoWorldMap, type GeoWorldMapHandle } from '../../features/mouza-geo/components/GeoWorldMap';
+import { useGeoOverlayPreview } from '../../features/mouza-geo/hooks/useGeoOverlayPreview';
 import { useMouzaGeoStore } from '../../features/mouza-geo/store/useMouzaGeoStore';
 import { exportMouzaKmz } from '../../features/mouza-geo/utils/kmz';
 
@@ -34,12 +35,18 @@ export default function MouzaGeoScreen() {
   const transform = useMouzaGeoStore((state) => state.transform);
   const mapStyle = useMouzaGeoStore((state) => state.mapStyle);
   const opacity = useMouzaGeoStore((state) => state.opacity);
-  const backgroundMode = useMouzaGeoStore((state) => state.backgroundMode);
+  const backgroundRemoved = useMouzaGeoStore((state) => state.backgroundRemoved);
+  const backgroundSensitivity = useMouzaGeoStore((state) => state.backgroundSensitivity);
   const setActiveView = useMouzaGeoStore((state) => state.setActiveView);
   const captureSource = useMouzaGeoStore((state) => state.captureSource);
   const captureWorld = useMouzaGeoStore((state) => state.captureWorld);
   const undo = useMouzaGeoStore((state) => state.undo);
   const redo = useMouzaGeoStore((state) => state.redo);
+  const { displayImage, processing: processingOverlay } = useGeoOverlayPreview(
+    image,
+    backgroundRemoved,
+    backgroundSensitivity,
+  );
 
   const pointNumber = controlPairs.length + 1;
   const instruction = useMemo(() => {
@@ -87,7 +94,13 @@ export default function MouzaGeoScreen() {
     }
     setExporting(true);
     try {
-      await exportMouzaKmz({ image, transform, opacity, backgroundMode });
+      await exportMouzaKmz({
+        image,
+        transform,
+        opacity,
+        backgroundRemoved,
+        backgroundSensitivity,
+      });
     } catch (error) {
       Alert.alert('KMZ export failed', error instanceof Error ? error.message : 'Could not create the KMZ file.');
     } finally {
@@ -112,7 +125,7 @@ export default function MouzaGeoScreen() {
       </View>
 
       <View style={[styles.workspace, { backgroundColor: theme === 'dark' ? '#080d16' : '#e5e7eb' }]}>
-        {!image ? (
+        {!image || !displayImage ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}><Globe2 size={28} color='#2563eb' /></View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>Georeference your mouza map</Text>
@@ -122,20 +135,26 @@ export default function MouzaGeoScreen() {
         ) : (
           <>
             <View pointerEvents={activeView === 'source' ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, activeView !== 'source' && styles.hiddenCanvas]}>
-              <GeoSourceCanvas ref={sourceRef} image={image} controlPairs={controlPairs} pendingSource={pendingSource} />
+              <GeoSourceCanvas ref={sourceRef} image={displayImage} controlPairs={controlPairs} pendingSource={pendingSource} />
             </View>
             <View pointerEvents={activeView === 'world' ? 'auto' : 'none'} style={[StyleSheet.absoluteFill, activeView !== 'world' && styles.hiddenCanvas]}>
               <GeoWorldMap
                 ref={worldRef}
-                image={image}
+                image={displayImage}
                 transform={transform}
                 controlPairs={controlPairs}
                 opacity={opacity}
                 mapStyle={mapStyle}
-                backgroundMode={backgroundMode}
               />
             </View>
             <GeoTargetCrosshair />
+
+            {processingOverlay ? (
+              <View pointerEvents='none' style={styles.processingBadge}>
+                <ActivityIndicator size='small' color='#2563eb' />
+                <Text style={styles.processingText}>Updating background preview…</Text>
+              </View>
+            ) : null}
 
             <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 10 }]}>
               <View style={[styles.instructionCard, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.94)' : 'rgba(255,255,255,0.96)', borderColor: colors.border }]}>
@@ -194,6 +213,8 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: Fonts.sansRegular, fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 5, maxWidth: 320 },
   primaryButton: { marginTop: 16, backgroundColor: '#2563eb', paddingHorizontal: 18, paddingVertical: 11, borderRadius: 10 },
   primaryButtonText: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 12 },
+  processingBadge: { position: 'absolute', top: 10, alignSelf: 'center', minHeight: 34, paddingHorizontal: 11, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.94)', flexDirection: 'row', alignItems: 'center', gap: 7, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 5, elevation: 4, zIndex: 45 },
+  processingText: { color: '#334155', fontFamily: Fonts.sansMedium, fontSize: 10 },
   bottomWrap: { position: 'absolute', left: 10, right: 10, zIndex: 50, gap: 8 },
   instructionCard: { borderRadius: 14, borderWidth: 1, padding: 9, gap: 8, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, elevation: 5 },
   instructionTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
