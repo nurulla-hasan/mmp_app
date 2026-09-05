@@ -7,8 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   Image,
 } from 'react-native';
 import {
@@ -23,6 +21,7 @@ import {
 } from 'lucide-react-native';
 import { Input } from '../ui/input';
 import { ProAvatarRing } from '../ui/pro-avatar-ring';
+import { KeyboardSafeView, useModalSafeBottomPadding } from '../common/keyboard-safe-layout';
 import { useThemeStore } from '../../stores/theme-store';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
@@ -45,6 +44,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const isDark = theme === 'dark';
+  const pickerBottomPadding = useModalSafeBottomPadding(24);
 
   const [name, setName] = useState(user.name || '');
   const [imageUrl, setImageUrl] = useState(user.imageUrl || '');
@@ -119,10 +119,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
       animationType='fade'
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.modalOverlay}
-      >
+      <KeyboardSafeView style={styles.modalOverlay}>
         <View
           style={[
             styles.modalContent,
@@ -135,7 +132,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
           <View style={[styles.modalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>প্রোফাইল সম্পাদনা</Text>
-              <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
+              <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}> 
                 আপনার ব্যক্তিগত পরিচয়, যোগাযোগের নম্বর ও এলাকা আপডেট করুন।
               </Text>
             </View>
@@ -148,6 +145,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.formScroll}
             keyboardShouldPersistTaps='handled'
+            keyboardDismissMode='on-drag'
           >
             <View
               style={[
@@ -174,7 +172,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                     {imageUrl ? (
                       <Image source={{ uri: imageUrl }} style={styles.avatarImg} />
                     ) : (
-                      <View style={[styles.avatarFallback, { backgroundColor: '#16a34a' }]}>
+                      <View style={[styles.avatarFallback, { backgroundColor: '#16a34a' }]}> 
                         <Text style={styles.avatarFallbackText}>
                           {name ? name.charAt(0).toUpperCase() : 'U'}
                         </Text>
@@ -222,7 +220,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
 
             <View style={{ marginBottom: 10 }}>
               <View style={styles.whatsappHeaderRow}>
-                <Text style={[styles.inputLabelText, { color: colors.text }]}>
+                <Text style={[styles.inputLabelText, { color: colors.text }]}> 
                   হোয়াটসঅ্যাপ নম্বর
                 </Text>
                 {phone ? (
@@ -247,7 +245,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
 
             <View style={styles.pickerRow}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}>
+                <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}> 
                   জেলা
                 </Text>
                 <TouchableOpacity
@@ -275,7 +273,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}>
+                <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}> 
                   উপজেলা / থানা
                 </Text>
                 <TouchableOpacity
@@ -308,7 +306,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               </View>
             </View>
 
-            <View style={[styles.modalActions, { borderTopColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
+            <View style={[styles.modalActions, { borderTopColor: isDark ? '#1f2937' : '#e2e8f0' }]}> 
               <TouchableOpacity
                 style={[
                   styles.cancelBtn,
@@ -342,7 +340,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             </View>
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
 
       <Modal
         visible={districtPickerOpen}
@@ -357,10 +355,11 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               {
                 backgroundColor: isDark ? '#111827' : '#ffffff',
                 borderColor: isDark ? '#1f2937' : '#e2e8f0',
+                paddingBottom: pickerBottomPadding,
               },
             ]}
           >
-            <View style={[styles.pickerModalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
+            <View style={[styles.pickerModalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}> 
               <Text style={[styles.modalTitle, { color: colors.text }]}>জেলা নির্বাচন করুন</Text>
               <TouchableOpacity onPress={() => setDistrictPickerOpen(false)}>
                 <X size={18} color={colors.textMuted} />
@@ -410,11 +409,12 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               {
                 backgroundColor: isDark ? '#111827' : '#ffffff',
                 borderColor: isDark ? '#1f2937' : '#e2e8f0',
+                paddingBottom: pickerBottomPadding,
               },
             ]}
           >
-            <View style={[styles.pickerModalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
+            <View style={[styles.pickerModalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}> 
+              <Text style={[styles.modalTitle, { color: colors.text }]}> 
                 {district} - উপজেলা নির্বাচন
               </Text>
               <TouchableOpacity onPress={() => setUpazilaPickerOpen(false)}>
@@ -628,7 +628,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderWidth: 1,
-    paddingBottom: 24,
   },
   pickerModalHeader: {
     flexDirection: 'row',
