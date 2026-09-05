@@ -132,7 +132,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
           <View style={[styles.modalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
             <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>প্রোফাইল সম্পাদনা</Text>
-              <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}> 
+              <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>
                 আপনার ব্যক্তিগত পরিচয়, যোগাযোগের নম্বর ও এলাকা আপডেট করুন।
               </Text>
             </View>
@@ -172,7 +172,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
                     {imageUrl ? (
                       <Image source={{ uri: imageUrl }} style={styles.avatarImg} />
                     ) : (
-                      <View style={[styles.avatarFallback, { backgroundColor: '#16a34a' }]}> 
+                      <View style={[styles.avatarFallback, { backgroundColor: '#16a34a' }]}>
                         <Text style={styles.avatarFallbackText}>
                           {name ? name.charAt(0).toUpperCase() : 'U'}
                         </Text>
@@ -220,7 +220,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
 
             <View style={{ marginBottom: 10 }}>
               <View style={styles.whatsappHeaderRow}>
-                <Text style={[styles.inputLabelText, { color: colors.text }]}> 
+                <Text style={[styles.inputLabelText, { color: colors.text }]}>
                   হোয়াটসঅ্যাপ নম্বর
                 </Text>
                 {phone ? (
@@ -245,7 +245,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
 
             <View style={styles.pickerRow}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}> 
+                <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}>
                   জেলা
                 </Text>
                 <TouchableOpacity
@@ -273,7 +273,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               </View>
 
               <View style={{ flex: 1 }}>
-                <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}> 
+                <Text style={[styles.inputLabelText, { color: colors.text, marginBottom: 4 }]}>
                   উপজেলা / থানা
                 </Text>
                 <TouchableOpacity
@@ -306,7 +306,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               </View>
             </View>
 
-            <View style={[styles.modalActions, { borderTopColor: isDark ? '#1f2937' : '#e2e8f0' }]}> 
+            <View style={[styles.modalActions, { borderTopColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
               <TouchableOpacity
                 style={[
                   styles.cancelBtn,
@@ -359,7 +359,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               },
             ]}
           >
-            <View style={[styles.pickerModalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}> 
+            <View style={[styles.pickerModalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>জেলা নির্বাচন করুন</Text>
               <TouchableOpacity onPress={() => setDistrictPickerOpen(false)}>
                 <X size={18} color={colors.textMuted} />
@@ -413,8 +413,8 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               },
             ]}
           >
-            <View style={[styles.pickerModalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}> 
-              <Text style={[styles.modalTitle, { color: colors.text }]}> 
+            <View style={[styles.pickerModalHeader, { borderBottomColor: isDark ? '#1f2937' : '#e2e8f0' }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
                 {district} - উপজেলা নির্বাচন
               </Text>
               <TouchableOpacity onPress={() => setUpazilaPickerOpen(false)}>
