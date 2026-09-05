@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Layers, MapPin, Ruler, User, type LucideIcon } from 'lucide-react-native';
+import { PAGE_LAYOUT } from './page-layout';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
@@ -12,7 +13,7 @@ export type AppBottomNavKey = 'index' | 'surveyors' | 'tools' | 'profile';
 export const APP_BOTTOM_NAV_LAYOUT = {
   baseHeight: 58,
   baseBottomPadding: 4,
-  centerOverhang: 22,
+  centerOverhang: PAGE_LAYOUT.floatingNavOverhang,
   centerSlotWidth: 80,
 } as const;
 

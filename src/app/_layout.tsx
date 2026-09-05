@@ -21,6 +21,7 @@ import {
 } from '@expo-google-fonts/noto-sans-bengali';
 import { BroadcastAnnouncementModal } from '../components/broadcasts/broadcast-announcement-modal';
 import { AppBottomNav, type AppBottomNavKey } from '../components/common/app-bottom-nav';
+import { hasStandaloneFloatingBottomNav } from '../components/common/page-layout';
 import { StandalonePageHeader } from '../components/common/standalone-page-header';
 import { Colors } from '../constants/colors';
 import { useThemeStore } from '../stores/theme-store';
@@ -63,11 +64,7 @@ export default function RootLayout() {
     pathname === '/join-as-surveyor' || pathname === '/surveyor-profile' || pathname.startsWith('/surveyors/')
       ? 'surveyors'
       : undefined;
-  const showStandaloneBottomNav =
-    pathname === '/pricing' ||
-    pathname === '/join-as-surveyor' ||
-    pathname === '/surveyor-profile' ||
-    pathname.startsWith('/surveyors/');
+  const showStandaloneBottomNav = hasStandaloneFloatingBottomNav(pathname);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
