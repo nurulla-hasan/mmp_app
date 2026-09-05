@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import type {
   AlignmentMode,
   ControlPair,
-  GeoBackgroundMode,
   GeoImage,
   GeoMapStyle,
   GeoPoint,
@@ -22,13 +21,15 @@ type GeoState = {
   alignmentMode: AlignmentMode;
   mapStyle: GeoMapStyle;
   opacity: number;
-  backgroundMode: GeoBackgroundMode;
+  backgroundRemoved: boolean;
+  backgroundSensitivity: number;
   setImage: (image: GeoImage) => void;
   clear: () => void;
   setActiveView: (view: GeoView) => void;
   setMapStyle: (style: GeoMapStyle) => void;
   setOpacity: (opacity: number) => void;
-  setBackgroundMode: (mode: GeoBackgroundMode) => void;
+  setBackgroundRemoved: (removed: boolean) => void;
+  setBackgroundSensitivity: (sensitivity: number) => void;
   setAlignmentMode: (mode: AlignmentMode) => void;
   captureSource: (point: Point2D) => void;
   captureWorld: (point: GeoPoint) => void;
@@ -62,7 +63,8 @@ const initial = {
   alignmentMode: 'similarity' as AlignmentMode,
   mapStyle: 'satellite' as GeoMapStyle,
   opacity: 0.72,
-  backgroundMode: 'original' as GeoBackgroundMode,
+  backgroundRemoved: false,
+  backgroundSensitivity: 75,
 };
 
 export const useMouzaGeoStore = create<GeoState>((set, get) => ({
@@ -71,8 +73,11 @@ export const useMouzaGeoStore = create<GeoState>((set, get) => ({
   clear: () => set({ ...initial }),
   setActiveView: (activeView) => set({ activeView }),
   setMapStyle: (mapStyle) => set({ mapStyle }),
-  setOpacity: (opacity) => set({ opacity: Math.max(0.2, Math.min(1, opacity)) }),
-  setBackgroundMode: (backgroundMode) => set({ backgroundMode }),
+  setOpacity: (opacity) => set({ opacity: Math.max(0.1, Math.min(1, opacity)) }),
+  setBackgroundRemoved: (backgroundRemoved) => set({ backgroundRemoved }),
+  setBackgroundSensitivity: (backgroundSensitivity) => set({
+    backgroundSensitivity: Math.max(0, Math.min(100, Math.round(backgroundSensitivity))),
+  }),
   setAlignmentMode: (alignmentMode) => {
     const state = get();
     set({ alignmentMode, transform: fit(state.controlPairs, state.image, alignmentMode) });
