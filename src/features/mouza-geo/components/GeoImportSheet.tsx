@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
 import { FileImage, FileText, ImagePlus, X } from 'lucide-react-native';
 import { Fonts } from '../../../constants/typography';
 import { Colors } from '../../../constants/colors';
@@ -11,7 +10,7 @@ import { useModalSafeBottomPadding } from '../../../components/common/keyboard-s
 import { useMouzaGeoStore } from '../store/useMouzaGeoStore';
 
 const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
-const MAX_IMAGE_EDGE = 4096;
+const MAX_PDF_RENDER_EDGE = 4096;
 
 type Props = { visible: boolean; onClose: () => void };
 
@@ -34,48 +33,58 @@ export function GeoImportSheet({ visible, onClose }: Props) {
       Alert.alert('Permission required', 'Allow photo access to select a mouza map.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 1,
+    });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
     if (!validateSize(asset.fileSize)) return;
-    setBusy(true);
-    try {
-      let uri = asset.uri;
-      let width = Math.max(asset.width, 1);
-      let height = Math.max(asset.height, 1);
-      if (Math.max(width, height) > MAX_IMAGE_EDGE) {
-        const landscape = width >= height;
-        const prepared = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ resize: landscape ? { width: MAX_IMAGE_EDGE, height: Math.round((height / width) * MAX_IMAGE_EDGE) } : { width: Math.round((width / height) * MAX_IMAGE_EDGE), height: MAX_IMAGE_EDGE } }],
-          { compress: 0.96, format: ImageManipulator.SaveFormat.JPEG },
-        );
-        uri = prepared.uri;
-        width = prepared.width;
-        height = prepared.height;
-      }
-      setImage({ uri, width, height, name: asset.fileName ?? 'mouza-map.jpg', size: asset.fileSize });
-      onClose();
-    } catch {
-      Alert.alert('Image import failed', 'The selected image could not be prepared. Try another JPG or PNG.');
-    } finally {
-      setBusy(false);
-    }
+
+    // Keep the selected image URI and its original pixel dimensions untouched.
+    // Preview processing is derived separately; KMZ export starts from this source.
+    setImage({
+      uri: asset.uri,
+      width: Math.max(asset.width, 1),
+      height: Math.max(asset.height, 1),
+      name: asset.fileName ?? 'mouza-map',
+      size: asset.fileSize,
+    });
+    onClose();
   };
 
   const pickPdf = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: 'application/pdf', copyToCacheDirectory: true, multiple: false });
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'application/pdf',
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
       if (!validateSize(asset.size)) return;
       setBusy(true);
+
       const { convertPage } = await import('@uzimandias/react-native-pdf-to-image');
       const page = await convertPage(asset.uri, 0, {
-        format: 'jpeg', quality: 0.96, scale: 3, maxWidth: MAX_IMAGE_EDGE, maxHeight: MAX_IMAGE_EDGE, output: 'file',
+        // The web app also renders PDF page 1 up to 4096 px. PNG avoids the
+        // extra JPEG generation loss that the old native path introduced.
+        format: 'png',
+        quality: 1,
+        scale: 4,
+        maxWidth: MAX_PDF_RENDER_EDGE,
+        maxHeight: MAX_PDF_RENDER_EDGE,
+        output: 'file',
       });
       if (!page.uri || !page.width || !page.height) throw new Error('PDF page image missing');
-      setImage({ uri: page.uri, width: page.width, height: page.height, name: `${asset.name || 'mouza-map.pdf'} • page 1`, size: asset.size });
+      setImage({
+        uri: page.uri,
+        width: page.width,
+        height: page.height,
+        name: `${asset.name || 'mouza-map.pdf'} • page 1`,
+        size: asset.size,
+      });
       onClose();
     } catch {
       Alert.alert('PDF import failed', 'The first PDF page could not be prepared. Try again in the development/APK build.');
@@ -102,17 +111,17 @@ export function GeoImportSheet({ visible, onClose }: Props) {
 
           <TouchableOpacity disabled={busy} style={[styles.option, { borderColor: colors.cardBorder, backgroundColor: colors.background }]} onPress={pickImage}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(37,99,235,0.12)' }]}>{busy ? <ActivityIndicator color='#2563eb' /> : <ImagePlus size={22} color='#2563eb' />}</View>
-            <View style={styles.optionText}><Text style={[styles.optionTitle, { color: colors.text }]}>Gallery Image</Text><Text style={[styles.optionSub, { color: colors.textMuted }]}>Use a saved JPG, PNG or phone photo</Text></View>
+            <View style={styles.optionText}><Text style={[styles.optionTitle, { color: colors.text }]}>Gallery Image</Text><Text style={[styles.optionSub, { color: colors.textMuted }]}>Keep the selected image at original pixel quality</Text></View>
           </TouchableOpacity>
 
           <TouchableOpacity disabled={busy} style={[styles.option, { borderColor: colors.cardBorder, backgroundColor: colors.background }]} onPress={pickPdf}>
             <View style={[styles.iconBox, { backgroundColor: 'rgba(239,68,68,0.12)' }]}><FileText size={22} color='#ef4444' /></View>
-            <View style={styles.optionText}><Text style={[styles.optionTitle, { color: colors.text }]}>Import PDF</Text><Text style={[styles.optionSub, { color: colors.textMuted }]}>Prepare page 1 as a high-resolution map</Text></View>
+            <View style={styles.optionText}><Text style={[styles.optionTitle, { color: colors.text }]}>Import PDF</Text><Text style={[styles.optionSub, { color: colors.textMuted }]}>Lossless PNG render of page 1, up to 4096 px</Text></View>
           </TouchableOpacity>
 
           <View style={[styles.performanceNote, { borderColor: colors.border }]}>
             <FileImage size={15} color={colors.textMuted} />
-            <Text style={[styles.noteText, { color: colors.textMuted }]}>Large images are capped at 4096 px so pan, pinch and map overlay stay responsive.</Text>
+            <Text style={[styles.noteText, { color: colors.textMuted }]}>Interactive background preview may be optimized for speed, but the original image remains untouched and KMZ export uses full source pixels.</Text>
           </View>
         </View>
       </View>
