@@ -33,11 +33,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const displaySubtitle = subtitle || (title === 'মৌজা ম্যাপ প্রো' ? 'ডিজিটাল ল্যান্ড প্ল্যাটফর্ম' : 'মৌজা ম্যাপ প্রো');
 
-  const openNotifications = () => {
-    setNotificationsOpen(true);
-    void broadcastsQuery.refetch();
-  };
-
   return (
     <SafeAreaView
       edges={['top']}
@@ -64,7 +59,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             activeOpacity={0.72}
             accessibilityRole='button'
             accessibilityLabel='নোটিফিকেশন দেখুন'
-            onPress={openNotifications}
+            onPress={() => setNotificationsOpen(true)}
             style={[styles.notificationButton, { backgroundColor: colors.iconBtnBg }]}
           >
             <Bell size={16} color={colors.textMuted} strokeWidth={2} />
