@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { PROVIDER_GOOGLE, UrlTile, type Region } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, UrlTile, type Region } from 'react-native-maps';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
@@ -27,9 +27,11 @@ import {
 import { Badge } from '../../components/ui/badge';
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
+import { CompassButton } from '../../features/kmz-viewer/components/CompassButton';
+import { CoordinateInspectorCard } from '../../features/kmz-viewer/components/CoordinateInspectorCard';
 import { KmzMapOverlayLayer } from '../../features/kmz-viewer/components/KmzMapOverlayLayer';
 import { MapBlurPlaceholder } from '../../features/kmz-viewer/components/MapBlurPlaceholder';
-import type { KmzDocument } from '../../features/kmz-viewer/types';
+import type { KmzCoordinate, KmzDocument } from '../../features/kmz-viewer/types';
 import {
   cleanupKmzDocument,
   loadKmzDocument,
@@ -130,6 +132,13 @@ export default function KmzViewerScreen() {
   const [overlayOpacity, setOverlayOpacity] = useState(1);
   const [isOpacityOpen, setIsOpacityOpen] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [mapHeading, setMapHeading] = useState(0);
+  const [inspectedCoordinate, setInspectedCoordinate] = useState<KmzCoordinate | null>(null);
+
+  const handleResetNorth = useCallback(() => {
+    mapRef.current?.animateCamera({ heading: 0 }, { duration: 350 });
+    setMapHeading(0);
+  }, []);
 
   useEffect(() => {
     documentRef.current = document;
@@ -318,10 +327,10 @@ export default function KmzViewerScreen() {
               ? DARK_STANDARD_STYLE
               : undefined
           }
-          rotateEnabled={false}
-          pitchEnabled={false}
+          rotateEnabled={true}
+          pitchEnabled={true}
           toolbarEnabled={false}
-          showsCompass
+          showsCompass={false}
           showsUserLocation={locationGranted}
           showsMyLocationButton={false}
           loadingEnabled={true}
@@ -330,7 +339,21 @@ export default function KmzViewerScreen() {
           userInterfaceStyle="dark"
           onMapReady={() => setIsMapReady(true)}
           onMapLoaded={() => setIsMapReady(true)}
-          onPress={() => setIsOpacityOpen(false)}
+          onRegionChangeComplete={async () => {
+            try {
+              const camera = await mapRef.current?.getCamera();
+              if (camera && typeof camera.heading === 'number') {
+                setMapHeading(camera.heading);
+              }
+            } catch {}
+          }}
+          onLongPress={(e) => {
+            setInspectedCoordinate(e.nativeEvent.coordinate);
+            setIsOpacityOpen(false);
+          }}
+          onPress={() => {
+            setIsOpacityOpen(false);
+          }}
         >
           <UrlTile
             key={`url-tile-${mapStyle}`}
@@ -350,7 +373,25 @@ export default function KmzViewerScreen() {
           {document ? (
             <KmzMapOverlayLayer document={document} overlayOpacity={overlayOpacity} />
           ) : null}
+
+          {inspectedCoordinate ? (
+            <Marker
+              coordinate={inspectedCoordinate}
+              pinColor="#16a34a"
+              title="নির্বাচিত অবস্থান"
+              description={`${inspectedCoordinate.latitude.toFixed(6)}, ${inspectedCoordinate.longitude.toFixed(6)}`}
+            />
+          ) : null}
         </MapView>
+
+        {/* ─── Floating Compass Widget (Top-Right) ─── */}
+        <View style={styles.topRightControls}>
+          <CompassButton
+            mapHeading={mapHeading}
+            onResetNorth={handleResetNorth}
+            theme={theme}
+          />
+        </View>
 
         {isOpacityOpen && document && (
           <Pressable
@@ -360,8 +401,17 @@ export default function KmzViewerScreen() {
         )}
 
         <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 12 }]}>
-          {/* ─── Opacity Popover Panel (Only when document exists) ─── */}
-          {isOpacityOpen && document && (
+          {/* ─── Coordinate Inspector Card ─── */}
+          {inspectedCoordinate && (
+            <CoordinateInspectorCard
+              coordinate={inspectedCoordinate}
+              onClose={() => setInspectedCoordinate(null)}
+              theme={theme}
+            />
+          )}
+
+          {/* ─── Opacity Popover Panel (Only when document exists & not inspecting) ─── */}
+          {isOpacityOpen && document && !inspectedCoordinate && (
             <View
               style={[
                 styles.opacityPanel,
@@ -665,6 +715,12 @@ const styles = StyleSheet.create({
   openButton: { minWidth: 82, maxWidth: 142, height: 35, borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginLeft: 8 },
   openButtonText: { flexShrink: 1, color: '#16a34a', fontFamily: Fonts.headingSemiBold, fontSize: 9.5 },
   mapWrap: { flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#0a0f1d' },
+  topRightControls: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    zIndex: 55,
+  },
   bottomWrap: { position: 'absolute', left: 12, right: 12, zIndex: 50 },
   toolbar: {
     minHeight: 64,
