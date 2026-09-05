@@ -5,17 +5,26 @@ import { Image as SkiaImage, useImage } from '@shopify/react-native-skia';
 import type { MapImage } from '../../store/useMapStore';
 import type { Point } from '../../types/map';
 
-const TILE_SIZE = 512;
+const TILE_TEXTURE_SIZE = 512;
 const TILE_MARGIN = 1;
 const OVERVIEW_MAX_DIMENSION = 1024;
 const TILING_MIN_PIXEL_COUNT = 500_000;
-const MAX_TILE_CACHE = 96;
+const MAX_TILE_CACHE = 128;
+const PYRAMID_SCALES = [0.125, 0.25, 0.5, 1] as const;
 const CACHE_ROOT = FileSystem.cacheDirectory
-  ? `${FileSystem.cacheDirectory}mmp-map-tiles-v3/`
+  ? `${FileSystem.cacheDirectory}mmp-map-tiles-v4/`
   : null;
 
 type Size = { width: number; height: number };
-type Tile = { key: string; uri: string; x: number; y: number; width: number; height: number };
+type Tile = {
+  key: string;
+  uri: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rasterScale: number;
+};
 type Coord = Omit<Tile, 'uri'>;
 
 type Props = {
@@ -47,6 +56,18 @@ function getOverviewScale(image: MapImage) {
   const maxDimension = Math.max(image.width, image.height);
   if (maxDimension <= OVERVIEW_MAX_DIMENSION) return 1;
   return OVERVIEW_MAX_DIMENSION / maxDimension;
+}
+
+function getRasterScale(stageScale: number) {
+  const desiredScale = Math.max(stageScale, 0.001) * 0.98;
+  for (const scale of PYRAMID_SCALES) {
+    if (scale >= desiredScale) return scale;
+  }
+  return 1;
+}
+
+function getScaleKey(rasterScale: number) {
+  return `s${Math.round(rasterScale * 1000)}`;
 }
 
 async function ensureMapCacheDirectory(imageKey: string) {
@@ -136,7 +157,7 @@ async function getOverviewUri(image: MapImage) {
     height: Math.max(1, Math.round(image.height * overviewScale)),
   });
   const rendered = await context.renderAsync();
-  const saved = await rendered.saveAsync({ compress: 0.78, format: SaveFormat.JPEG });
+  const saved = await rendered.saveAsync({ compress: 0.82, format: SaveFormat.JPEG });
   const uri = await persistGeneratedFile(saved.uri, targetUri);
   overviewCache.set(imageKey, uri);
   return uri;
@@ -148,30 +169,36 @@ function getVisibleCoords(
   viewport: Size,
   stageScale: number,
   stagePos: Point,
+  rasterScale: number,
 ): Coord[] {
   const safeScale = Math.max(stageScale, 0.001);
   const left = Math.max(0, -stagePos.x / safeScale);
   const top = Math.max(0, -stagePos.y / safeScale);
   const right = Math.min(image.width, left + viewport.width / safeScale);
   const bottom = Math.min(image.height, top + viewport.height / safeScale);
-  const startCol = Math.max(0, Math.floor(left / TILE_SIZE) - TILE_MARGIN);
-  const endCol = Math.min(Math.ceil(image.width / TILE_SIZE) - 1, Math.floor(right / TILE_SIZE) + TILE_MARGIN);
-  const startRow = Math.max(0, Math.floor(top / TILE_SIZE) - TILE_MARGIN);
-  const endRow = Math.min(Math.ceil(image.height / TILE_SIZE) - 1, Math.floor(bottom / TILE_SIZE) + TILE_MARGIN);
+  const logicalTileSize = TILE_TEXTURE_SIZE / rasterScale;
+  const totalCols = Math.ceil(image.width / logicalTileSize);
+  const totalRows = Math.ceil(image.height / logicalTileSize);
+  const startCol = Math.max(0, Math.floor(left / logicalTileSize) - TILE_MARGIN);
+  const endCol = Math.min(totalCols - 1, Math.floor(right / logicalTileSize) + TILE_MARGIN);
+  const startRow = Math.max(0, Math.floor(top / logicalTileSize) - TILE_MARGIN);
+  const endRow = Math.min(totalRows - 1, Math.floor(bottom / logicalTileSize) + TILE_MARGIN);
   const centerX = (left + right) / 2;
   const centerY = (top + bottom) / 2;
+  const scaleKey = getScaleKey(rasterScale);
   const result: Coord[] = [];
 
   for (let row = startRow; row <= endRow; row += 1) {
     for (let col = startCol; col <= endCol; col += 1) {
-      const x = col * TILE_SIZE;
-      const y = row * TILE_SIZE;
+      const x = col * logicalTileSize;
+      const y = row * logicalTileSize;
       result.push({
-        key: `${imageKey}:${row}:${col}`,
+        key: `${imageKey}:${scaleKey}:${row}:${col}`,
         x,
         y,
-        width: Math.min(TILE_SIZE, image.width - x),
-        height: Math.min(TILE_SIZE, image.height - y),
+        width: Math.min(logicalTileSize, image.width - x),
+        height: Math.min(logicalTileSize, image.height - y),
+        rasterScale,
       });
     }
   }
@@ -182,6 +209,14 @@ function getVisibleCoords(
     return aDistance - bDistance;
   });
   return result;
+}
+
+function getTileFileName(coord: Coord) {
+  const parts = coord.key.split(':');
+  const scaleKey = parts[parts.length - 3];
+  const row = parts[parts.length - 2];
+  const col = parts[parts.length - 1];
+  return `tile-${scaleKey}-${row}-${col}.jpg`;
 }
 
 const SkiaSourceImage = memo(function SkiaSourceImage({
@@ -213,13 +248,14 @@ const SkiaSourceImage = memo(function SkiaSourceImage({
 });
 
 /**
- * Memory-conscious native raster renderer.
+ * Memory-conscious native image pyramid.
  *
- * Large maps never stay mounted as one full-resolution Skia texture. Instead
- * we keep a small persisted overview underneath the canvas and overlay only
- * the committed viewport's 512px full-resolution tiles. During pan/pinch the
- * already-mounted raster is transformed on the UI thread; new crops are only
- * requested after the gesture transform is committed.
+ * Large maps never stay mounted as one full-resolution Skia texture. A small
+ * persisted overview covers zoomed-out views. After a committed pan/zoom, the
+ * renderer selects a 1/8, 1/4, 1/2 or full-resolution level and loads only the
+ * visible 512px textures plus one surrounding tile. Gesture frames simply
+ * transform the already-mounted raster on the UI thread, so image cropping and
+ * React state updates never sit in the pinch/pan hot path.
  */
 export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageScale, stagePos, fitScale }: Props) {
   const imageKey = useMemo(
@@ -228,21 +264,23 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
   );
   const isLargeImage = image.width * image.height >= TILING_MIN_PIXEL_COUNT;
   const overviewScale = getOverviewScale(image);
+  const rasterScale = getRasterScale(stageScale);
   const [overviewUri, setOverviewUri] = useState<string | null>(isLargeImage ? null : image.uri);
   const [tiles, setTiles] = useState<Tile[]>([]);
   const overviewTicketRef = useRef(0);
   const tileTicketRef = useRef(0);
 
-  const tileActivationScale = Math.max(fitScale * 1.12, overviewScale * 0.9);
+  const tileActivationScale = Math.max(fitScale * 1.15, overviewScale * 1.15);
   const shouldTile = isLargeImage && Boolean(overviewUri) && stageScale >= tileActivationScale;
   const coords = useMemo(
     () => shouldTile
-      ? getVisibleCoords(image, imageKey, viewport, stageScale, stagePos)
+      ? getVisibleCoords(image, imageKey, viewport, stageScale, stagePos, rasterScale)
       : [],
     [
       image.height,
       image.width,
       imageKey,
+      rasterScale,
       shouldTile,
       stagePos.x,
       stagePos.y,
@@ -270,8 +308,8 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
         if (ticket === overviewTicketRef.current) setOverviewUri(uri);
       })
       .catch(() => {
-        // Keep the workspace responsive instead of forcing a full-res GPU texture.
-        if (ticket === overviewTicketRef.current) setOverviewUri(null);
+        // Functional fallback for unusual files/devices that cannot create a preview.
+        if (ticket === overviewTicketRef.current) setOverviewUri(image.uri);
       });
   }, [image.height, image.uri, image.width, imageKey, isLargeImage]);
 
@@ -294,8 +332,7 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
       for (const coord of coords) {
         if (ticket !== tileTicketRef.current) return;
         if (tileCache.has(coord.key) || !directory) continue;
-        const rowCol = coord.key.split(':').slice(-2).join('-');
-        const persistedUri = `${directory}tile-${rowCol}.jpg`;
+        const persistedUri = `${directory}${getTileFileName(coord)}`;
         if (await fileExists(persistedUri)) {
           cacheTile({ ...coord, uri: persistedUri });
         }
@@ -307,22 +344,29 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
       const missing = coords.filter((coord) => !tileCache.has(coord.key));
       if (missing.length === 0) return;
 
-      // One manipulator context keeps native decoding sequential and avoids
-      // the memory spikes caused by parallel full-image crops on low-end Android.
+      // Reuse one source context and process sequentially. Parallel crops can
+      // cause large temporary native allocations on low-memory Android phones.
       const context = ImageManipulator.manipulate(image.uri);
       let completedSinceRender = 0;
       for (const coord of missing) {
         if (ticket !== tileTicketRef.current) return;
         context.reset().crop({
-          originX: coord.x,
-          originY: coord.y,
-          width: coord.width,
-          height: coord.height,
+          originX: Math.round(coord.x),
+          originY: Math.round(coord.y),
+          width: Math.max(1, Math.round(coord.width)),
+          height: Math.max(1, Math.round(coord.height)),
         });
+
+        if (coord.rasterScale < 0.999) {
+          context.resize({
+            width: Math.max(1, Math.round(coord.width * coord.rasterScale)),
+            height: Math.max(1, Math.round(coord.height * coord.rasterScale)),
+          });
+        }
+
         const rendered = await context.renderAsync();
-        const saved = await rendered.saveAsync({ compress: 0.92, format: SaveFormat.JPEG });
-        const rowCol = coord.key.split(':').slice(-2).join('-');
-        const targetUri = directory ? `${directory}tile-${rowCol}.jpg` : null;
+        const saved = await rendered.saveAsync({ compress: 0.96, format: SaveFormat.JPEG });
+        const targetUri = directory ? `${directory}${getTileFileName(coord)}` : null;
         const uri = await persistGeneratedFile(saved.uri, targetUri);
         cacheTile({ ...coord, uri });
         completedSinceRender += 1;
@@ -337,9 +381,9 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
         setTiles(coords.map((coord) => getCachedTile(coord.key)).filter((tile): tile is Tile => Boolean(tile)));
       }
     })().catch(() => {
-      // Overview stays visible if a device cannot create or persist crops.
+      // The overview remains available if a device cannot crop/persist tiles.
     });
-  // coordKey intentionally represents committed viewport changes only.
+  // coordKey intentionally represents committed viewport/level changes only.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coordKey, image.uri, imageKey, shouldTile]);
 
