@@ -28,7 +28,6 @@ export default function ToolsLayout() {
           <Stack.Screen name='scale-guide' options={{ title: 'ম্যাপ স্কেল গাইড' }} />
           <Stack.Screen name='land-measurement' options={{ headerShown: false }} />
           <Stack.Screen name='kmz-viewer' options={{ headerShown: false }} />
-          <Stack.Screen name='mouza-geo' options={{ headerShown: false }} />
           <Stack.Screen name='pantagraph' options={{ title: 'ম্যাপ তুলনা ও প্যান্টাগ্রাফ' }} />
           <Stack.Screen name='tracer' options={{ title: 'ডিজিটাল ট্রেসার' }} />
         </Stack>
