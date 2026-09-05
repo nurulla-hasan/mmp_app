@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { unwrapApiResult } from '../../lib/api-result';
-import { queryKeys, STALE_TIME } from '../../lib/query-keys';
+import { queryKeys } from '../../lib/query-keys';
 import { BroadcastService } from '../../services/broadcast-service';
 import { useAuthStore } from '../../stores/auth-store';
+
+const BROADCAST_REFRESH_INTERVAL_MS = 15_000;
 
 export function useActiveBroadcasts() {
   const user = useAuthStore((state) => state.user);
@@ -17,7 +19,9 @@ export function useActiveBroadcasts() {
     queryKey: queryKeys.broadcasts.active(audience),
     queryFn: async () => unwrapApiResult(await BroadcastService.getActive()),
     enabled: !authLoading,
-    staleTime: STALE_TIME.FIVE_MINUTES,
+    staleTime: 0,
+    refetchInterval: BROADCAST_REFRESH_INTERVAL_MS,
     refetchOnMount: true,
+    refetchOnReconnect: true,
   });
 }
