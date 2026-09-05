@@ -1,13 +1,33 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import * as ImageManipulator from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
 import { strToU8, zipSync } from 'fflate';
-import type { GeoBackgroundMode, GeoImage, GeoTransform } from '../types';
-import { getKmzCorners } from './geo-math';
-import { getGeoOverlayImageUri } from './overlay-image';
+import type { GeoImage, GeoTransform } from '../types';
+import { applyGeoTransform, fromMercator } from './geo-math';
+import { getGeoExportTileBase64 } from './overlay-image';
+
+const TILE_SIZE = 2048;
+
+type OverlayTile = {
+  column: number;
+  row: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  path: string;
+};
 
 function sanitizeName(name: string) {
   return (name.replace(/\.[^.]+$/, '').replace(/[<>:"/\\|?*]+/g, '-').trim() || 'mouza-map').slice(0, 80);
+}
+
+function escapeXml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
 }
 
 function coordinateText(points: { lat: number; lng: number }[]) {
@@ -31,46 +51,103 @@ function base64ToBytes(base64: string) {
   return bytes;
 }
 
-export async function exportMouzaKmz({ image, transform, opacity, backgroundMode }: {
+function createTileDescriptors(width: number, height: number) {
+  const columns = Math.ceil(width / TILE_SIZE);
+  const rows = Math.ceil(height / TILE_SIZE);
+  const tiles: OverlayTile[] = [];
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < columns; column += 1) {
+      const x = column * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      tiles.push({
+        column,
+        row,
+        x,
+        y,
+        width: Math.min(TILE_SIZE, width - x),
+        height: Math.min(TILE_SIZE, height - y),
+        path: `files/tile-${row}-${column}.png`,
+      });
+    }
+  }
+
+  return tiles;
+}
+
+function getTileCorners(transform: GeoTransform, tile: OverlayTile) {
+  return [
+    { x: tile.x, y: tile.y + tile.height },
+    { x: tile.x + tile.width, y: tile.y + tile.height },
+    { x: tile.x + tile.width, y: tile.y },
+    { x: tile.x, y: tile.y },
+  ].map((point) => fromMercator(applyGeoTransform(transform, point)));
+}
+
+export async function exportMouzaKmz({
+  image,
+  transform,
+  opacity,
+  backgroundRemoved,
+  backgroundSensitivity,
+}: {
   image: GeoImage;
   transform: GeoTransform;
   opacity: number;
-  backgroundMode: GeoBackgroundMode;
+  backgroundRemoved: boolean;
+  backgroundSensitivity: number;
 }) {
   const name = sanitizeName(image.name);
-  const transparentOverlay = backgroundMode !== 'original';
-  let mapBase64: string;
-  let mapPath: 'files/map.jpg' | 'files/map.png';
+  const kmlName = escapeXml(name);
+  const tiles = createTileDescriptors(image.width, image.height);
+  const alpha = Math.round(Math.max(0, Math.min(1, opacity)) * 255)
+    .toString(16)
+    .padStart(2, '0');
+  const overlays = tiles
+    .map((tile) => `
+    <GroundOverlay>
+      <name>${kmlName} ${tile.row + 1}-${tile.column + 1}</name>
+      <drawOrder>1</drawOrder>
+      <color>${alpha}ffffff</color>
+      <Icon><href>${tile.path}</href></Icon>
+      <altitudeMode>clampToGround</altitudeMode>
+      <gx:LatLonQuad><coordinates>${coordinateText(getTileCorners(transform, tile))}</coordinates></gx:LatLonQuad>
+    </GroundOverlay>`)
+    .join('');
+  const kml = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>${kmlName}</name>
+    <Folder>
+      <name>${kmlName} original-quality tiles</name>${overlays}
+    </Folder>
+  </Document>
+</kml>`;
 
-  if (transparentOverlay) {
-    const overlayUri = await getGeoOverlayImageUri(image, backgroundMode);
-    mapBase64 = await FileSystem.readAsStringAsync(overlayUri, { encoding: FileSystem.EncodingType.Base64 });
-    mapPath = 'files/map.png';
-  } else {
-    const prepared = await ImageManipulator.manipulateAsync(
-      image.uri,
-      [],
-      { format: ImageManipulator.SaveFormat.JPEG, compress: 0.94, base64: true },
+  const files: Record<string, Uint8Array> = {
+    'doc.kml': strToU8(kml),
+  };
+
+  // Match the web app's Original Quality path: keep the source pixel grid and
+  // export 2048px PNG tiles. PNG is lossless; background removal, when enabled,
+  // runs on each full-resolution tile instead of on the smaller preview image.
+  for (const tile of tiles) {
+    const base64 = await getGeoExportTileBase64(
+      image,
+      tile,
+      backgroundRemoved ? backgroundSensitivity : null,
     );
-    if (!prepared.base64) throw new Error('Could not prepare map image for KMZ');
-    mapBase64 = prepared.base64;
-    mapPath = 'files/map.jpg';
+    files[tile.path] = base64ToBytes(base64);
   }
 
-  const corners = getKmzCorners(transform, image);
-  const alpha = Math.round(Math.max(0, Math.min(1, opacity)) * 255).toString(16).padStart(2, '0');
-  const kml = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">\n  <Document>\n    <name>${name}</name>\n    <GroundOverlay>\n      <name>${name}</name>\n      <drawOrder>1</drawOrder>\n      <color>${alpha}ffffff</color>\n      <Icon><href>${mapPath}</href></Icon>\n      <altitudeMode>clampToGround</altitudeMode>\n      <gx:LatLonQuad><coordinates>${coordinateText(corners)}</coordinates></gx:LatLonQuad>\n    </GroundOverlay>\n  </Document>\n</kml>`;
+  const archive = zipSync(files, { level: 0 });
+  const cacheDirectory = FileSystem.cacheDirectory;
+  if (!cacheDirectory) throw new Error('App cache is unavailable');
+  const uri = `${cacheDirectory}${name}.kmz`;
+  await FileSystem.writeAsStringAsync(uri, bytesToBase64(archive), {
+    encoding: FileSystem.EncodingType.Base64,
+  });
 
-  const archive = zipSync(
-    {
-      'doc.kml': strToU8(kml),
-      [mapPath]: base64ToBytes(mapBase64),
-    },
-    { level: 0 },
-  );
-
-  const uri = `${FileSystem.cacheDirectory}${name}.kmz`;
-  await FileSystem.writeAsStringAsync(uri, bytesToBase64(archive), { encoding: FileSystem.EncodingType.Base64 });
   if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device');
   await Sharing.shareAsync(uri, {
     mimeType: 'application/vnd.google-earth.kmz',
