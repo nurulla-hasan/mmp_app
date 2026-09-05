@@ -7,11 +7,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { X, Lock, ShieldCheck } from 'lucide-react-native';
 import { Input } from '../ui/input';
+import { KeyboardSafeView } from '../common/keyboard-safe-layout';
 import { useThemeStore } from '../../stores/theme-store';
 import { Fonts } from '../../constants/typography';
 import { Colors } from '../../constants/colors';
@@ -91,10 +90,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
       animationType='fade'
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.modalOverlay}
-      >
+      <KeyboardSafeView style={styles.modalOverlay}>
         <View
           style={[
             styles.modalContent,
@@ -116,7 +112,12 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.formScroll}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.formScroll}
+            keyboardShouldPersistTaps='handled'
+            keyboardDismissMode='on-drag'
+          >
             {hasPassword && (
               <Input
                 label='বর্তমান পাসওয়ার্ড'
@@ -185,7 +186,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
             </View>
           </ScrollView>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </Modal>
   );
 };
