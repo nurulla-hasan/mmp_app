@@ -3,9 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BookmarkCheck, Calendar, FolderOpen, Layers, Search, Trash2, X } from 'lucide-react-native';
 import { useMapStore } from '../../store/useMapStore';
 import { calculatePolygonData } from '../../utils/calculations';
@@ -25,6 +22,7 @@ import { CalculationService } from '../../../../services/calculation-service';
 import { ErrorToast, SuccessToast } from '../../../../lib/utils';
 import { Fonts } from '../../../../constants/typography';
 import { useThemeStore } from '../../../../stores/theme-store';
+import { KeyboardSafeView, useModalSafeBottomPadding } from '../../../../components/common/keyboard-safe-layout';
 import { getLandMeasurementToolColors } from '../../utils/tool-theme';
 import { useSavedCalculations } from '../../../../hooks/queries/use-calculations';
 import { queryKeys } from '../../../../lib/query-keys';
@@ -76,7 +74,7 @@ export function applyServerCalculation(calculation: ServerCalculation) {
 export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }: Props) {
   const { theme } = useThemeStore();
   const colors = getLandMeasurementToolColors(theme);
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useModalSafeBottomPadding();
   const queryClient = useQueryClient();
   const plots = useMapStore((state) => state.plots);
   const scale = useMapStore((state) => state.scale);
@@ -188,10 +186,7 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
 
   return (
     <Modal visible={visible} transparent animationType='slide' onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoider}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      <KeyboardSafeView style={styles.keyboardAvoider}>
         <View style={[styles.backdrop, { backgroundColor: colors.overlayStrong }]}>
           <TouchableOpacity activeOpacity={1} style={StyleSheet.absoluteFill} onPress={onClose} />
           <View
@@ -200,7 +195,7 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
               {
                 backgroundColor: colors.panel,
                 borderColor: colors.panelBorder,
-                paddingBottom: Math.max(16, insets.bottom + 10),
+                paddingBottom: bottomPadding,
               },
             ]}
           >
@@ -326,7 +321,7 @@ export function CalculationLibrarySheet({ visible, mode, onClose, onRequireMap }
             </>}
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardSafeView>
     </Modal>
   );
 }
