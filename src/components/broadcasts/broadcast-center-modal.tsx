@@ -24,6 +24,7 @@ import {
 import { Colors } from '../../constants/colors';
 import { Fonts } from '../../constants/typography';
 import { useThemeStore } from '../../stores/theme-store';
+import { useModalSafeBottomPadding } from '../common/keyboard-safe-layout';
 import type { BroadcastType, TBroadcast } from '../../types/broadcast';
 
 const WEB_TO_APP_ROUTES: Record<string, string> = {
@@ -118,6 +119,7 @@ export function BroadcastCenterModal({
   const router = useRouter();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
+  const bottomPadding = useModalSafeBottomPadding();
 
   const openBroadcast = async (broadcast: TBroadcast) => {
     const linkUrl = broadcast.linkUrl?.trim();
@@ -147,7 +149,7 @@ export function BroadcastCenterModal({
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: bottomPadding }]}>
           <View style={styles.handle} />
 
           <View style={styles.header}>
@@ -275,7 +277,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.16,
