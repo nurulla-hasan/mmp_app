@@ -77,8 +77,8 @@ export const OTHER_CORE_TOOLS: ToolItem[] = [
   },
   {
     id: 'kmz-viewer',
-    title: 'KMZ ভিউয়ার',
-    subtitle: 'KMZ Viewer',
+    title: 'মৌজা জিও ভিউয়ার',
+    subtitle: 'Mouza Geo Viewer',
     description: 'Google Earth-এর KMZ/KML import করে image overlay, point, line ও polygon সরাসরি map-এ দেখুন।',
     route: '/kmz-viewer',
     isPro: false,

@@ -292,11 +292,11 @@ export default function KmzViewerScreen() {
           </TouchableOpacity>
           <View style={styles.headerText}>
             <View style={styles.titleRow}>
-              <Text style={[styles.title, { color: colors.text }]}>KMZ Viewer</Text>
+              <Text style={[styles.title, { color: colors.text }]}>মৌজা জিও ভিউয়ার</Text>
               <Badge label='ফ্রি' variant='free' />
             </View>
             <Text numberOfLines={1} style={[styles.subtitle, { color: colors.textMuted }]}>
-              {document ? document.name : 'Google Earth KMZ / KML viewer'}
+              {document ? document.name : 'Google Earth KMZ / KML জিও ভিউয়ার'}
             </Text>
           </View>
         </View>

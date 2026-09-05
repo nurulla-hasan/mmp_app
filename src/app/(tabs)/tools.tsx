@@ -57,7 +57,7 @@ const SPECIALIZED_TOOLS = [
   },
   {
     id: 'kmz-viewer',
-    title: 'KMZ ভিউয়ার',
+    title: 'মৌজা জিও ভিউয়ার',
     description: 'Google Earth-এর KMZ/KML import করে image overlay, point, line ও polygon map-এ দেখুন।',
     route: '/(tools)/kmz-viewer',
     badge: 'ফ্রি',

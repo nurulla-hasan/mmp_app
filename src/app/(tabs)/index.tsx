@@ -188,7 +188,7 @@ const HOME_TOOLS = [
   },
   {
     id: 'kmz-viewer',
-    title: 'KMZ ভিউয়ার',
+    title: 'মৌজা জিও ভিউয়ার',
     routeOrUrl: '/(tools)/kmz-viewer',
     isExternal: false,
     isPro: false,
@@ -415,10 +415,11 @@ export default function HomeScreen() {
             icon={<Map size={15} color='#fff' />}
           />
           <Button
-            title='স্কেল গাইড'
+            title='সংরক্ষিত প্রজেক্ট'
             variant='outline'
             size='md'
-            onPress={() => handleOpenTool('/(tools)/scale-guide', false, false)}
+            icon={<FolderKanban size={15} color={colors.heroSecondaryText} />}
+            onPress={() => router.push('/calculations')}
             style={[
               styles.heroBtnOutline,
               {
