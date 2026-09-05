@@ -222,12 +222,16 @@ const SkiaSourceImage = memo(function SkiaSourceImage({
  * requested after the gesture transform is committed.
  */
 export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageScale, stagePos, fitScale }: Props) {
-  const imageKey = useMemo(() => getImageCacheKey(image), [image]);
+  const imageKey = useMemo(
+    () => getImageCacheKey(image),
+    [image.height, image.uri, image.width],
+  );
   const isLargeImage = image.width * image.height >= TILING_MIN_PIXEL_COUNT;
   const overviewScale = getOverviewScale(image);
   const [overviewUri, setOverviewUri] = useState<string | null>(isLargeImage ? null : image.uri);
   const [tiles, setTiles] = useState<Tile[]>([]);
-  const ticketRef = useRef(0);
+  const overviewTicketRef = useRef(0);
+  const tileTicketRef = useRef(0);
 
   const tileActivationScale = Math.max(fitScale * 1.12, overviewScale * 0.9);
   const shouldTile = isLargeImage && Boolean(overviewUri) && stageScale >= tileActivationScale;
@@ -235,13 +239,24 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
     () => shouldTile
       ? getVisibleCoords(image, imageKey, viewport, stageScale, stagePos)
       : [],
-    [image, imageKey, shouldTile, stagePos.x, stagePos.y, stageScale, viewport.height, viewport.width],
+    [
+      image.height,
+      image.width,
+      imageKey,
+      shouldTile,
+      stagePos.x,
+      stagePos.y,
+      stageScale,
+      viewport.height,
+      viewport.width,
+    ],
   );
   const coordKey = coords.map((coord) => coord.key).join('|');
 
   useEffect(() => {
     clearOtherMapTiles(imageKey);
-    const ticket = ++ticketRef.current;
+    const ticket = ++overviewTicketRef.current;
+    tileTicketRef.current += 1;
     setTiles([]);
 
     if (!isLargeImage) {
@@ -252,16 +267,16 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
     setOverviewUri(null);
     void getOverviewUri(image)
       .then((uri) => {
-        if (ticket === ticketRef.current) setOverviewUri(uri);
+        if (ticket === overviewTicketRef.current) setOverviewUri(uri);
       })
       .catch(() => {
         // Keep the workspace responsive instead of forcing a full-res GPU texture.
-        if (ticket === ticketRef.current) setOverviewUri(null);
+        if (ticket === overviewTicketRef.current) setOverviewUri(null);
       });
-  }, [image, imageKey, isLargeImage]);
+  }, [image.height, image.uri, image.width, imageKey, isLargeImage]);
 
   useEffect(() => {
-    const ticket = ++ticketRef.current;
+    const ticket = ++tileTicketRef.current;
     if (!shouldTile || coords.length === 0) {
       setTiles([]);
       return;
@@ -274,10 +289,10 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
 
     void (async () => {
       const directory = await ensureMapCacheDirectory(imageKey);
-      if (ticket !== ticketRef.current) return;
+      if (ticket !== tileTicketRef.current) return;
 
       for (const coord of coords) {
-        if (ticket !== ticketRef.current) return;
+        if (ticket !== tileTicketRef.current) return;
         if (tileCache.has(coord.key) || !directory) continue;
         const rowCol = coord.key.split(':').slice(-2).join('-');
         const persistedUri = `${directory}tile-${rowCol}.jpg`;
@@ -286,7 +301,7 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
         }
       }
 
-      if (ticket !== ticketRef.current) return;
+      if (ticket !== tileTicketRef.current) return;
       setTiles(coords.map((coord) => getCachedTile(coord.key)).filter((tile): tile is Tile => Boolean(tile)));
 
       const missing = coords.filter((coord) => !tileCache.has(coord.key));
@@ -297,7 +312,7 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
       const context = ImageManipulator.manipulate(image.uri);
       let completedSinceRender = 0;
       for (const coord of missing) {
-        if (ticket !== ticketRef.current) return;
+        if (ticket !== tileTicketRef.current) return;
         context.reset().crop({
           originX: coord.x,
           originY: coord.y,
@@ -312,13 +327,13 @@ export const SkiaTiledMap = memo(function SkiaTiledMap({ image, viewport, stageS
         cacheTile({ ...coord, uri });
         completedSinceRender += 1;
 
-        if (completedSinceRender >= 3 && ticket === ticketRef.current) {
+        if (completedSinceRender >= 3 && ticket === tileTicketRef.current) {
           completedSinceRender = 0;
           setTiles(coords.map((item) => getCachedTile(item.key)).filter((tile): tile is Tile => Boolean(tile)));
         }
       }
 
-      if (ticket === ticketRef.current) {
+      if (ticket === tileTicketRef.current) {
         setTiles(coords.map((coord) => getCachedTile(coord.key)).filter((tile): tile is Tile => Boolean(tile)));
       }
     })().catch(() => {
