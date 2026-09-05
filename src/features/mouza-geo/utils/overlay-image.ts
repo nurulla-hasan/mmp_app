@@ -3,6 +3,10 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import type { GeoImage } from '../types';
 
+// Match the web studio's low-memory preview budget. The original file remains
+// untouched and full-resolution crops are still used for sharp zoom/export.
+const PREVIEW_MAX_DIMENSION = 2560;
+const PREVIEW_MAX_PIXELS = 4_000_000;
 const previewCache = new Map<string, Promise<string>>();
 const sourceTileCache = new Map<string, Promise<string>>();
 
@@ -70,7 +74,6 @@ function processPngBase64(base64: string, sensitivity: number) {
     alphaType: AlphaType.Unpremul,
   };
 
-  // Normalize every input into the same RGBA layout before changing alpha.
   const surface = Skia.Surface.MakeOffscreen(width, height);
   if (!surface) throw new Error('Could not create a map cleanup surface.');
   const canvas = surface.getCanvas();
@@ -92,8 +95,24 @@ function processPngBase64(base64: string, sensitivity: number) {
   );
   if (!cleanedImage) throw new Error('Could not create the cleaned map overlay.');
 
-  // Skia encodes PNG by default here. PNG is lossless and preserves alpha.
   return cleanedImage.encodeToBase64();
+}
+
+function getPreviewActions(image: GeoImage) {
+  const sourceWidth = Math.max(1, image.width);
+  const sourceHeight = Math.max(1, image.height);
+  const scale = Math.min(
+    1,
+    PREVIEW_MAX_DIMENSION / Math.max(sourceWidth, sourceHeight),
+    Math.sqrt(PREVIEW_MAX_PIXELS / Math.max(1, sourceWidth * sourceHeight)),
+  );
+
+  if (scale >= 0.9999) return [] as Parameters<typeof ImageManipulator.manipulateAsync>[1];
+
+  if (sourceWidth >= sourceHeight) {
+    return [{ resize: { width: Math.max(1, Math.round(sourceWidth * scale)) } }];
+  }
+  return [{ resize: { height: Math.max(1, Math.round(sourceHeight * scale)) } }];
 }
 
 async function preparePngBase64(
@@ -110,18 +129,30 @@ async function preparePngBase64(
 }
 
 /**
- * Interactive overlay preview keeps the source image's original pixel
- * dimensions. Background cleanup may change alpha/color data, but no resize or
- * lossy JPEG pass is applied.
+ * Lightweight interactive preview. It follows the web studio's 2560px / 4MP
+ * mobile budget so panning does not keep a huge decoded texture on screen.
+ * `sensitivity === null` means the normal map preview; otherwise background
+ * cleanup is applied to the same bounded preview. Source pixels are untouched.
  */
-export function getGeoOverlayPreviewUri(image: GeoImage, sensitivity: number) {
-  const safeSensitivity = clampSensitivity(sensitivity);
-  const key = `${image.uri}|${image.width}x${image.height}|full-resolution-v1|${safeSensitivity}`;
+export function getGeoOverlayPreviewUri(image: GeoImage, sensitivity: number | null) {
+  const safeSensitivity = sensitivity === null ? null : clampSensitivity(sensitivity);
+  const mode = safeSensitivity === null ? 'original' : `clean-${safeSensitivity}`;
+  const key = `${image.uri}|${image.width}x${image.height}|interactive-v2|${mode}`;
   const cached = previewCache.get(key);
   if (cached) return cached;
 
   const task = (async () => {
-    const base64 = await preparePngBase64(image, []);
+    const actions = getPreviewActions(image);
+
+    if (safeSensitivity === null) {
+      const prepared = await ImageManipulator.manipulateAsync(image.uri, actions, {
+        compress: 1,
+        format: ImageManipulator.SaveFormat.PNG,
+      });
+      return prepared.uri;
+    }
+
+    const base64 = await preparePngBase64(image, actions);
     const cleanedBase64 = processPngBase64(base64, safeSensitivity);
     const cacheDirectory = FileSystem.cacheDirectory;
     if (!cacheDirectory) throw new Error('App cache is unavailable.');
@@ -173,8 +204,7 @@ export async function getGeoExportTileBase64(
 /**
  * Visible source-map tiles are generated from the untouched source image at the
  * exact source pixel grid. Android can downsample one huge SVG image texture;
- * these small lossless PNG crops avoid that decoder limit without altering the
- * stored original image or the KMZ export source.
+ * these lossless crops restore native detail only where the user is zoomed in.
  */
 export function getGeoSourceTileUri(
   image: GeoImage,
