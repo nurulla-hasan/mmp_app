@@ -135,6 +135,7 @@ export const KmzMapOverlayLayer = memo(function KmzMapOverlayLayer({
             title={placemark.name || undefined}
             description={placemark.description}
             pinColor='#dc2626'
+            tracksViewChanges={false}
           />
         )),
       )}

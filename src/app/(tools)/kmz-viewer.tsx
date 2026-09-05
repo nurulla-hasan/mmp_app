@@ -2,16 +2,18 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import MapView, { type Region } from 'react-native-maps';
+import MapView, { UrlTile, type Region } from 'react-native-maps';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import * as FileSystem from 'expo-file-system/legacy';
 import {
   ArrowLeft,
   FileUp,
@@ -32,6 +34,23 @@ import {
   loadKmzDocument,
 } from '../../features/kmz-viewer/utils/kmz-parser';
 import { useThemeStore } from '../../stores/theme-store';
+
+// Google Maps canvas background — replaces the default WHITE canvas with dark navy.
+// Without this, every zoom in/out shows a blinding white flash while new tiles load.
+// customMapStyle works even with mapType="none" on Android.
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#0a0f1d' }] },
+  { elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#050a14' }] },
+];
+
+// Tile cache directory — once a tile is downloaded it lives here.
+// On subsequent zooms / revisits those tiles load from disk (instant),
+// so there is no white flash for any area that has been viewed before.
+const MAP_TILE_CACHE_DIR = (FileSystem.cacheDirectory ?? '')
+  .replace(/^file:\/\//, '')          // strip file:// scheme
+  .replace(/\/$/, '')                 // strip trailing slash
+  + '/mmp-map-tiles';
 
 const INITIAL_REGION: Region = {
   latitude: 25.6217,
@@ -216,23 +235,44 @@ export default function KmzViewerScreen() {
       <View style={styles.mapWrap}>
         <MapView
           ref={mapRef}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, { backgroundColor: '#0a0f1d' }]}
           initialRegion={INITIAL_REGION}
-          mapType={mapStyle}
+          mapType="none"
+          customMapStyle={DARK_MAP_STYLE}
           rotateEnabled={false}
           pitchEnabled={false}
           toolbarEnabled={false}
           showsCompass
           showsUserLocation={locationGranted}
           showsMyLocationButton={false}
-          loadingEnabled
+          loadingBackgroundColor="#0a0f1d"
           onPress={() => setIsOpacityOpen(false)}
-          onPanDrag={() => setIsOpacityOpen(false)}
         >
+          <UrlTile
+            key={mapStyle}
+            urlTemplate={
+              mapStyle === 'hybrid'
+                ? 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&scale=2'
+                : 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&scale=2'
+            }
+            tileSize={256}
+            maximumZ={22}
+            flipY={false}
+            zIndex={-1}
+            tileCachePath={MAP_TILE_CACHE_DIR}
+            tileCacheMaxAge={60 * 60 * 24 * 30}
+          />
           {document ? (
             <KmzMapOverlayLayer document={document} overlayOpacity={overlayOpacity} />
           ) : null}
         </MapView>
+
+        {isOpacityOpen && (
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setIsOpacityOpen(false)}
+          />
+        )}
 
         {document ? (
           <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 12 }]}>
@@ -522,7 +562,7 @@ const styles = StyleSheet.create({
   subtitle: { fontFamily: Fonts.sansRegular, fontSize: 10, marginTop: -1 },
   openButton: { minWidth: 82, maxWidth: 142, height: 35, borderRadius: 9, borderWidth: 1, paddingHorizontal: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginLeft: 8 },
   openButtonText: { flexShrink: 1, color: '#16a34a', fontFamily: Fonts.headingSemiBold, fontSize: 9.5 },
-  mapWrap: { flex: 1, position: 'relative', overflow: 'hidden' },
+  mapWrap: { flex: 1, position: 'relative', overflow: 'hidden', backgroundColor: '#0a0f1d' },
   bottomWrap: { position: 'absolute', left: 12, right: 12, zIndex: 50 },
   toolbar: {
     minHeight: 64,
