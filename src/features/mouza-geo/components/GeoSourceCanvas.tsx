@@ -8,8 +8,10 @@ import React, {
   useState,
 } from 'react';
 import { LayoutChangeEvent, PanResponder, StyleSheet, View } from 'react-native';
-import Svg, { Circle, G, Image as SvgImage, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Path, Text as SvgText } from 'react-native-svg';
 import type { ControlPair, GeoImage, Point2D } from '../types';
+import { useMouzaGeoStore } from '../store/useMouzaGeoStore';
+import { GeoSourceTiledImage } from './GeoSourceTiledImage';
 
 export type GeoSourceCanvasHandle = {
   getCenterSourcePoint: () => Point2D | null;
@@ -74,6 +76,10 @@ export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function
   { image, controlPairs, pendingSource },
   ref,
 ) {
+  const originalImage = useMouzaGeoStore((state) => state.image);
+  const backgroundRemoved = useMouzaGeoStore((state) => state.backgroundRemoved);
+  const backgroundSensitivity = useMouzaGeoStore((state) => state.backgroundSensitivity);
+  const sourceImage = originalImage ?? image;
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
   const [renderTransform, setRenderTransform] = useState<Transform>({
     scale: 1,
@@ -91,6 +97,18 @@ export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function
     center: Point2D;
   }>(null);
 
+  const fitScale = useMemo(() => {
+    if (!viewport.width || !viewport.height) return 1;
+    return Math.max(
+      MIN_ZOOM,
+      Math.min(
+        (viewport.width - 30) / Math.max(sourceImage.width, 1),
+        (viewport.height - 30) / Math.max(sourceImage.height, 1),
+        1,
+      ),
+    );
+  }, [sourceImage.height, sourceImage.width, viewport.height, viewport.width]);
+
   const applyNativeTransform = useCallback((next: Transform) => {
     transformRef.current = next;
     contentGroupRef.current?.setNativeProps({
@@ -105,27 +123,19 @@ export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function
 
   const resetView = useCallback(() => {
     if (!viewport.width || !viewport.height) return;
-    const fitScale = Math.max(
-      MIN_ZOOM,
-      Math.min(
-        (viewport.width - 30) / Math.max(image.width, 1),
-        (viewport.height - 30) / Math.max(image.height, 1),
-        1,
-      ),
-    );
 
     commitTransform({
       scale: fitScale,
       pos: {
-        x: (viewport.width - image.width * fitScale) / 2,
-        y: (viewport.height - image.height * fitScale) / 2,
+        x: (viewport.width - sourceImage.width * fitScale) / 2,
+        y: (viewport.height - sourceImage.height * fitScale) / 2,
       },
     });
-  }, [commitTransform, image.height, image.width, viewport.height, viewport.width]);
+  }, [commitTransform, fitScale, sourceImage.height, sourceImage.width, viewport.height, viewport.width]);
 
   useEffect(() => {
     resetView();
-  }, [image.uri, resetView]);
+  }, [resetView, sourceImage.uri]);
 
   useImperativeHandle(ref, () => ({
     resetView,
@@ -136,10 +146,15 @@ export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function
         x: (viewport.width / 2 - current.pos.x) / current.scale,
         y: (viewport.height / 2 - current.pos.y) / current.scale,
       };
-      if (point.x < 0 || point.y < 0 || point.x > image.width || point.y > image.height) return null;
+      if (
+        point.x < 0 ||
+        point.y < 0 ||
+        point.x > sourceImage.width ||
+        point.y > sourceImage.height
+      ) return null;
       return point;
     },
-  }), [image.height, image.width, resetView, viewport.height, viewport.width]);
+  }), [resetView, sourceImage.height, sourceImage.width, viewport.height, viewport.width]);
 
   const panResponder = useMemo(() => PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -227,13 +242,15 @@ export const GeoSourceCanvas = forwardRef<GeoSourceCanvasHandle, Props>(function
             ref={contentGroupRef}
             transform={`translate(${renderTransform.pos.x} ${renderTransform.pos.y}) scale(${renderTransform.scale})`}
           >
-            <SvgImage
-              href={{ uri: image.uri }}
-              x={0}
-              y={0}
-              width={image.width}
-              height={image.height}
-              preserveAspectRatio='none'
+            <GeoSourceTiledImage
+              sourceImage={sourceImage}
+              previewImage={image}
+              viewport={viewport}
+              stageScale={renderTransform.scale}
+              stagePos={renderTransform.pos}
+              fitScale={fitScale}
+              backgroundRemoved={backgroundRemoved}
+              backgroundSensitivity={backgroundSensitivity}
             />
 
             {controlPairs.map((pair, index) => (

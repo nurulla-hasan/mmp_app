@@ -6,6 +6,7 @@ import type { GeoImage } from '../types';
 const PREVIEW_MAX_DIMENSION = 2560;
 const PREVIEW_MAX_PIXELS = 4_000_000;
 const previewCache = new Map<string, Promise<string>>();
+const sourceTileCache = new Map<string, Promise<string>>();
 
 export type GeoImageCrop = {
   x: number;
@@ -185,4 +186,43 @@ export async function getGeoExportTileBase64(
   return sensitivity === null
     ? base64
     : processPngBase64(base64, sensitivity);
+}
+
+/**
+ * Visible source-map tiles are generated from the untouched source image at the
+ * exact source pixel grid. Android can downsample one huge SVG image texture;
+ * these small lossless PNG crops avoid that decoder limit without altering the
+ * stored original image or the KMZ export source.
+ */
+export function getGeoSourceTileUri(
+  image: GeoImage,
+  crop: GeoImageCrop,
+  sensitivity: number | null,
+) {
+  const safeSensitivity = sensitivity === null ? null : clampSensitivity(sensitivity);
+  const key = [
+    image.uri,
+    `${image.width}x${image.height}`,
+    `${crop.x},${crop.y},${crop.width},${crop.height}`,
+    safeSensitivity === null ? 'original' : `clean-${safeSensitivity}`,
+  ].join('|');
+  const cached = sourceTileCache.get(key);
+  if (cached) return cached;
+
+  const task = (async () => {
+    const base64 = await getGeoExportTileBase64(image, crop, safeSensitivity);
+    const cacheDirectory = FileSystem.cacheDirectory;
+    if (!cacheDirectory) throw new Error('App cache is unavailable.');
+    const uri = `${cacheDirectory}mouza-geo-source-${crop.x}-${crop.y}-${crop.width}-${crop.height}-${safeSensitivity ?? 'original'}-${Date.now()}.png`;
+    await FileSystem.writeAsStringAsync(uri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    return uri;
+  })().catch((error) => {
+    sourceTileCache.delete(key);
+    throw error;
+  });
+
+  sourceTileCache.set(key, task);
+  return task;
 }
