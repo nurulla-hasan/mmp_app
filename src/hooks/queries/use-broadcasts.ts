@@ -1,10 +1,11 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { unwrapApiResult } from '../../lib/api-result';
 import { queryKeys } from '../../lib/query-keys';
 import { BroadcastService } from '../../services/broadcast-service';
 import { useAuthStore } from '../../stores/auth-store';
 
-const BROADCAST_REFRESH_INTERVAL_MS = 15_000;
+const fetchedAudiencesThisSession = new Set<string>();
 
 export function useActiveBroadcasts() {
   const user = useAuthStore((state) => state.user);
@@ -15,13 +16,27 @@ export function useActiveBroadcasts() {
     ? `${user.role}-${user.isSubscribed ? 'pro' : 'free'}`
     : 'guest';
 
-  return useQuery({
+  const query = useQuery({
     queryKey: queryKeys.broadcasts.active(audience),
     queryFn: async () => unwrapApiResult(await BroadcastService.getActive()),
-    enabled: !authLoading,
-    staleTime: 0,
-    refetchInterval: BROADCAST_REFRESH_INTERVAL_MS,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
+    enabled: false,
+    staleTime: Infinity,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    if (authLoading || fetchedAudiencesThisSession.has(audience)) return;
+
+    fetchedAudiencesThisSession.add(audience);
+
+    void query.refetch().then((result) => {
+      if (result.isError) {
+        fetchedAudiencesThisSession.delete(audience);
+      }
+    });
+  }, [audience, authLoading, query.refetch]);
+
+  return query;
 }
