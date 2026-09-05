@@ -254,22 +254,6 @@ export default function KmzViewerScreen() {
           </View>
         ) : null}
 
-        <TouchableOpacity
-          style={[
-            styles.locationFab,
-            {
-              backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.96)' : 'rgba(255,255,255,0.97)',
-              borderColor: locationGranted ? 'rgba(37,99,235,0.45)' : colors.border,
-            },
-          ]}
-          onPress={goToMyLocation}
-          disabled={locating}
-        >
-          {locating
-            ? <ActivityIndicator size='small' color='#2563eb' />
-            : <Navigation size={19} color={locationGranted ? '#2563eb' : colors.textMuted} />}
-        </TouchableOpacity>
-
         {document ? (
           <View pointerEvents='box-none' style={[styles.bottomWrap, { bottom: insets.bottom + 10 }]}>
             <View style={[styles.infoCard, { backgroundColor: theme === 'dark' ? 'rgba(15,23,42,0.96)' : 'rgba(255,255,255,0.96)', borderColor: colors.border }]}>
@@ -312,9 +296,11 @@ export default function KmzViewerScreen() {
                 colors={colors}
               />
               <Tool
-                icon={<Navigation size={18} color={locationGranted ? '#2563eb' : colors.textMuted} />}
+                icon={locating
+                  ? <ActivityIndicator size='small' color='#2563eb' />
+                  : <Navigation size={18} color={locationGranted ? '#2563eb' : colors.textMuted} />}
                 label='My Location'
-                active={locationGranted}
+                active={locationGranted || locating}
                 activeColor='#2563eb'
                 onPress={goToMyLocation}
                 colors={colors}
@@ -383,7 +369,6 @@ const styles = StyleSheet.create({
   emptyText: { fontFamily: Fonts.sansRegular, fontSize: 11, lineHeight: 16, textAlign: 'center' },
   primaryButton: { minHeight: 43, marginTop: 8, paddingHorizontal: 18, borderRadius: 11, backgroundColor: '#16a34a', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   primaryButtonText: { color: '#fff', fontFamily: Fonts.headingBold, fontSize: 12 },
-  locationFab: { position: 'absolute', top: 12, right: 12, width: 44, height: 44, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 6, elevation: 5 },
   bottomWrap: { position: 'absolute', left: 10, right: 10, gap: 8, zIndex: 50 },
   infoCard: { borderRadius: 14, borderWidth: 1, padding: 10, gap: 9, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 7, elevation: 5 },
   fileRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
