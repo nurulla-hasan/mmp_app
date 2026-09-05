@@ -346,14 +346,14 @@ export default function HomeScreen() {
         <TouchableOpacity
           activeOpacity={0.8}
           style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.cardBorder }]}
-          onPress={() => router.push('/(tools)/mouza-geo')}
+          onPress={() => router.push('/(tools)/kmz-viewer')}
         >
           <View style={[styles.iconBox, { backgroundColor: 'rgba(34, 197, 94, 0.12)' }]}>
             <Globe size={19} color='#16a34a' strokeWidth={2} />
           </View>
           <View style={styles.toolTextCol}>
-            <Text style={[styles.toolTitle, { color: colors.text }]}>মৌজা জিও</Text>
-            <Badge label='বেটা' variant='warning' />
+            <Text style={[styles.toolTitle, { color: colors.text }]}>KMZ ভিউয়ার</Text>
+            <Badge label='নতুন' variant='pro' />
           </View>
         </TouchableOpacity>
       </View>
